@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils"
  */
 
 const REASON_CLASSES: Record<AwayTodayItem["reason"], string> = {
-  leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  out_of_station: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+  leave: "bg-purple/15 text-purple",
+  out_of_station: "bg-info/15 text-info",
 }
 
 function untilLabel(item: AwayTodayItem, todayIso: string): string {
@@ -58,13 +58,11 @@ export function AwayToday({
               <li key={`${item.reason}-${item.userId}`} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{item.name}</p>
-                  <p className="text-muted-foreground truncate text-[11px]">
+                  <p className="text-muted-foreground truncate text-xs">
                     {[item.department, untilLabel(item, todayIso)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
-                <Badge className={`shrink-0 px-1.5 py-0 text-[10px] ${REASON_CLASSES[item.reason]}`}>
-                  {item.label}
-                </Badge>
+                <Badge className={`shrink-0 px-1.5 py-0 text-xs ${REASON_CLASSES[item.reason]}`}>{item.label}</Badge>
               </li>
             ))}
           </ul>

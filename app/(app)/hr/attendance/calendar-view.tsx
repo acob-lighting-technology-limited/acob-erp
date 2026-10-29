@@ -42,27 +42,27 @@ function formatTime(t: string | null | undefined) {
 }
 
 const CELL_BG: Record<string, string> = {
-  early: "bg-green-50/80 border-green-200 dark:bg-green-950/30 dark:border-green-800",
-  present: "bg-blue-50/80 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-  late: "bg-yellow-50/80 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
-  lateness_with_permission: "bg-amber-50/80 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
-  incomplete_with_permission: "bg-teal-50/80 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800",
-  early_departure: "bg-orange-50/80 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800",
-  early_departure_with_permission: "bg-orange-50/80 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800",
-  early_closure: "bg-blue-50/80 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-  late_resumption: "bg-sky-50/80 border-sky-200 dark:bg-sky-950/30 dark:border-sky-800",
-  incomplete: "bg-cyan-50/80 border-cyan-200 dark:bg-cyan-950/30 dark:border-cyan-800",
-  absent: "bg-red-50/80 border-red-200 dark:bg-red-950/30 dark:border-red-800",
-  absent_with_permission: "bg-rose-50/80 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800",
-  out_of_station: "bg-indigo-50/80 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-800",
-  waiver: "bg-blue-50/80 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-  waived: "bg-blue-50/80 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-  exempted: "bg-violet-50/80 border-violet-200 dark:bg-violet-950/30 dark:border-violet-800",
-  on_leave: "bg-purple-50/80 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800",
-  holiday: "bg-sky-50/80 border-sky-200 dark:bg-sky-950/30 dark:border-sky-800",
-  weekend: "bg-slate-50/60 border-slate-200 dark:bg-slate-900/40 dark:border-slate-800",
-  no_record: "bg-gray-50/80 border-gray-200 dark:bg-gray-900/30 dark:border-gray-800",
-  half_day: "bg-yellow-50/80 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
+  early: "bg-success/80 border-success/30",
+  present: "bg-info/80 border-info/30",
+  late: "bg-warning/80 border-warning/30",
+  lateness_with_permission: "bg-warning/80 border-warning/30",
+  incomplete_with_permission: "bg-success/80 border-success/30",
+  early_departure: "bg-warning/80 border-warning/30",
+  early_departure_with_permission: "bg-warning/80 border-warning/30",
+  early_closure: "bg-info/80 border-info/30",
+  late_resumption: "bg-info/80 border-info/30",
+  incomplete: "bg-info/80 border-info/30",
+  absent: "bg-danger/80 border-danger/30",
+  absent_with_permission: "bg-danger/80 border-danger/30",
+  out_of_station: "bg-info/80 border-info/30",
+  waiver: "bg-info/80 border-info/30",
+  waived: "bg-info/80 border-info/30",
+  exempted: "bg-purple/80 border-purple/30",
+  on_leave: "bg-purple/80 border-purple/30",
+  holiday: "bg-info/80 border-info/30",
+  weekend: "bg-muted/60 border-border",
+  no_record: "bg-muted/80 border-border",
+  half_day: "bg-warning/80 border-warning/30",
 }
 
 function shortStatusLabel(status: string, fullLabel: string): string {
@@ -160,13 +160,11 @@ export function EmployeeCalendarView() {
         {!loading && monthWorkedHours !== null && (
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
-              <p className="text-muted-foreground mb-0.5 text-[10px] leading-none sm:mb-1 sm:text-[11px]">Work Hours</p>
+              <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Work Hours</p>
               <p className="text-xs leading-none font-semibold text-emerald-600 sm:text-sm">{monthWorkedHours} hrs</p>
             </div>
             <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
-              <p className="text-muted-foreground mb-0.5 text-[10px] leading-none sm:mb-1 sm:text-[11px]">
-                Missed Hours
-              </p>
+              <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Missed Hours</p>
               <p className="text-xs leading-none font-semibold text-amber-600 sm:text-sm">{monthMissedHours} hrs</p>
             </div>
           </div>
@@ -182,7 +180,7 @@ export function EmployeeCalendarView() {
             {DAY_HEADERS.map((d) => (
               <div
                 key={d}
-                className="text-muted-foreground py-1.5 text-center text-[11px] font-semibold sm:py-2 sm:text-xs"
+                className="text-muted-foreground py-1.5 text-center text-xs font-semibold sm:py-2 sm:text-xs"
               >
                 {d}
               </div>
@@ -218,7 +216,7 @@ export function EmployeeCalendarView() {
                   className={`min-h-14 border-b p-1 text-xs sm:min-h-16 sm:p-1.5 ${isLastInRow ? "" : "border-r"} ${bg}`}
                 >
                   <div
-                    className={`mb-0.5 text-[11px] font-medium sm:text-xs ${date === today ? "text-primary font-bold" : "text-muted-foreground"}`}
+                    className={`mb-0.5 text-xs font-medium sm:text-xs ${date === today ? "text-primary font-bold" : "text-muted-foreground"}`}
                   >
                     {date.slice(8)}
                   </div>
@@ -227,16 +225,14 @@ export function EmployeeCalendarView() {
                       <Badge
                         className={`max-w-full truncate px-1 py-0 text-[9px] font-medium sm:text-[10px] ${
                           ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-                          "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                          "bg-muted text-foreground"
                         }`}
                       >
                         <span className="sm:hidden">{shortStatusLabel(status, fullLabel)}</span>
                         <span className="hidden sm:inline">{fullLabel}</span>
                       </Badge>
                       {timeLabel && (
-                        <div className="text-muted-foreground mt-0.5 text-[9px] leading-tight sm:text-[10px]">
-                          {timeLabel}
-                        </div>
+                        <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">{timeLabel}</div>
                       )}
                     </>
                   )}

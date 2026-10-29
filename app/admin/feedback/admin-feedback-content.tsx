@@ -13,12 +13,13 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FeedbackDetailDialog } from "@/components/feedback/feedback-detail-dialog"
+import { FeedbackDetailSheet } from "@/components/feedback/feedback-detail-sheet"
 import type { FeedbackRecord } from "@/components/feedback/types"
 import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface AdminFeedbackContentProps {
   initialFeedback: FeedbackRecord[]
   initialStats: {
@@ -64,6 +65,8 @@ async function fetchFilterData(): Promise<FilterData> {
 }
 
 export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFeedbackContentProps) {
+  const shell = useShellBase()
+  const surveysHref = shell.href("/admin/feedback/surveys")
   const router = useRouter()
   const [feedback, setFeedback] = useState(initialFeedback)
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRecord | null>(null)
@@ -156,7 +159,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
                     : "Unknown"}
               </span>
               {!r.is_anonymous && r.profiles?.company_email && (
-                <div className="text-muted-foreground group flex items-center gap-1 text-[10px]">
+                <div className="text-muted-foreground group flex items-center gap-1 text-xs">
                   <Mail className="h-2.5 w-2.5" />
                   <span className="group-hover:text-foreground transition-colors">{r.profiles.company_email}</span>
                 </div>
@@ -182,7 +185,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
                     <span className="text-sm font-medium">
                       {`${r.target_lead?.first_name || ""} ${r.target_lead?.last_name || ""}`.trim() || "Unknown lead"}
                     </span>
-                    <span className="text-muted-foreground text-[10px]">
+                    <span className="text-muted-foreground text-xs">
                       {r.target_department || r.target_lead?.department || "—"}
                     </span>
                   </div>
@@ -209,7 +212,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         render: (r) => (
           <div className="flex max-w-[280px] flex-col">
             <span className="truncate font-medium">{r.title}</span>
-            <Badge variant="outline" className="mt-1 w-fit text-[10px] font-normal uppercase">
+            <Badge variant="outline" className="mt-1 w-fit text-xs font-normal uppercase">
               {r.feedback_type}
             </Badge>
           </div>
@@ -264,15 +267,17 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
       title="User Feedback"
       description="Centralized portal for managing employee concerns, suggestions and system praise."
       icon={MessageSquare}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
+      backLink={{ href: shell.backHref("/admin"), label: "Back to Admin" }}
       actions={
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-            <Link href="/admin/feedback/surveys">
-              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-              Satisfaction Surveys
-            </Link>
-          </Button>
+          {surveysHref && (
+            <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+              <Link href={surveysHref}>
+                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                Satisfaction Surveys
+              </Link>
+            </Button>
+          )}
         </div>
       }
       tabs={hasLeadFeedback ? tabs : undefined}
@@ -347,9 +352,9 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-4 border-t p-6">
+            <div className="space-y-4">
               <div>
-                <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">
+                <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                   Description / Feedback
                 </h4>
                 <div className="bg-background rounded-lg border p-4 text-sm leading-relaxed whitespace-pre-wrap">
@@ -381,7 +386,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
             `${r.is_anonymous ? "Anonymous" : r.profiles ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown" : "Unknown"} · ${r.feedback_type} · ${formatWATDate(r.created_at)}`,
           trailing: (r) => (
             <Badge
-              className={cn("px-2 py-0.5 text-[10px]", STATUS_COLOR_MAP[r.status] || "bg-muted text-muted-foreground")}
+              className={cn("px-2 py-0.5 text-xs", STATUS_COLOR_MAP[r.status] || "bg-muted text-muted-foreground")}
             >
               {formatName(r.status)}
             </Badge>
@@ -445,12 +450,9 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
             }}
           >
             <div className="mb-2 flex items-start justify-between">
-              <span className="text-muted-foreground font-mono text-[10px]">{r.id.substring(0, 8).toUpperCase()}</span>
+              <span className="text-muted-foreground font-mono text-xs">{r.id.substring(0, 8).toUpperCase()}</span>
               <Badge
-                className={cn(
-                  "px-1.5 py-0 text-[10px]",
-                  STATUS_COLOR_MAP[r.status] || "bg-muted text-muted-foreground"
-                )}
+                className={cn("px-1.5 py-0 text-xs", STATUS_COLOR_MAP[r.status] || "bg-muted text-muted-foreground")}
               >
                 {formatName(r.status)}
               </Badge>
@@ -468,7 +470,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
                     : "Unknown"}
               </span>
               <div className="ml-auto flex items-center gap-2">
-                <Badge variant="outline" className="text-[9px] font-normal uppercase">
+                <Badge variant="outline" className="text-xs font-normal uppercase">
                   {r.feedback_type}
                 </Badge>
               </div>
@@ -478,7 +480,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         urlSync
       />
 
-      <FeedbackDetailDialog
+      <FeedbackDetailSheet
         feedback={selectedFeedback}
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}

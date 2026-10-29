@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { PortalReferenceGeneratorContent } from "@/app/(app)/correspondence/portal-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Correspondence" }
+
 interface DepartmentCodeOption {
   department_name: string
   department_code: string

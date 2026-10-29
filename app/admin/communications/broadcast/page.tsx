@@ -4,6 +4,10 @@ import { CommunicationsComposer } from "@/app/admin/communications/_components/c
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Broadcast" }
+
 export default async function CommunicationsBroadcastPage() {
   const supabase = await createClient()
 

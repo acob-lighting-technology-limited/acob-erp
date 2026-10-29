@@ -11,6 +11,9 @@ import {
   type UserProfile,
 } from "@/app/admin/assets/admin-assets-content"
 
+export const metadata: Metadata = { title: "Dept Assets" }
+import type { Metadata } from "next"
+
 type AssetAssignmentRow = {
   asset_id: string
   assigned_to?: string | null

@@ -65,9 +65,7 @@ export function ProjectsOverview({
           </CardDescription>
         </div>
         {needAttention > 0 && (
-          <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
-            {needAttention} need attention
-          </Badge>
+          <Badge className="text-danger border-danger/20 bg-danger/10">{needAttention} need attention</Badge>
         )}
       </CardHeader>
       <CardContent className="p-0">
@@ -131,7 +129,7 @@ export function ProjectsOverview({
                     )}
                     <div className="col-span-3 flex items-center justify-between gap-2 md:col-span-1 md:justify-end">
                       {health.overdueCount > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400">
+                        <span className="text-danger inline-flex items-center gap-1 text-xs font-medium">
                           <Clock className="h-3.5 w-3.5" />
                           {health.overdueCount} past due
                         </span>

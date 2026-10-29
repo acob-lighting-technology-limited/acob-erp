@@ -17,21 +17,14 @@ import { AttendanceManagerDialog } from "./_components/attendance-manager-dialog
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Dialog } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { BarChart3, Download, FileText, Users, Clock, AlertCircle, Pencil, Info, Settings2, Mail } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
@@ -42,13 +35,9 @@ import {
   toLocalYearMonth,
   isLate,
 } from "@/lib/hr/attendance-utils"
-import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import { formatWATDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
-import {
-  ATTENDANCE_STATUS_LABELS,
-  getManualStatusEditOptions,
-  isPermissionAttendanceStatus,
-} from "@/lib/hr/attendance-status"
+import { getManualStatusEditOptions, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { StatusBadge, labelSource } from "./_components/status-badge"
@@ -57,6 +46,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
+import { AttendanceDialog } from "./_components/attendance-dialog"
+import { DayTimelineDialog } from "./_components/day-timeline-dialog"
 
 const log = logger("hr-attendance-reports")
 
@@ -94,7 +85,7 @@ export interface AttendanceReport {
   cycle_label?: string
 }
 
-interface DayRecord {
+export interface DayRecord {
   id: string
   date: string
   clock_in: string | null
@@ -167,7 +158,7 @@ function daySourceLabel(day: CalendarDay): string {
   }
 }
 
-type TimelineEvent = {
+export type TimelineEvent = {
   id: string
   event_type: string
   from_status: string | null
@@ -179,7 +170,7 @@ type TimelineEvent = {
   metadata?: Record<string, unknown> | null
 }
 
-type TimelineContext = {
+export type TimelineContext = {
   holiday: string | null
   holiday_added_by: string | null
   on_leave: string | null
@@ -187,7 +178,7 @@ type TimelineContext = {
   exempt_reason: string | null
 }
 
-const EVENT_LABELS: Record<string, string> = {
+export const EVENT_LABELS: Record<string, string> = {
   device_punch_in: "Clocked in (device)",
   device_punch_out: "Clocked out (device)",
   self_clock_in: "Clocked in",
@@ -210,16 +201,16 @@ const EVENT_LABELS: Record<string, string> = {
   marked_incomplete: "Auto-marked incomplete",
 }
 
-function eventBadgeClass(eventType: string): string {
+export function eventBadgeClass(eventType: string): string {
   if (eventType.startsWith("appeal_")) {
-    if (eventType === "appeal_rejected") return "bg-red-100 text-red-800"
-    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-emerald-100 text-emerald-800"
-    return "bg-amber-100 text-amber-800"
+    if (eventType === "appeal_rejected") return "bg-danger/15 text-danger"
+    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-success/15 text-success"
+    return "bg-warning/15 text-warning"
   }
-  if (eventType.startsWith("device_")) return "bg-blue-100 text-blue-800"
-  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-violet-100 text-violet-800"
-  if (eventType === "marked_incomplete") return "bg-cyan-100 text-cyan-800"
-  return "bg-gray-100 text-gray-800"
+  if (eventType.startsWith("device_")) return "bg-info/15 text-info"
+  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-purple/15 text-purple"
+  if (eventType === "marked_incomplete") return "bg-info/15 text-info"
+  return "bg-muted text-muted-foreground"
 }
 
 type ExemptionsPayload = {
@@ -242,7 +233,7 @@ function currentYearMonth() {
   return toLocalYearMonth()
 }
 
-function formatDayShort(dateString: string) {
+export function formatDayShort(dateString: string) {
   return formatWATDate(dateString, { weekday: "short", month: "short", day: "numeric" })
 }
 
@@ -528,45 +519,45 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
     <>
       <div className="bg-muted/40 mb-4 grid max-w-4xl grid-cols-3 gap-2 rounded-lg border p-3 sm:grid-cols-5 lg:grid-cols-9">
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Late</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Late</span>
           <span className="mt-1 text-sm font-semibold text-yellow-600">{report.late_days}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Incomplete</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Incomplete</span>
           <span className="mt-1 text-sm font-semibold text-cyan-600">{report.incomplete_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Exempted</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Exempted</span>
           <span className="mt-1 text-sm font-semibold text-violet-600">{report.exempted_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">LWP</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">LWP</span>
           <span className="mt-1 text-sm font-semibold text-amber-600">{report.lateness_with_permission_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">OOS</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">OOS</span>
           <span className="mt-1 text-sm font-semibold text-indigo-600">{report.out_of_station_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">AWP</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">AWP</span>
           <span className="mt-1 text-sm font-semibold text-teal-600">{report.absent_with_permission_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Leave</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Leave</span>
           <span className="mt-1 text-sm font-semibold text-purple-600">{report.leave_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Holiday</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Holiday</span>
           <span className="mt-1 text-sm font-semibold text-sky-600">{report.holiday_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Waiver</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Waiver</span>
           <span className="mt-1 text-sm font-semibold text-blue-600">{report.waived_days || 0}</span>
         </div>
       </div>
 
       <div className="space-y-1 py-2">
-        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-[11px] font-semibold uppercase">
+        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-xs font-semibold uppercase">
           <span>Day</span>
           <span>Status</span>
           <span>In</span>
@@ -611,7 +602,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
                         day.status === "late" ||
                           day.status === "lateness_with_permission" ||
                           (day.status !== "present" && isLate(day.record.clock_in))
-                          ? "text-yellow-600 dark:text-yellow-500"
+                          ? "text-warning"
                           : "text-green-600"
                       )}
                     />
@@ -673,162 +664,33 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
         })}
       </div>
 
-      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{isCreating ? "Add Attendance Record" : "Edit Attendance Record"}</DialogTitle>
-            <DialogDescription>
-              {editTarget && `${report.user_name} — ${formatDayShort(editTarget.date)}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {isOnTimePresent && !isOverridden ? (
-              <p className="text-muted-foreground text-sm">
-                This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={editForm.status}
-                    onValueChange={(value) => setEditForm((f) => ({ ...f, status: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>
-                    Comment (required) <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    required
-                    placeholder="Reason for this manual attendance change"
-                    value={editForm.manual_comment}
-                    onChange={(e) => setEditForm((f) => ({ ...f, manual_comment: e.target.value }))}
-                  />
-                  {!hasManualComment && (
-                    <p className="text-[11px] font-medium text-red-500">
-                      A comment is required for all manual attendance alterations.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            {isOverridden ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleRevert}
-                disabled={reverting || saving}
-              >
-                {reverting ? "Reverting…" : "Revert Override"}
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditTarget(null)} disabled={saving || reverting}>
-                Cancel
-              </Button>
-              {(!isOnTimePresent || !isOverridden) && (
-                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
-                  {saving ? "Saving…" : isCreating ? "Create" : "Save"}
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AttendanceDialog
+        editTarget={editTarget}
+        setEditTarget={setEditTarget}
+        isCreating={isCreating}
+        report={report}
+        isOnTimePresent={isOnTimePresent}
+        isOverridden={isOverridden}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        statusOptions={statusOptions}
+        hasManualComment={hasManualComment}
+        handleRevert={handleRevert}
+        reverting={reverting}
+        saving={saving}
+        saveEdit={saveEdit}
+        cannotSave={cannotSave}
+      />
 
-      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Day Timeline</DialogTitle>
-            <DialogDescription>
-              {historyTarget ? `${report.user_name} — ${formatDayShort(historyTarget.date)}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          {historyContext && (historyContext.holiday || historyContext.on_leave || historyContext.exempt) && (
-            <div className="flex flex-wrap gap-2">
-              {historyContext.holiday && (
-                <Badge className="bg-sky-100 text-xs text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
-                  Holiday — {historyContext.holiday}
-                  {historyContext.holiday_added_by ? ` · added by ${historyContext.holiday_added_by}` : ""}
-                </Badge>
-              )}
-              {historyContext.on_leave && (
-                <Badge className="bg-purple-100 text-xs text-purple-800 dark:bg-purple-950/40 dark:text-purple-300">
-                  On leave — {historyContext.on_leave}
-                </Badge>
-              )}
-              {historyContext.exempt && (
-                <Badge className="bg-violet-100 text-xs text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
-                  Exempt{historyContext.exempt_reason ? ` — ${historyContext.exempt_reason}` : ""}
-                </Badge>
-              )}
-            </div>
-          )}
-
-          <div className="max-h-[420px] space-y-3 overflow-y-auto">
-            {historyLoading ? (
-              <p className="text-muted-foreground text-sm">Loading…</p>
-            ) : historyItems.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No recorded events for this day.</p>
-            ) : (
-              historyItems.map((item) => {
-                const label = EVENT_LABELS[item.event_type] ?? item.event_type.replaceAll("_", " ")
-                const fromLabel = item.from_status
-                  ? (ATTENDANCE_STATUS_LABELS[item.from_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
-                    item.from_status)
-                  : null
-                const toLabel = item.to_status
-                  ? (ATTENDANCE_STATUS_LABELS[item.to_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
-                    item.to_status)
-                  : null
-                const isAutomated = item.actor_name === null
-                return (
-                  <div key={item.id} className="rounded-md border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className={`text-xs ${eventBadgeClass(item.event_type)}`}>{label}</Badge>
-                      <p className="text-sm font-medium">{isAutomated ? "System / Device" : item.actor_name}</p>
-                    </div>
-                    <p className="text-muted-foreground text-xs">{formatWATDateTime(item.created_at)}</p>
-                    {(fromLabel || toLabel) && (
-                      <p className="mt-1 text-xs">
-                        <span className="font-medium">Status:</span>{" "}
-                        <span className="text-muted-foreground">
-                          {fromLabel ? `${fromLabel} → ` : ""}
-                          {toLabel ?? "—"}
-                        </span>
-                      </p>
-                    )}
-                    {item.comment && (
-                      <p className="mt-1 text-xs">
-                        <span className="font-medium">Comment:</span>{" "}
-                        <span className="text-muted-foreground">{item.comment}</span>
-                      </p>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DayTimelineDialog
+        historyOpen={historyOpen}
+        setHistoryOpen={setHistoryOpen}
+        historyTarget={historyTarget}
+        report={report}
+        historyContext={historyContext}
+        historyLoading={historyLoading}
+        historyItems={historyItems}
+      />
     </>
   )
 }
@@ -1121,7 +983,7 @@ export function AttendanceReportsPage({
 
   return (
     <DataTablePage
-      title="Attendance Reports"
+      title="Attendance"
       description={
         activeTab === "summary"
           ? "Monthly attendance performance by employee."
@@ -1136,39 +998,22 @@ export function AttendanceReportsPage({
                   : "Records needing attention — late arrivals, missing clock-outs, absences."
       }
       icon={BarChart3}
-      backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
       tabs={ATTENDANCE_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as AttendanceTab)}
       actions={
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" onClick={() => setReportDialogOpen(true)} size="sm" aria-label="Reports">
-                <Mail className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">Reports</span>
-                <span className="sr-only sm:hidden">Reports</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Attendance Reports</TooltipContent>
-          </Tooltip>
-          {canUseAttendanceManager && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => setManagerOpen(true)}
-                  size="sm"
-                  aria-label="Attendance Manager"
-                >
-                  <Settings2 className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Attendance Manager</span>
-                  <span className="sr-only sm:hidden">Attendance Manager</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Attendance Manager</TooltipContent>
-            </Tooltip>
-          )}
+          <HeaderMoreMenu
+            items={[
+              { label: "Attendance reports", icon: Mail, onSelect: () => setReportDialogOpen(true) },
+              {
+                label: "Attendance manager",
+                icon: Settings2,
+                onSelect: () => setManagerOpen(true),
+                hidden: !canUseAttendanceManager,
+              },
+            ]}
+          />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1278,13 +1123,13 @@ export function AttendanceReportsPage({
                       </span>
                     </>
                   )}
-                  <span className="text-blue-600 dark:text-blue-400">
+                  <span className="text-info">
                     <span className="font-semibold tabular-nums">{r.present_days}</span> present
                   </span>
-                  <span className="text-amber-600 dark:text-amber-400">
+                  <span className="text-warning">
                     <span className="font-semibold tabular-nums">{r.late_days}</span> late
                   </span>
-                  <span className="text-red-600 dark:text-red-400">
+                  <span className="text-danger">
                     <span className="font-semibold tabular-nums">{r.absent_days}</span> absent
                   </span>
                 </span>
@@ -1292,13 +1137,11 @@ export function AttendanceReportsPage({
             },
             trailing: (r) =>
               r.attendance_exempt ? (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   Exempt
                 </Badge>
               ) : (
-                <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  {r.total_hours} hrs
-                </span>
+                <span className="text-success font-mono text-xs font-semibold">{r.total_hours} hrs</span>
               ),
           }}
           cardRenderer={(r) => (
@@ -1312,14 +1155,14 @@ export function AttendanceReportsPage({
               </div>
               <div className="border-border/40 grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] uppercase">Early / Present</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-muted-foreground block text-xs uppercase">Early / Present</span>
+                  <span className="text-success font-semibold">
                     {r.early_days ?? 0} early / {r.present_days} present
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] uppercase">Absent</span>
-                  <span className="font-semibold text-rose-600 dark:text-rose-400">{r.absent_days} days</span>
+                  <span className="text-muted-foreground block text-xs uppercase">Absent</span>
+                  <span className="text-danger font-semibold">{r.absent_days} days</span>
                 </div>
               </div>
             </div>

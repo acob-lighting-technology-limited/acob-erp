@@ -1,44 +1,24 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { calculatePayroll, type PayrollBreakdown } from "@/lib/hr/payroll-utils"
-import { printPayslip } from "@/lib/hr/payslip-print"
-import { payslipFromBreakdown, type PayslipEmployeeMeta } from "@/lib/hr/payslip-types"
+import { type PayslipEmployeeMeta } from "@/lib/hr/payslip-types"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
-import { Checkbox } from "@/components/ui/checkbox"
 import { ManageGrossSalaryDialog } from "@/components/hr/manage-gross-salary-dialog"
-import {
-  FileText,
-  Save,
-  Lock,
-  Download,
-  DollarSign,
-  Clock,
-  Eye,
-  Printer,
-  Mail,
-  Loader2,
-  MailCheck,
-  Send,
-} from "lucide-react"
+import { FileText, Save, Lock, Download, DollarSign, Clock, Eye, Mail, MailCheck, Send } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { ViewPayslipDialog } from "./_components/view-payslip-dialog"
+import { EmailThisPayslipDialog } from "./_components/email-this-payslip-dialog"
+import { EmailAllPayslipsForDialog } from "./_components/email-all-payslips-for-dialog"
 
 export interface PayrollRow {
   user_id: string
@@ -191,7 +171,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch(`/api/admin/payroll/run?payroll_period_id=${period.id}`)
+        const res = await apiFetch(`/api/admin/payroll/run?payroll_period_id=${period.id}`)
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error || "Failed to load worksheet")
         setRows(payload.data || [])
@@ -677,9 +657,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
           subtitle: (r) =>
             `${r.department || "General"} · Gross: ${money(r.breakdown.monthlyGross)} · Net: ${money(r.breakdown.netPay)}`,
           trailing: (r) => (
-            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {money(r.breakdown.netPay)}
-            </span>
+            <span className="text-success font-mono text-xs font-bold">{money(r.breakdown.netPay)}</span>
           ),
           onSelect: (r) => setViewRow(r),
         }}
@@ -693,11 +671,9 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
                 <p className="text-sm font-semibold">{formatEmployeeName(r)}</p>
                 <p className="text-muted-foreground text-xs">{r.department || "General"}</p>
               </div>
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                {money(r.breakdown.netPay)}
-              </span>
+              <span className="text-success font-mono text-xs font-bold">{money(r.breakdown.netPay)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 border-t pt-2 text-[11px]">
+            <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
               <div>Gross: {money(r.breakdown.monthlyGross)}</div>
               <div>Tax: {money(r.breakdown.monthlyTax)}</div>
             </div>
@@ -709,343 +685,41 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
       />
 
       {/* Printable Payslip Viewer */}
-      <Dialog open={viewRow !== null} onOpenChange={(o) => !o && setViewRow(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader className="print:hidden">
-            <DialogTitle>View Payslip</DialogTitle>
-            <DialogDescription>
-              Print or review the details of the employee&apos;s monthly salary breakdown.
-            </DialogDescription>
-          </DialogHeader>
-
-          {viewRow && vb && (
-            <div
-              id="payslip-print-area"
-              className="space-y-4 rounded-lg border bg-white p-5 text-sm text-gray-800 shadow-sm dark:bg-white dark:text-gray-800"
-            >
-              {/* Header: Logo + Company Info + Payslip Label */}
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 pb-3">
-                <div>
-                  <Image
-                    src="/images/exports/acob-lighting-full.png"
-                    alt="ACOB Lighting Technology Limited"
-                    width={200}
-                    height={56}
-                    className="object-contain"
-                    unoptimized
-                  />
-                  <p className="mt-1.5 text-[10px] text-gray-500">
-                    Plot 2. Block 14 Extension, Federal Ministry of Works And Housing Sites and Services Scheme, Setraco
-                    Gate, Gwarinpa, FCT, Nigeria.
-                  </p>
-                  <p className="text-[10px] text-gray-500">
-                    Email: info@acoblighting.com &nbsp;|&nbsp; Web: www.acoblighting.com
-                  </p>
-                </div>
-                <div className="min-w-[130px] text-right">
-                  <p className="text-xs font-bold text-emerald-700 uppercase">Payslip</p>
-                  <p className="text-[10px] text-gray-500">
-                    Period: <span className="font-semibold whitespace-nowrap text-gray-700">{period.name}</span>
-                  </p>
-                  <p className="text-[10px] text-gray-500">
-                    Pay Date: <span className="font-semibold whitespace-nowrap text-gray-700">{period.pay_date}</span>
-                  </p>
-                  <p
-                    className="mt-1 text-[10px] font-bold uppercase"
-                    style={{ color: status === "completed" ? "#059669" : "#d97706" }}
-                  >
-                    ● {status === "completed" ? "Paid" : "Draft"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Employee Info */}
-              <div className="grid grid-cols-2 gap-3 rounded border border-gray-100 bg-gray-50 px-4 py-2.5 text-[11px]">
-                <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Employee Name</p>
-                  <p className="font-semibold text-gray-800">{viewRow.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Staff ID</p>
-                  <p className="font-mono font-semibold text-gray-800">{viewRow.employee_number}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Department</p>
-                  <p className="font-semibold text-gray-800">{viewRow.department || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Designation</p>
-                  <p className="font-semibold text-gray-800">{viewRow.designation || "—"}</p>
-                </div>
-              </div>
-
-              {/* Earnings & Deductions */}
-              <div className="grid grid-cols-1 gap-4 text-[11px] sm:grid-cols-2">
-                <div>
-                  <h3 className="mb-1.5 border-b border-emerald-200 pb-1 text-[9px] font-bold tracking-widest text-emerald-700 uppercase">
-                    Earnings
-                  </h3>
-                  <table className="w-full">
-                    <tbody>
-                      {[
-                        ["Basic Salary", vb.monthlyBasic],
-                        ["Housing Allowance", vb.monthlyHousing],
-                        ["Transport Allowance", vb.monthlyTransport],
-                        ["Leave Allowance", vb.monthlyLeave],
-                        ["Communication Allowance", vb.monthlyCommunication],
-                        ...(vb.bonus > 0 ? [["Bonus / Refund", vb.bonus]] : []),
-                      ].map(([label, val]) => (
-                        <tr key={String(label)} className="border-b border-gray-50">
-                          <td className="py-1 text-gray-600">{label}</td>
-                          <td className="py-1 text-right font-medium text-gray-800">
-                            ₦
-                            {Number(val).toLocaleString("en-US", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="border-t border-gray-200">
-                        <td className="pt-1.5 font-bold text-gray-900">Gross Cash Pay</td>
-                        <td className="pt-1.5 text-right font-bold text-gray-900">
-                          ₦
-                          {(vb.monthlyGross + vb.bonus).toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div>
-                  <h3 className="mb-1.5 border-b border-red-200 pb-1 text-[9px] font-bold tracking-widest text-red-600 uppercase">
-                    Deductions
-                  </h3>
-                  <table className="w-full">
-                    <tbody>
-                      {(() => {
-                        const rows: [string, number][] = [
-                          ["Pension (Employee)", vb.monthlyPensionEmployee],
-                          ["PAYE Tax", vb.monthlyTax],
-                        ]
-                        if (vb.unpaidLeaveDeduction > 0)
-                          rows.push([`Unpaid Leave (${vb.unpaidLeaveDays}d)`, vb.unpaidLeaveDeduction])
-                        if (vb.lunchDeduction > 0) rows.push(["Lunch Deduction", vb.lunchDeduction])
-                        if (vb.loanRepayment > 0) rows.push(["Loan Repayment", vb.loanRepayment])
-                        if (vb.latenessSurcharge + vb.absentSurcharge > 0)
-                          rows.push(["Lateness/Absence Surcharge", vb.latenessSurcharge + vb.absentSurcharge])
-                        return rows.map(([label, val]) => (
-                          <tr key={label} className="border-b border-gray-50">
-                            <td className="py-1 text-gray-600">{label}</td>
-                            <td className="py-1 text-right font-medium text-red-600">
-                              ₦
-                              {Number(val).toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </td>
-                          </tr>
-                        ))
-                      })()}
-                      <tr className="border-t border-gray-200">
-                        <td className="pt-1.5 font-bold text-gray-900">Total Deductions</td>
-                        <td className="pt-1.5 text-right font-bold text-red-600">
-                          ₦
-                          {vb.totalDeductions.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Net Pay Banner */}
-              <div className="flex items-center justify-between rounded-lg bg-emerald-600 px-5 py-3 text-white">
-                <span className="text-xs font-bold tracking-widest uppercase">Net Pay (Take Home)</span>
-                <span className="text-lg font-extrabold">
-                  ₦{vb.netPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              {/* Signature Lines */}
-              <div className="flex items-end justify-between pt-6 text-[10px] text-gray-400">
-                <div className="w-36 border-t border-gray-300 pt-1 text-center">Employee Signature</div>
-                <div className="text-center text-[9px] text-gray-300">
-                  This payslip is computer-generated and valid without a signature.
-                </div>
-                <div className="w-36 border-t border-gray-300 pt-1 text-center">Authorised Signatory</div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="print:hidden">
-            <Button variant="outline" onClick={() => setViewRow(null)}>
-              Close
-            </Button>
-            <Button variant="outline" onClick={() => setEmailTarget(viewRow)} disabled={!viewRow || !vb}>
-              <Mail className="mr-1.5 h-4 w-4" /> Email Payslip
-            </Button>
-            <Button
-              className="bg-primary text-primary-foreground"
-              onClick={() => {
-                if (!viewRow || !vb) return
-                printPayslip(payslipFromBreakdown(vb, payslipMeta(viewRow)))
-              }}
-            >
-              <Printer className="mr-1.5 h-4 w-4" /> Print Payslip
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ViewPayslipDialog
+        viewRow={viewRow}
+        setViewRow={setViewRow}
+        vb={vb}
+        period={period}
+        status={status}
+        setEmailTarget={setEmailTarget}
+        payslipMeta={payslipMeta}
+      />
 
       {/* Email confirmation — states the exact recipient before anything is sent */}
-      <Dialog open={emailTarget !== null} onOpenChange={(o) => !o && !emailSending && setEmailTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Email this payslip?</DialogTitle>
-            <DialogDescription>
-              The payslip is attached as a PDF. The email body carries no salary figures.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 text-sm">
-            <div className="bg-muted/50 space-y-1.5 rounded-md border p-3">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Recipient</span>
-                <span className="font-medium break-all">{emailTarget?.company_email || "—"}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Employee</span>
-                <span className="font-medium">{emailTarget?.full_name}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Period</span>
-                <span className="font-medium">{period.name}</span>
-              </div>
-            </div>
-
-            <label className="flex cursor-pointer items-start gap-2.5">
-              <Checkbox
-                checked={protectPdf}
-                onCheckedChange={(checked) => setProtectPdf(checked === true)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="font-medium">Password-protect the PDF</span>
-                <span className="text-muted-foreground block text-xs">
-                  The attachment opens with the employee&apos;s staff ID ({emailTarget?.employee_number || "—"}).
-                </span>
-              </span>
-            </label>
-
-            {status !== "completed" && (
-              <p className="text-xs text-amber-600 dark:text-amber-500">
-                This period is still a draft, so the payslip will be marked <strong>DRAFT</strong>. Figures are
-                recomputed at send time; unsaved bonus or loan edits in the table are not included.
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEmailTarget(null)} disabled={emailSending}>
-              Cancel
-            </Button>
-            <Button onClick={handleEmailPayslip} disabled={emailSending}>
-              {emailSending ? (
-                <>
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…
-                </>
-              ) : (
-                <>
-                  <Mail className="mr-1.5 h-4 w-4" /> Send Payslip
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmailThisPayslipDialog
+        emailTarget={emailTarget}
+        emailSending={emailSending}
+        setEmailTarget={setEmailTarget}
+        period={period}
+        protectPdf={protectPdf}
+        setProtectPdf={setProtectPdf}
+        status={status}
+        handleEmailPayslip={handleEmailPayslip}
+      />
 
       {/* Bulk email confirmation — states the exact headcount before any mail goes out */}
-      <Dialog open={bulkConfirmOpen} onOpenChange={(o) => !o && !bulkSending && setBulkConfirmOpen(false)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Email all payslips for {period.name}?</DialogTitle>
-            <DialogDescription>
-              Sends one email per employee, each with their own password-protectable PDF. Anyone already emailed is
-              skipped automatically.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 text-sm">
-            <div className="bg-muted/50 space-y-1.5 rounded-md border p-3">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Already emailed</span>
-                <span className="font-medium">{rows.length - unsentCount}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Will be emailed now</span>
-                <span className="font-medium">{unsentCount}</span>
-              </div>
-            </div>
-
-            {!bulkSending && (
-              <label className="flex cursor-pointer items-start gap-2.5">
-                <Checkbox
-                  checked={protectPdf}
-                  onCheckedChange={(checked) => setProtectPdf(checked === true)}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="font-medium">Password-protect each PDF</span>
-                  <span className="text-muted-foreground block text-xs">
-                    Each attachment opens with that employee&apos;s own staff ID.
-                  </span>
-                </span>
-              </label>
-            )}
-
-            {bulkSending && (
-              <div className="space-y-1.5">
-                <div className="bg-muted h-2 overflow-hidden rounded-full">
-                  <div
-                    className="h-full bg-emerald-500 transition-all"
-                    style={{
-                      width: `${bulkProgress.total > 0 ? ((bulkProgress.sent + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Sent {bulkProgress.sent} of {bulkProgress.total}
-                  {bulkProgress.failed > 0 ? ` — ${bulkProgress.failed} failed` : ""}. Keep this open until it finishes.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)} disabled={bulkSending}>
-              Cancel
-            </Button>
-            <Button onClick={handleBulkSend} disabled={bulkSending} className="bg-emerald-600 hover:bg-emerald-700">
-              {bulkSending ? (
-                <>
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…
-                </>
-              ) : (
-                <>
-                  <Send className="mr-1.5 h-4 w-4" /> Send {unsentCount} Payslip{unsentCount === 1 ? "" : "s"}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmailAllPayslipsForDialog
+        bulkConfirmOpen={bulkConfirmOpen}
+        bulkSending={bulkSending}
+        setBulkConfirmOpen={setBulkConfirmOpen}
+        period={period}
+        rows={rows}
+        unsentCount={unsentCount}
+        protectPdf={protectPdf}
+        setProtectPdf={setProtectPdf}
+        bulkProgress={bulkProgress}
+        handleBulkSend={handleBulkSend}
+      />
     </DataTablePage>
   )
 }

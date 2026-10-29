@@ -1,0 +1,449 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { MessageSquare, Send, Users } from "lucide-react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn } from "@/components/ui/data-table"
+import { apiFetch } from "@/lib/api-client"
+import { Dialog } from "@/components/ui/dialog"
+import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { formatDate, personName } from "@/lib/format"
+import { GivePeerFeedbackDialog } from "./_components/give-peer-feedback-dialog"
+
+export type Profile = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+}
+
+type Cycle = CycleFilterCycle
+
+type PeerFeedbackRow = {
+  id: string
+  subject_user_id: string
+  review_cycle_id: string
+  score: number
+  collaboration: number | null
+  communication: number | null
+  teamwork: number | null
+  professionalism: number | null
+  comments: string | null
+  status: string
+  created_at: string
+  subject?: Profile | null
+  reviewer?: Profile | null
+}
+
+export default function PeerFeedbackPage() {
+  const { cycles } = usePerformanceCycles<Cycle>()
+  const {
+    data,
+    isLoading,
+    refetch: loadData,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myPeerFeedback(),
+    queryFn: async () => {
+      const [given, received] = await Promise.all([
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback?as_reviewer=true"),
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback"),
+      ])
+      return { myFeedback: given.data ?? [], receivedFeedback: received.data ?? [] }
+    },
+    meta: { errorMessage: "Failed to load data" },
+  })
+  const { profiles: colleagues } = useHrProfiles<Profile>()
+  const myFeedback = useMemo(() => data?.myFeedback ?? [], [data])
+  const receivedFeedback = useMemo(() => data?.receivedFeedback ?? [], [data])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState<"received" | "given">("received")
+
+  // Form state
+  const [selectedColleague, setSelectedColleague] = useState("")
+  const [selectedCycle, setSelectedCycle] = useState("")
+  const [score, setScore] = useState("")
+  const [collaboration, setCollaboration] = useState("")
+  const [communication, setCommunication] = useState("")
+  const [teamwork, setTeamwork] = useState("")
+  const [professionalism, setProfessionalism] = useState("")
+  const [comments, setComments] = useState("")
+
+  const alreadySubmittedKeys = useMemo(
+    () => new Set(myFeedback.map((f) => `${f.subject_user_id}:${f.review_cycle_id}`)),
+    [myFeedback]
+  )
+
+  function resetForm() {
+    setSelectedColleague("")
+    setSelectedCycle("")
+    setScore("")
+    setCollaboration("")
+    setCommunication("")
+    setTeamwork("")
+    setProfessionalism("")
+    setComments("")
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!selectedColleague || !selectedCycle || !score) {
+      toast.error("Please select a colleague, cycle, and provide an overall score")
+      return
+    }
+    const parsedScore = Number(score)
+    if (!Number.isFinite(parsedScore) || parsedScore < 0 || parsedScore > 100) {
+      toast.error("Score must be a number between 0 and 100")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await apiFetch("/api/hr/performance/peer-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject_user_id: selectedColleague,
+          review_cycle_id: selectedCycle,
+          score: parsedScore,
+          collaboration: collaboration ? Number(collaboration) : null,
+          communication: communication ? Number(communication) : null,
+          teamwork: teamwork ? Number(teamwork) : null,
+          professionalism: professionalism ? Number(professionalism) : null,
+          comments: comments || null,
+        }),
+      })
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string } | null
+      if (!response.ok) throw new Error(payload?.error || "Failed to submit")
+      toast.success(payload?.message || "Peer feedback submitted")
+      setIsDialogOpen(false)
+      resetForm()
+      void loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to submit")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const avgReceived =
+    receivedFeedback.length > 0
+      ? Math.round((receivedFeedback.reduce((sum, f) => sum + f.score, 0) / receivedFeedback.length) * 100) / 100
+      : null
+
+  const { filters: cycleFilters } = useCycleFilters<PeerFeedbackRow>({
+    cycles,
+    getRowCycleId: (f) => f.review_cycle_id,
+    cycleKey: "review_cycle",
+    cycleLabel: "Quarter",
+  })
+
+  const givenColumns = useMemo<DataTableColumn<PeerFeedbackRow>[]>(
+    () => [
+      {
+        key: "subject",
+        label: "Colleague",
+        sortable: true,
+        accessor: (f) => personName(f.subject),
+        render: (f) => <span className="font-medium">{personName(f.subject)}</span>,
+      },
+      {
+        key: "score",
+        label: "Overall Score",
+        sortable: true,
+        accessor: (f) => f.score,
+        render: (f) => <Badge variant="secondary">{f.score}%</Badge>,
+      },
+      {
+        key: "created_at",
+        label: "Submitted",
+        sortable: true,
+        accessor: (f) => f.created_at,
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    []
+  )
+
+  const receivedColumns = useMemo<DataTableColumn<PeerFeedbackRow>[]>(
+    () => [
+      {
+        key: "score",
+        label: "Overall Score",
+        sortable: true,
+        accessor: (f) => f.score,
+        render: (f) => (
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-sm">Anonymous Peer</span>
+            <Badge variant="secondary">{f.score}%</Badge>
+          </div>
+        ),
+      },
+      {
+        key: "collaboration",
+        label: "Collaboration",
+        accessor: (f) => f.collaboration ?? -1,
+        render: (f) => <span className="text-xs">{f.collaboration !== null ? `${f.collaboration}%` : "-"}</span>,
+        hideOnMobile: true,
+      },
+      {
+        key: "teamwork",
+        label: "Teamwork",
+        accessor: (f) => f.teamwork ?? -1,
+        render: (f) => <span className="text-xs">{f.teamwork !== null ? `${f.teamwork}%` : "-"}</span>,
+        hideOnMobile: true,
+      },
+      {
+        key: "created_at",
+        label: "Received",
+        sortable: true,
+        accessor: (f) => f.created_at,
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    []
+  )
+
+  const rows = activeTab === "given" ? myFeedback : receivedFeedback
+
+  return (
+    <DataTablePage
+      title="Peer Feedback"
+      description="Give feedback to colleagues and view feedback you've received this cycle."
+      icon={MessageSquare}
+      backLink={{ href: "/pms", label: "Back to PMS" }}
+      spacing="tight"
+      actionsPlacement="inline-always"
+      tabs={[
+        { key: "received", label: "Feedback Received", icon: Users },
+        { key: "given", label: "Feedback Given", icon: Send },
+      ]}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as "received" | "given")}
+      actions={
+        <Button onClick={() => setIsDialogOpen(true)} size="sm">
+          <Send className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Give Feedback</span>
+        </Button>
+      }
+      stats={
+        <StatGrid>
+          <StatCard variant="compact" title="Given by You" value={myFeedback.length} icon={Send} />
+          <StatCard variant="compact" title="Received" value={receivedFeedback.length} icon={Users} />
+          <StatCard
+            variant="compact"
+            title="Avg Received Score"
+            value={avgReceived !== null ? `${avgReceived}%` : "-"}
+            icon={MessageSquare}
+          />
+        </StatGrid>
+      }
+    >
+      {activeTab === "given" ? (
+        <DataTable<PeerFeedbackRow>
+          data={rows}
+          columns={givenColumns}
+          filters={cycleFilters}
+          getRowId={(f) => f.id}
+          searchPlaceholder="Search colleague name..."
+          searchFn={(f, query) => personName(f.subject).toLowerCase().includes(query.toLowerCase())}
+          isLoading={isLoading}
+          onRetry={() => void loadData()}
+          emptyTitle="No Feedback Given Yet"
+          emptyAction={
+            <Button size="sm" onClick={() => setIsDialogOpen(true)}>
+              Give feedback
+            </Button>
+          }
+          emptyDescription={'No peer feedback submitted yet. Use the "Give Feedback" button to start.'}
+          emptyIcon={Send}
+          viewToggle
+          stickyToolbar
+          contactsView
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (f) => personName(f.subject),
+            subtitle: (f) => [f.subject?.department, formatDate(f.created_at)].filter(Boolean).join(" · "),
+            trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
+            detail: {
+              title: (f) => personName(f.subject),
+              fields: (f) => [
+                { label: "Overall score", value: `${f.score}%` },
+                { label: "Comments", value: f.comments || "No comments left." },
+                { label: "Submitted", value: formatDate(f.created_at) },
+              ],
+            },
+          }}
+          cardRenderer={(f) => (
+            <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm font-semibold">{personName(f.subject)}</span>
+                <Badge variant="secondary">{f.score}%</Badge>
+              </div>
+              {f.comments && <p className="text-muted-foreground line-clamp-2 text-xs">{f.comments}</p>}
+              <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+                <span>Submitted</span>
+                <span>{formatDate(f.created_at)}</span>
+              </div>
+            </div>
+          )}
+          expandable={{
+            render: (f) => (
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Feedback Comments</span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {f.comments || "No comments left."}
+                  </p>
+                </div>
+                <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+                  <span>
+                    Submitted to {personName(f.subject)} ({f.subject?.department || "—"})
+                  </span>
+                  <span>{formatDate(f.created_at)}</span>
+                </div>
+              </div>
+            ),
+          }}
+          urlSync
+        />
+      ) : (
+        <DataTable<PeerFeedbackRow>
+          data={rows}
+          columns={receivedColumns}
+          filters={cycleFilters}
+          getRowId={(f) => f.id}
+          searchPlaceholder="Search feedback..."
+          searchFn={() => true}
+          isLoading={isLoading}
+          onRetry={() => void loadData()}
+          emptyTitle="No Feedback Received Yet"
+          emptyDescription="No peer feedback received yet for the current cycle."
+          emptyIcon={Users}
+          viewToggle
+          stickyToolbar
+          contactsView
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: () => "Anonymous Peer",
+            subtitle: (f) => `Received ${formatDate(f.created_at)}`,
+            trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
+            detail: {
+              title: () => "Anonymous Peer",
+              fields: (f) => [
+                { label: "Overall score", value: `${f.score}%` },
+                { label: "Collaboration", value: f.collaboration !== null ? `${f.collaboration}%` : null },
+                { label: "Teamwork", value: f.teamwork !== null ? `${f.teamwork}%` : null },
+                { label: "Communication", value: f.communication !== null ? `${f.communication}%` : null },
+                { label: "Professionalism", value: f.professionalism !== null ? `${f.professionalism}%` : null },
+                { label: "Comments", value: f.comments || null },
+                { label: "Received", value: formatDate(f.created_at) },
+              ],
+            },
+          }}
+          cardRenderer={(f) => (
+            <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-muted-foreground text-sm">Anonymous Peer</span>
+                <Badge variant="secondary">{f.score}%</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {f.collaboration !== null && (
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Collaboration</p>
+                    <p className="font-medium">{f.collaboration}%</p>
+                  </div>
+                )}
+                {f.teamwork !== null && (
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Teamwork</p>
+                    <p className="font-medium">{f.teamwork}%</p>
+                  </div>
+                )}
+              </div>
+              <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+                <span>Received</span>
+                <span>{formatDate(f.created_at)}</span>
+              </div>
+            </div>
+          )}
+          expandable={{
+            render: (f) => (
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Collaboration</span>
+                    <span className="font-medium">{f.collaboration !== null ? `${f.collaboration}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Teamwork</span>
+                    <span className="font-medium">{f.teamwork !== null ? `${f.teamwork}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Communication</span>
+                    <span className="font-medium">{f.communication !== null ? `${f.communication}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Professionalism</span>
+                    <span className="font-medium">{f.professionalism !== null ? `${f.professionalism}%` : "—"}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 border-t pt-3">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
+                    Qualitative Feedback
+                  </span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {f.comments || "No written comments provided."}
+                  </p>
+                </div>
+              </div>
+            ),
+          }}
+          urlSync
+        />
+      )}
+
+      {/* Give Feedback Dialog */}
+      <GivePeerFeedbackDialog
+        isDialogOpen={isDialogOpen}
+        setIsDialogOpen={setIsDialogOpen}
+        handleSubmit={handleSubmit}
+        selectedColleague={selectedColleague}
+        setSelectedColleague={setSelectedColleague}
+        colleagues={colleagues}
+        alreadySubmittedKeys={alreadySubmittedKeys}
+        selectedCycle={selectedCycle}
+        setSelectedCycle={setSelectedCycle}
+        cycles={cycles}
+        score={score}
+        setScore={setScore}
+        collaboration={collaboration}
+        setCollaboration={setCollaboration}
+        communication={communication}
+        setCommunication={setCommunication}
+        teamwork={teamwork}
+        setTeamwork={setTeamwork}
+        professionalism={professionalism}
+        setProfessionalism={setProfessionalism}
+        comments={comments}
+        setComments={setComments}
+        isSubmitting={isSubmitting}
+      />
+    </DataTablePage>
+  )
+}

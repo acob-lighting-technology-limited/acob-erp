@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { AdminCompetenciesPage } from "./view"
+export { default } from "./page-client"
 
-export default function AdminCompetenciesPageRoute() {
-  return <AdminCompetenciesPage />
-}
+export const metadata: Metadata = { title: "Admin Competency Frameworks" }

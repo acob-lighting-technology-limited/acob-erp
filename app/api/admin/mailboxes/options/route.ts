@@ -71,6 +71,8 @@ export async function GET() {
         projects,
         staffDomain: ORG_STAFF_DOMAIN,
         quotaPresetsGb: [1, 2, 5, 10, 25],
+        quotaPresetsMb: [250, 500, 1024, 2048, 5120],
+        defaultQuotaMb: 250,
       },
     })
   } catch (err) {

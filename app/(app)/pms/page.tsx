@@ -7,6 +7,10 @@ import { getCurrentUserPmsData } from "./_lib"
 import { CycleSelector } from "./_components/cycle-selector"
 import { formatScore } from "@/lib/format"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "PMS" }
+
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
   const { profile, score, cycles, activeCycleId, attendance, latestReview } = await getCurrentUserPmsData(cycle_id)
@@ -19,9 +23,9 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       icon: Target,
       score: formatScore(score.kpi_score),
       scoreSub: "Weighted task score",
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-info/10 text-info border-info/20",
       fill: "bg-blue-500",
-      hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-blue-500",
     },
     {
@@ -31,9 +35,9 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       icon: Clock3,
       score: formatScore(score.attendance_score),
       scoreSub: `${attendance.presentDays}/${attendance.trackedDays || 0} days positive`,
-      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      color: "bg-warning/10 text-warning border-warning/20",
       fill: "bg-amber-500",
-      hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
+      hoverBorder: "hover:border-warning/50",
       hoverText: "group-hover:text-amber-500",
     },
     {
@@ -43,9 +47,9 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       icon: Brain,
       score: formatScore(score.cbt_score),
       scoreSub: "Learning score in PMS",
-      color: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+      color: "bg-purple/10 text-purple border-purple/20",
       fill: "bg-violet-500",
-      hoverBorder: "hover:border-violet-500/60 dark:hover:border-violet-400/60",
+      hoverBorder: "hover:border-purple/50",
       hoverText: "group-hover:text-violet-500",
     },
     {
@@ -55,9 +59,9 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       icon: ShieldCheck,
       score: formatScore(score.behaviour_score),
       scoreSub: "Manager & peer feedback",
-      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      color: "bg-purple/10 text-purple border-purple/20",
       fill: "bg-purple-500",
-      hoverBorder: "hover:border-purple-500/60 dark:hover:border-purple-400/60",
+      hoverBorder: "hover:border-purple/50",
       hoverText: "group-hover:text-purple-500",
     },
     {
@@ -70,9 +74,9 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
           ? `${latestReview.final_score}%`
           : latestReview?.status || "Draft",
       scoreSub: latestReview ? `Status: ${latestReview.status || "draft"}` : "No review yet",
-      color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+      color: "bg-indigo-500/10 text-info border-indigo-500/20",
       fill: "bg-indigo-500",
-      hoverBorder: "hover:border-indigo-500/60 dark:hover:border-indigo-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-indigo-500",
     },
   ]

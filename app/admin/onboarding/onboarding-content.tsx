@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { formatWATDateTime, formatWATRelative, toLocalISODate } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,13 +20,13 @@ import {
   Download,
   IdCard,
   Mail,
-  RefreshCw,
   Shield,
   UserCheck,
   Users,
   UserX,
 } from "lucide-react"
 
+import { apiFetch } from "@/lib/api-client"
 export interface OnboardingRow {
   id: string
   employee_number: string | null
@@ -80,7 +80,7 @@ interface OnboardingPayload {
 }
 
 async function fetchOnboarding(): Promise<OnboardingPayload> {
-  const response = await fetch("/api/admin/onboarding", {
+  const response = await apiFetch("/api/admin/onboarding", {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -134,8 +134,6 @@ function toCsv(rows: OnboardingRow[]) {
 }
 
 export function OnboardingContent() {
-  const queryClient = useQueryClient()
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.adminOnboarding(),
     queryFn: fetchOnboarding,
@@ -337,22 +335,11 @@ export function OnboardingContent() {
       title="Onboarding"
       description="Every staff profile, including not-yet-onboarded placeholders, and whether the person has ever signed in."
       icon={UserCheck}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as OnboardingTab)}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOnboarding() })}
-            disabled={isLoading}
-            className="h-8 gap-1.5 sm:gap-2"
-          >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           <Button size="sm" onClick={exportCsv} disabled={scopedRows.length === 0} className="h-8 gap-1.5 sm:gap-2">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export CSV</span>
@@ -464,11 +451,9 @@ export function OnboardingContent() {
             subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>
               row.has_signed_in ? (
-                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
-                  Signed in
-                </Badge>
+                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">Signed in</Badge>
               ) : (
-                <Badge className="border-red-500/20 bg-red-500/10 text-[10px] text-red-600">Never</Badge>
+                <Badge className="border-red-500/20 bg-red-500/10 text-xs text-red-600">Never</Badge>
               ),
             detail: {
               title: (row) => row.full_name,

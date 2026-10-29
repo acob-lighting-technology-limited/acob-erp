@@ -1,6 +1,5 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -12,9 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { toast } from "sonner"
 import {
   LogOut,
   Menu,
@@ -37,6 +35,7 @@ import { cn, getInitials } from "@/lib/utils"
 import { MatrixLogo } from "@/components/matrix-logo"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
+import { useLogout } from "@/hooks/use-logout"
 interface NavbarProps {
   user?: {
     email?: string
@@ -58,7 +57,6 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(
     avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
   )
-  const router = useRouter()
   const pathname = usePathname()
   const isMaintenancePage = pathname.startsWith("/maintenance")
   const dashboardHref = isAdminMode ? "/admin" : "/profile"
@@ -103,12 +101,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
     }
   }, [])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    toast.success("Logged out successfully")
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const guideButton = (
     <Tooltip>

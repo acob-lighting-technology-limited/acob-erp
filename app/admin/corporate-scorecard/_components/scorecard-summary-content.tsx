@@ -16,6 +16,7 @@ import { apiFetch } from "@/lib/api-client"
 import { ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 import { exportSummaryToExcel, exportSummaryToPdf } from "@/lib/corporate-scorecard/export"
 import { PlanYearSelect } from "./plan-year-select"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type PerspectiveRollup = {
   perspective: string
@@ -76,7 +77,7 @@ export function ScorecardSummaryContent({
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
-    queryKey: ["corporate-scorecard-summary", selectedYear],
+    queryKey: QUERY_KEYS.corporateScorecardSummary(selectedYear),
     queryFn: async () => {
       const query = selectedYear ? `?year=${selectedYear}` : ""
       const res = await apiFetch(`/api/corporate-scorecard/summary${query}`, { cache: "no-store" })
@@ -129,7 +130,7 @@ export function ScorecardSummaryContent({
           ) : (
             <div className="w-32 space-y-1">
               <Progress value={r.attainmentPct} />
-              <span className="text-muted-foreground text-[11px]">{r.attainmentPct}%</span>
+              <span className="text-muted-foreground text-xs">{r.attainmentPct}%</span>
             </div>
           ),
       },
@@ -148,7 +149,6 @@ export function ScorecardSummaryContent({
       title={tabs ? "Corporate Scorecard" : "Scorecard Summary"}
       description={`Company-wide attainment against the ${planYear} plan. Departments are scored on CORE ownership only.`}
       icon={BarChart3}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}

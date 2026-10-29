@@ -7,6 +7,9 @@ import { Brain } from "lucide-react"
 import { getCbtSettings } from "@/lib/cbt-config"
 import { CbtSettingsForm } from "./_components/cbt-settings-form"
 
+export const metadata: Metadata = { title: "Admin CBT settings" }
+import type { Metadata } from "next"
+
 export default async function CbtSettingsPage() {
   const supabase = await createClient()
   const {

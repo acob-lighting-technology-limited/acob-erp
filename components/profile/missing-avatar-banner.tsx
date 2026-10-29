@@ -82,7 +82,7 @@ export function MissingAvatarBanner({ hasAvatar }: MissingAvatarBannerProps) {
       ref={bannerRef}
       role="status"
       // Sticks just under the fixed h-16 navbar; opaque so scrolled content doesn't show through.
-      className="sticky top-16 z-30 flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 md:px-6 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+      className="border-warning/30 bg-warning/15 text-warning sticky top-16 z-30 flex items-center gap-3 border-b px-4 py-2.5 text-sm md:px-6"
     >
       <Camera className="h-4 w-4 shrink-0" aria-hidden />
       <p className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function MissingAvatarBanner({ hasAvatar }: MissingAvatarBannerProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            className="text-warning hover:bg-warning/25 h-8 w-8 shrink-0"
             onClick={handleDismiss}
             aria-label="Remind me tomorrow"
           >

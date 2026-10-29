@@ -36,11 +36,12 @@ import {
   type ControlledDocType,
 } from "@/lib/documentation/controlled"
 import { AcknowledgementProgress, ControlledDocStatusBadge, ReviewDateBadge } from "./controlled-doc-badges"
-import { ControlledDocAcknowledgementsDialog } from "./controlled-doc-acknowledgements-dialog"
+import { ControlledDocAcknowledgementsSheet } from "./controlled-doc-acknowledgements-sheet"
 import { ControlledDocActionDialog, type ControlledDocAction } from "./controlled-doc-action-dialog"
 import { ControlledDocFormDialog } from "./controlled-doc-form-dialog"
 import { ControlledDocVersionDialog } from "./controlled-doc-version-dialog"
 import { ControlledDocViewDialog } from "./controlled-doc-view-dialog"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const REVIEW_LABELS = {
   overdue: "Overdue",
@@ -97,8 +98,8 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
   const permissions = data?.permissions ?? { canCreate: false, manageableDepartments: [] }
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["controlled-docs", type] })
-    void queryClient.invalidateQueries({ queryKey: ["controlled-doc"] })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDocs(type) })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDoc() })
   }
 
   const stats = useMemo(() => {
@@ -135,7 +136,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         render: (r) => (
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.title}</span>
-            {r.category && <span className="text-muted-foreground text-[11px]">{r.category}</span>}
+            {r.category && <span className="text-muted-foreground text-xs">{r.category}</span>}
           </div>
         ),
       },
@@ -161,9 +162,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         render: (r) => (
           <div className="flex flex-col">
             <span className="text-xs font-medium">v{r.current_version?.version_number ?? "—"}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {formatDocDate(r.current_version?.effective_date)}
-            </span>
+            <span className="text-muted-foreground text-xs">{formatDocDate(r.current_version?.effective_date)}</span>
           </div>
         ),
         hideOnMobile: true,
@@ -262,7 +261,6 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
       title={meta.plural}
       description={description}
       icon={Icon}
-      backLink={backLink}
       actions={
         permissions.canCreate ? (
           <Button size="sm" onClick={() => setIsCreateOpen(true)}>
@@ -385,7 +383,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
             `${r.reference_code} · v${r.current_version?.version_number ?? "—"} · ${CONTROLLED_DOC_STATUS_LABELS[r.status]}`,
           trailing: (r) =>
             isPolicy && r.acknowledgement ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 {r.acknowledgement.acknowledged}/{r.acknowledgement.total}
               </Badge>
             ) : (
@@ -435,7 +433,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         onSaved={refresh}
       />
       <ControlledDocViewDialog documentId={viewingId} onOpenChange={(open) => !open && setViewingId(null)} />
-      <ControlledDocAcknowledgementsDialog doc={ackDoc} onOpenChange={(open) => !open && setAckDoc(null)} />
+      <ControlledDocAcknowledgementsSheet doc={ackDoc} onOpenChange={(open) => !open && setAckDoc(null)} />
       <ControlledDocActionDialog
         action={pendingAction?.action ?? null}
         doc={pendingAction?.doc ?? null}

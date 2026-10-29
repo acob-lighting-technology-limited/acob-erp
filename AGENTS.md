@@ -48,6 +48,24 @@ it on the merits and say what you actually think **before** acting.
 call.** State the trade-off once, then implement what they asked, fully and well. Do not
 re-litigate it, do not quietly implement a different thing, and do not sandbag the work.
 
+### This file can be wrong too
+
+The same honesty applies to `AGENTS.md`. It is written by people and agents, and parts
+of it go stale as the code moves on. Following a rule you believe is wrong is the same
+failure as agreeing with a user you believe is wrong.
+
+- When a rule here contradicts the code (it describes behaviour the code no longer has),
+  produces a worse result for the user, or departs from industry standard without a
+  stated reason, **say so plainly**. Name the rule, what is wrong with it, and what it
+  should say instead.
+- Do not silently ignore the rule, and do not silently follow it. Raise it in your
+  response before or alongside the work, and propose the exact edit to this file.
+- Check first. Search the history (`git log -S`) and any rationale next to the rule; a
+  rule that looks odd often exists because of a past incident. If you still think it
+  is wrong after that, raise it.
+- Once the user decides, update this file in the same change so the next agent does
+  not hit the same contradiction.
+
 ## Engineering Practices — Mandatory
 
 Distilled from the 2026-10 full-repo audit (`docs/audit/2026-10-01-full-repo-critique.md`).
@@ -130,6 +148,20 @@ Every rule here exists because breaking it already cost us something.
   (`` `min-w-[${x}]` `` never generates); use `style` for dynamic values.
 - **Dialogs on phones**: use `ResponsiveModal` (Dialog on desktop, bottom sheet on mobile)
   for forms, not a bare centred `Dialog`.
+- **Sheets and modals — pick by what the user is doing.** *Viewing or reviewing a record* (a profile,
+  a request and its approval trail, a document, a history) opens a **side sheet** built on
+  `DetailSheet` from `@/components/ui/detail-sheet`, with `DetailList` and `SectionHeading` from
+  `@/components/ui/detail-list` for the content. *Creating, editing or confirming* opens a modal
+  (`ResponsiveModal`, or `AlertDialog` to confirm). A long multi-section edit form is a page. Never
+  build a read-only record view as a centred modal, and never hand-roll a sheet shell: the shared one
+  keeps the width, header, divided sections and sticky footer the same everywhere, and keeps the header
+  badges clear of the close button.
+- **Views shared by `/admin` and `/dept/<id>` never hard-code `/admin/…`.** A pure department lead cannot
+  open `/admin`. In a client component call `useShellBase()` (`@/hooks/use-shell-base`): `shell.href("/admin/x")`
+  gives the console's own link, or `null` when the console has no such page (leave the link out), and
+  `shell.backHref(...)` falls back to the nearest page the console has. A server component takes a `basePath`
+  prop. `lib/dept/shell-links.ts` lists the console's pages and a test fails if it drifts from `app/dept`.
+- **Name a component for what it renders.** A side sheet is `*-sheet.tsx`, a modal `*-dialog.tsx`.
 - **Every empty state** says what happened and offers one primary next action.
 
 ### Loading states and skeletons
@@ -224,9 +256,14 @@ feature or fix.
 
 - Format commits as `type: description`.
 - Use a single-line, lowercase subject.
-- Keep the full message to 72 characters or fewer.
+- Keep the **subject line** to 72 characters or fewer.
 - Do not end the subject with a period.
+- A body is optional: leave a blank line after the subject, and keep **every body line to 100 characters or
+  fewer** (commitlint `body-max-line-length`).
 - Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`, `revert`.
+- The commit-msg hook prints one generic "invalid format" message whatever the cause. To see the real reason,
+  run the message through `npx --no -- commitlint`. For a multi-line message, write it to a file and use
+  `git commit -F <file>`; backslashes in `-m` strings are eaten by Git Bash.
 
 Examples:
 
@@ -598,8 +635,8 @@ const filters: DataTableFilter<MyRow>[] = [
 | Row actions | ✅ | Pass `rowActions` |
 | Bulk select + actions toolbar | ✅ | Pass `selectable` + `bulkActions` |
 | Keyboard navigation ↑↓ / Enter | ✅ | Always on |
-| List / card view toggle | ✅ | Pass `viewToggle` + `cardRenderer` |
-| List / card view toggle (mobile) | ✅ | Mobile defaults to list view with horizontal scroll; users opt into card view via the toggle |
+| List / table view toggle | ✅ | Pass `viewToggle` + `mobileRow` (+ `contactsView`). The `mobileRow` list stands in for the table below `md` |
+| Card view | opt-in | Pass `cards` **and** `cardRenderer`. Off by default: on most tables a card repeats the list row. Use it only where a card shows what a row cannot (a summary, a chart, a progress bar), or where a page has no `mobileRow` and cards are its phone view |
 | URL-synced filters | ✅ | Pass `urlSync` — search + filters write to query params |
 
 ### Stats cards — required on every table page
@@ -622,15 +659,16 @@ import { StatGrid } from "@/components/ui/stat-grid"
 </StatGrid>
 ```
 
-**The mobile rule `StatGrid` enforces: one row, three cards maximum.** Columns
-are `min(cardCount, 3)` below `sm`; a fourth card and beyond is hidden on phones
-and returns from `sm` up. A stats band must never cost a phone two rows before
-the data starts.
+**The mobile rule `StatGrid` enforces: a single line, not cards.** Below `sm` the cards become one
+scrolling line of metrics (`12 Staff  3 Pending  1 Overdue`) derived from the cards' own `title` and
+`value`, so a page writes each metric once and the two renderings cannot disagree. From `sm` up the cards
+return as a grid. A stats band must never cost a phone more than one line before the data starts. (A grid
+whose children are not plain `StatCard`s cannot be reduced to a line and keeps the old rule: one row of
+three cards.)
 
-**Priority is source order.** The first three children are the ones a phone
-keeps. There is deliberately no `priority` prop — a page that wants a different
-card on mobile **reorders its JSX**, so the code reads in the same order the
-reader sees.
+**Priority is source order.** The first metrics are the ones a phone shows first, and the line scrolls
+sideways for the rest. There is deliberately no `priority` prop — a page that wants a different metric
+first **reorders its JSX**, so the code reads in the same order the reader sees.
 
 This matters more than it looks. Pages naturally list metrics in workflow order
 (`Total → In Progress → Submitted → Overdue`), which puts the exception state
@@ -662,13 +700,24 @@ table or filter bar. Use `ExportOptionsDialog` from
 `@/components/admin/export-options-dialog`. Export logic lives in
 `@/lib/<section>/export.ts`.
 
+**Shells.** Every app shell renders `SkipToContent` first and the content area is `#main-content`. A
+hand-built slide-in drawer uses `useDrawerA11y` (Escape, focus trap, focus return, `inert` while closed);
+prefer `Sheet`, which does all of this already.
+
+**Header buttons.** A header shows one main button, Export when the page has one, and
+`HeaderMoreMenu` (`@/components/ui/patterns/header-more-menu`) for anything else. Do not add a
+Refresh button to a page whose data is a TanStack query: it refetches on window focus.
+
+`DataTable` has no built-in `export` prop (removed): two exports on one page, one in the toolbar and one in
+the header, confused users. A page that also needs a column picker opens `ExportColumnsDialog` from
+the `ExportOptionsDialog` choice; it is a second step, not a second export system.
+
 ### Back link convention
 
-| Page location | Back link |
-|--------------|-----------|
-| `/admin/hr/pms/…` | `{ href: "/admin/hr/pms", label: "Back to PMS" }` |
-| `/admin/hr/…` | `{ href: "/admin/hr", label: "Back to HR" }` |
-| `/admin/…` | `{ href: "/admin", label: "Back to Admin" }` |
+**A page the sidebar opens directly has no back link.** The sidebar is the way back; a second control
+for the same job costs a header line and drifts into eight different wordings. A **nested** page (a record
+detail, a cycle, a worksheet) links to its parent, labelled "Back to <the parent's sidebar name>", for
+example "Back to Leave" or "Back to Payroll".
 
 ### Colour / design token standards
 
@@ -687,6 +736,12 @@ These five icon tints are the **only** sanctioned raw palette classes. Status co
 `@/components/ui/patterns/status-badge` — never a local `getStatusColor()` map or
 hand-picked `bg-green-100 text-green-700`. Never add `dark:` overrides to fix a colour;
 if a token is wrong in one theme, fix the token in `app/globals.css`.
+
+**Status tones.** For a colour that means something (done, late, warning, info), use the tone
+tokens in `app/globals.css`: `text-success`, `text-warning`, `text-danger`, `text-info`,
+`text-purple`, with `bg-success/15` and `border-success/30` for the tint. Each token carries
+its own light and dark value, so a call site never writes `dark:`. A status shown as a badge
+uses `<StatusBadge status=... tone=... />`, whose `TONE_CLASSES` is the single map of these.
 
 ### Hard prohibitions
 
@@ -784,10 +839,20 @@ width. Put the modal behind a **button in the sheet** instead — pass `onSelect
 and it becomes the sheet's primary action.
 
 `mobileRow.detail` is optional. Omit it and `DataTable` synthesizes the sheet from
-`columns` — every column with an `accessor` becomes a field (`hideOnMobile` ones
+`columns`: every column with an `accessor` becomes a field (`hideOnMobile` ones
 included; the sheet is exactly where data too wide for the mobile table belongs),
-and `onSelect` becomes the footer button. Supply `detail` explicitly only to
-curate which fields show or to add more actions.
+and a column with only a `render` (a status badge, an amount) shows its rendered cell.
+Mechanical columns (`actions`, `select`, `expand`, S/N) are skipped, and a column can
+opt out with `sheet: false`. Supply `detail` explicitly only to curate which fields
+show.
+
+The sheet carries **everything the table can do**. Its footer is built from `rowActions`:
+hidden actions drop out per row, destructive ones go last, and `onSelect` becomes a
+leading "Open". Up to three show as buttons; with more, the rest sit behind **More**.
+An explicit `detail.actions` wins over the derived ones. So a page does not repeat its
+row actions inside `detail`, and a phone can approve, edit or delete what the desktop
+menu can. If the table is `expandable`, that panel renders inside the sheet under the
+fields; the row stays closed unless `mobileRow.expandInline` is set.
 
 - ❌ `onSelect` that opens a dialog and no `detail` — that *was* the bug on 42
   tables: the tap flew past the sheet straight into the modal.
@@ -806,10 +871,11 @@ table on a phone). The toggle's pressed state is resolved the same way. This
 applies only while the reader has made no choice; after that a single mode
 renders. Any other pair falls back to the JS breakpoint.
 
-`contactsView` removes the desktop table from view, and `expandable` never fires in
-it. Anything the expandable row used to show — an attachment link, a timeline, a
-"returned for correction" instruction — has to move into `detail.fields`, or it is
-simply gone. Fields that open something take `href`, not `copyable`.
+`contactsView` removes the desktop table from view. The `expandable` panel is not
+lost: a tap on a list row opens the sheet and the panel renders inside it, under the
+fields, so an attachment link, a timeline or a "returned for correction" instruction
+still reaches a phone. Keep that panel free of its own outer padding and border, as it
+now sits in two containers. Fields that open something take `href`, not `copyable`.
 
 ### Stats parity
 
@@ -835,14 +901,84 @@ reflow on mount. Use the canonical skeletons from
 Do not hand-roll a single bar or generic card placeholder for a table page. Match
 the expected stats count, tabs, filter count, action count, and table density.
 
-### UI audit tooling
+### UI guard — audit and ratchet
 
-- Run `npm run ui:audit` after table, skeleton, or page-shell changes.
-- Run `npm run ui:ensure-loading` only when intentionally adding missing route
-  loading files.
-- Review generated loading files manually before committing them.
-- UI audit scripts must normalize Windows paths with `toPosix()` before route
-  matching.
+`npm run ui:guard` runs in the pre-push hook and in CI. It is two checks:
+
+- **`ui:audit`** (`scripts/ui/audit-reusables.mjs`): every page has a `loading.tsx` (a page that only
+  redirects is exempt), uses the shared page header, and tables, stat cards and dialogs use the shared
+  components. Intentional exceptions (standalone public pages) live in `scripts/ui/ui-audit-allowlist.json`.
+- **`ui:ratchet`** (`scripts/ui/ratchet.mjs`): for each rule below, a file's count of the pattern may not
+  rise above `scripts/ui/ratchet-baseline.json`. The baseline is **per file**, so fixing one file cannot
+  pay for a new violation in another, and a new file starts at zero.
+
+| Rule | Counts | Do this instead |
+|------|--------|-----------------|
+| `tiny-text` | `text-[9px]` to `text-[11px]` | `text-xs` is the minimum |
+| `locale-without-en-ng` | a date or time `toLocale*String()` with neither `en-NG` nor a `timeZone` | `@/lib/utils/date` helpers, or `en-NG` and `timeZone: "Africa/Lagos"` |
+| `raw-img` | `<img>` outside email/PDF/OG renderers | `next/image` |
+| `window-dialogs` | `window.confirm/alert/prompt`, bare `alert()` | `AlertDialog`, sonner |
+| `key-index` | `key={i}`, `key={idx}`, `key={index}` | a stable id |
+| `dialog-in-page` | `<DialogContent>` in a page/view/`*-content` file | move to `_components/` |
+| `explicit-any` | `: any`, `as any`, `any[]` | a real type or `unknown` |
+| `eslint-disable` | disable comments | fix the cause |
+| `select-star` | `.select("*")` | list the columns |
+| `inline-query-key` | `queryKey: ["literal"...]` | `QUERY_KEYS` in `lib/query-keys.ts` |
+| `dark-color-override` | `dark:bg-*`, `dark:text-*`, `dark:border-*` | a theme token or `StatusBadge` |
+| `local-status-colour` | `bg-*-100 text-*` status pairs | `StatusBadge` |
+| `fixed-px-width` | `w-[400px]` or wider | `w-full` with `max-w-*` |
+| `click-div` | `<div onClick>` | `<button>` or `<Link>` |
+| `client-page` | `page.tsx` that starts with `"use client"` | server page, client child |
+| `page-missing-metadata` | server `page.tsx` without `metadata` | export a title |
+| `title-brand-suffix` | a page title that already ends in `| Matrix` or `| ACOB…` | the root layout adds the brand; write only the page name |
+| `file-lines` | a file over 1,000 lines, by its length | extract; never grow it |
+
+Working with it:
+
+- **The check fails:** fix the new occurrence. Do not edit the baseline to make it pass.
+- **You removed violations:** run `npm run ui:ratchet:update` and commit the lowered baseline in the same
+  change. It refuses to write a baseline in which any count is higher.
+- **Adding a rule:** add it (with a test) in `scripts/ui/ratchet-rules.mjs`, generate the baseline once with
+  `node scripts/ui/ratchet.mjs --update --allow-increase`, and review the totals in the PR. That flag is
+  for this case only.
+- `npm run ui:ratchet -- --summary` prints today's totals per rule.
+- Run `npm run ui:ensure-loading` only when intentionally adding missing route loading files, and review
+  what it generates before committing.
+- UI audit scripts must normalize Windows paths with `toPosix()` before route matching.
+
+The baseline is today's debt, not a target. `docs/audit/2026-10-27-tables-sheets-ui-review.md` lists
+every file behind it and the fix for each.
+
+---
+
+## Page Types Standard — Mandatory for every `page.tsx`
+
+Every page is exactly one of these types. The type decides its frame, its width and its loading skeleton,
+so pages of the same type look and load the same way.
+
+| Type | For | Frame | `PageWrapper` width | `loading.tsx` |
+|------|-----|-------|---------------------|---------------|
+| Table | a list of records | `DataTablePage` | `full` | `TablePageSkeleton` |
+| Dashboard | KPIs, queues, activity | `PageWrapper` + `PageHeader` + `Section` | `full` | `DashboardSkeleton` |
+| Hub | links into sub-modules | `PageWrapper` + `PageHeader` + `ModuleHubGrid` | `full` | `CardGridPageSkeleton` |
+| Detail | one record | `PageWrapper` + `PageHeader` with a back link | `content` or `full` | `DetailPageSkeleton` |
+| Form | create, edit, settings | `PageWrapper` + `PageHeader` | `form` | `FormPageSkeleton` |
+| Auth | sign-in and recovery | `AuthShell` | its own | `AuthPageSkeleton` |
+| Standalone | public, print or share pages with their own layout | its own | its own | none; list it in `ui-audit-allowlist.json` |
+
+Rules for every type:
+
+- **The skeleton mirrors the page.** Pass the same stat count, tabs, filter count and action count the page
+  renders, and `list="responsive"` when the page opens as a phone list. A skeleton that differs from the page
+  makes the layout jump when the data arrives.
+- **One loading shape.** If a client page shows a full-page loader while its query runs, `PageLoader` uses the
+  same variant and props as the route's `loading.tsx`, never a second, different skeleton.
+- **The title comes from `PageHeader`.** Do not hand-write an `<h1>`.
+- **The browser tab names the page.** A server `page.tsx` exports
+  `metadata = { title: "<Page title>" }`: the root layout adds " | Matrix", so never write the brand
+  yourself. Keep `page.tsx` a server
+  component and put interaction in a `"use client"` child; both are in the ratchet.
+- **Name the page like its sidebar entry.** Someone who clicks "Leave" should land on "Leave".
 
 ---
 

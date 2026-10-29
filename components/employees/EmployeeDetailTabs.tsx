@@ -26,29 +26,29 @@ function getStatusColor(status: string) {
   switch (status?.toLowerCase()) {
     case "completed":
     case "resolved":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     case "in_progress":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info/15 text-info"
     case "pending":
     case "open":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning/15 text-warning"
     case "assigned":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
+      return "bg-purple/15 text-purple"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 
 function getPriorityColor(priority: string) {
   switch (priority?.toLowerCase()) {
     case "high":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger/15 text-danger"
     case "medium":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning/15 text-warning"
     case "low":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 
@@ -167,7 +167,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No tasks assigned to this user</p>
+              <EmptyState compact title="No tasks assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -217,7 +217,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No devices assigned to this user</p>
+              <EmptyState compact title="No devices assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -267,7 +267,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No assets assigned to this user</p>
+              <EmptyState compact title="No assets assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -311,7 +311,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No documentation created by this user</p>
+              <EmptyState compact title="No documentation created by this user" />
             )}
           </CardContent>
         </Card>
@@ -359,7 +359,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No feedback submitted by this user</p>
+              <EmptyState compact title="No feedback submitted by this user" />
             )}
           </CardContent>
         </Card>

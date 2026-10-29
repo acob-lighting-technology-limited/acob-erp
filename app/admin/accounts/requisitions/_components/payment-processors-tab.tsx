@@ -17,6 +17,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import type { ExtraTab } from "@/components/requisitions/requisitions-list-page"
 import { useStaffOptions } from "@/components/requisitions/use-staff-options"
 import { apiFetch } from "@/lib/api-client"
+import { useConfirm } from "@/providers/confirm-provider"
 
 interface ProcessorRow {
   profile_id: string
@@ -26,6 +27,7 @@ interface ProcessorRow {
 
 /** Admin tab: who records payments (Processed By). The Accounts lead always can and is not listed. */
 export function usePaymentProcessorsTab(): ExtraTab {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<ProcessorRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function usePaymentProcessorsTab(): ExtraTab {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/requisitions/payment-processors")
+      const res = await apiFetch("/api/requisitions/payment-processors")
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load payment processors")
       setRows(json.data || [])
@@ -76,6 +78,13 @@ export function usePaymentProcessorsTab(): ExtraTab {
   }
 
   const remove = async (row: ProcessorRow) => {
+    const ok = await confirm({
+      title: "Remove this payment processor?",
+      description: row.person?.full_name ?? undefined,
+      confirmLabel: "Remove",
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/requisitions/payment-processors?profile_id=${row.profile_id}`, {
         method: "DELETE",
@@ -146,7 +155,7 @@ export function usePaymentProcessorsTab(): ExtraTab {
             title: (r) => r.person?.full_name || "—",
             subtitle: (r) => r.person?.department || "",
           }}
-          rowActions={[{ label: "Remove", onClick: (row) => void remove(row) }]}
+          rowActions={[{ label: "Remove", variant: "destructive", onClick: (row) => void remove(row) }]}
         />
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogContent className="sm:max-w-md">

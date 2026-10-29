@@ -282,6 +282,16 @@ export async function POST(request: NextRequest) {
     if (hasWorkLinkConflict(payload.project_id, payload.portfolio_id)) {
       return apiError(WORK_LINK_CONFLICT, ApiErrorCode.VALIDATION_ERROR, 400)
     }
+    if (payload.project_id && payload.status !== "completed" && payload.status !== "cancelled") {
+      const { data: linkedProject } = await supabase
+        .from("projects")
+        .select("status")
+        .eq("id", payload.project_id)
+        .maybeSingle()
+      if (linkedProject?.status === "completed") {
+        return apiError("Cannot attach an uncompleted task to a completed project", ApiErrorCode.VALIDATION_ERROR, 400)
+      }
+    }
     const resolvedDepartment = payload.department || profile?.department || null
 
     // Determine target users to assign

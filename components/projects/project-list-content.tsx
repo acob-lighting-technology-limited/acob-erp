@@ -14,7 +14,6 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import {
   FolderGit2,
   FolderKanban,
-  RefreshCw,
   Calendar,
   MapPin,
   Wrench,
@@ -72,6 +71,7 @@ import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 
+import { apiFetch } from "@/lib/api-client"
 // Define user-facing project type (includes tasks count payload)
 export interface ProjectRow {
   id: string
@@ -117,7 +117,7 @@ export interface ProjectContentProps {
 }
 
 async function fetchUserProjects(): Promise<ProjectRow[]> {
-  const res = await fetch("/api/projects", { cache: "no-store" })
+  const res = await apiFetch("/api/projects", { cache: "no-store" })
   const payload = await res.json()
   if (!res.ok) {
     throw new Error(payload?.error || `Failed to load projects (${res.status})`)
@@ -427,7 +427,6 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
           ? "Overview and detailed task status tracking for all company ongoing installations."
           : "View ongoing mini-grid electrification and solar installations progress and task milestones."
       }
-      backLink={admin ? { href: "/admin", label: "Back to Admin" } : undefined}
       spacing="tight"
       tabs={tabs}
       activeTab={activeTab}
@@ -435,15 +434,6 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
       actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {admin && (
             <Button size="sm" onClick={() => setIsAddOpen(true)}>
               <Plus className="h-4 w-4 sm:mr-2" />
@@ -595,15 +585,15 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Location</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Location</p>
                     <p className="font-medium">{r.location || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Technology</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Technology</p>
                     <p className="font-medium">{r.technology_type || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Capacity</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Capacity</p>
                     <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
                   </div>
                 </div>
@@ -625,7 +615,7 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
           }}
           expandable={{
             render: (r) => (
-              <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
+              <div className="space-y-3">
                 <ProjectSummary project={r} health={healthById.get(r.id)} />
                 <div className="flex justify-end">
                   <Button asChild size="sm" variant="outline">

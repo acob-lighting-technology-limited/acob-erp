@@ -16,7 +16,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
-import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
+import { DocViewSheet } from "@/components/documentation/doc-view-sheet"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
 import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 
@@ -203,10 +203,7 @@ export function DocumentationContent({
     draft: docs.filter((d) => d.is_draft).length,
   }
 
-  const getStatusColor = (isDraft: boolean) =>
-    isDraft
-      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+  const getStatusColor = (isDraft: boolean) => (isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success")
 
   const categoryOptions = useMemo(
     () =>
@@ -289,10 +286,9 @@ export function DocumentationContent({
 
       <TabsContent value="knowledge-docs" className="space-y-4">
         <DataTablePage
-          title="My Documentation"
+          title="Department"
           description="Create and manage your work documentation"
           icon={FileText}
-          backLink={{ href: backLinkHref, label: backLinkLabel }}
           spacing="tight"
           actionsPlacement="inline-always"
           actions={
@@ -421,7 +417,7 @@ export function DocumentationContent({
                   <h4 className="line-clamp-1 text-sm font-semibold">{d.title}</h4>
                   <Badge className={getStatusColor(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
                 </div>
-                <p className="text-muted-foreground text-[11px]">{d.category ?? "-"}</p>
+                <p className="text-muted-foreground text-xs">{d.category ?? "-"}</p>
                 <p className="text-muted-foreground mt-2 line-clamp-3 text-xs">{d.content}</p>
               </div>
             )}
@@ -431,7 +427,7 @@ export function DocumentationContent({
             urlSync
           />
 
-          <DocViewDialog
+          <DocViewSheet
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
             doc={selectedDoc}

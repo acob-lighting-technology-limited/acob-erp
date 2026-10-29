@@ -8,7 +8,7 @@ import type { Database } from "@/types/database"
 import { GuideContent, type GuideExtraModule } from "./guide-content"
 
 export const metadata: Metadata = {
-  title: "Matrix Guide | ACOB Lighting Technology Limited",
+  title: "Matrix Guide",
   description: "What Matrix is, the modules you can use, and how to get started.",
 }
 

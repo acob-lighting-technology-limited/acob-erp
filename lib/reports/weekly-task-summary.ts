@@ -1,6 +1,7 @@
 import { isTaskInCycle, type CycleAnchoredTask } from "@/lib/tasks/scoring"
 import { normalizeDepartmentName } from "@/shared/departments"
 
+import { apiFetch } from "@/lib/api-client"
 /**
  * Per-department task counts shown on the weekly report PowerPoint.
  *
@@ -187,7 +188,7 @@ export function attachActionPoints(
 
 /** Client-side: task counts for one report week, ready to pass to the PowerPoint export. */
 export async function loadWeeklyTaskSummaryOptions(week: number, year: number): Promise<WeeklyTaskSummaryOptions> {
-  const res = await fetch(`/api/reports/weekly-reports/task-summary?week=${week}&year=${year}`)
+  const res = await apiFetch(`/api/reports/weekly-reports/task-summary?week=${week}&year=${year}`)
   if (!res.ok) throw new Error("Could not load task counts for this week")
   const { data } = (await res.json()) as { data: WeeklyDeptTaskSummary[] }
   return { summaries: new Map(data.map((d) => [d.department, d])) }

@@ -2,6 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { BillsPage, type Bill } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Bills" }
+
 const log = logger("finance-bills-page")
 
 export const dynamic = "force-dynamic"

@@ -65,7 +65,7 @@ function Steps({ items }: { items: React.ReactNode[] }) {
   return (
     <ol className="list-decimal space-y-1.5 pl-5 text-sm">
       {items.map((item, i) => (
-        <li key={i}>{item}</li>
+        <li key={`row-${i}`}>{item}</li>
       ))}
     </ol>
   )

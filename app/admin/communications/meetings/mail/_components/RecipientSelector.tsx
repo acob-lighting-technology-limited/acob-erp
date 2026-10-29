@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, UserPlus, Mail, Plus, Search, X, RotateCcw } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 type Employee = {
   id: string
@@ -135,7 +136,7 @@ export function RecipientSelector({
                 <label
                   key={emp.id}
                   className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                    selectedEmployeeIds.has(emp.id) ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
+                    selectedEmployeeIds.has(emp.id) ? "bg-success/15" : "hover:bg-muted/50"
                   }`}
                 >
                   <Checkbox checked={selectedEmployeeIds.has(emp.id)} onCheckedChange={() => toggleEmployee(emp.id)} />
@@ -152,9 +153,7 @@ export function RecipientSelector({
                   )}
                 </label>
               ))}
-              {filteredEmployees.length === 0 && (
-                <div className="text-muted-foreground py-8 text-center text-sm">No employees found</div>
-              )}
+              {filteredEmployees.length === 0 && <EmptyState compact title="No employees found" />}
             </div>
             <p className="text-muted-foreground text-xs">
               {selectedEmployeeIds.size} of {employees.length} selected
@@ -227,9 +226,9 @@ export function RecipientSelector({
                 <p className="text-sm font-medium text-orange-600">
                   {missedRecipients.length} missed recipient{missedRecipients.length !== 1 ? "s" : ""} found:
                 </p>
-                <div className="max-h-[200px] overflow-y-auto rounded-lg border bg-orange-50 p-3 dark:bg-orange-950/20">
+                <div className="bg-warning/15 max-h-[200px] overflow-y-auto rounded-lg border p-3">
                   {missedRecipients.map((email) => (
-                    <div key={email} className="py-0.5 font-mono text-xs text-orange-800 dark:text-orange-300">
+                    <div key={email} className="text-warning py-0.5 font-mono text-xs">
                       {email}
                     </div>
                   ))}

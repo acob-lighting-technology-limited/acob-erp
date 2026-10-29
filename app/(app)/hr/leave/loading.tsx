@@ -6,18 +6,18 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function LeaveLoading() {
   return (
     <TablePageSkeleton
+      statCards={4}
       filters={2}
       columns={5}
       rows={6}
-      showStats
-      statCards={3}
-      spacing="tight"
-      showBackLink
-      inlineActions
-      actions={2}
+      showStats={true}
       tabs={2}
+      actions={3}
+      showBackLink={false}
+      statBadges={4}
+      spacing="tight"
+      inlineActions
       list="responsive"
-      groups={1}
     />
   )
 }

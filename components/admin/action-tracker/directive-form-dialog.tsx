@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { depsChanged } from "@/lib/utils/deps-changed"
 
 export interface EditableDirective {
@@ -81,7 +82,7 @@ export function DirectiveFormDialog({
   const [meetingDate, setMeetingDate] = useState("")
 
   const { data: staff = [] } = useQuery({
-    queryKey: ["action-tracker", "directive-staff-options"],
+    queryKey: QUERY_KEYS.actionTracker("directive-staff-options"),
     enabled: isOpen,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -222,7 +223,7 @@ export function DirectiveFormDialog({
         <div className="grid gap-5 py-2">
           <div className="bg-muted/30 grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
             <div className="col-span-2 space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Meeting Date</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Meeting Date</Label>
               <Input
                 type="date"
                 value={meetingDate}
@@ -231,7 +232,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Week</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Week</Label>
               <Input
                 type="number"
                 min={1}
@@ -242,7 +243,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Year</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Year</Label>
               <Input
                 type="number"
                 value={year}

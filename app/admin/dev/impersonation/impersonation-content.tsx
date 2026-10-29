@@ -10,7 +10,9 @@ import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
+import { ManualLinkDialog } from "./_components/manual-link-dialog"
 
 type ImpersonationRow = {
   id: string
@@ -91,15 +93,15 @@ async function copyLinkWithFallback(link: string): Promise<"copied" | "manual"> 
     document.body.removeChild(textarea)
     if (ok) return "copied"
   } catch {
-    // Fall through to prompt fallback.
+    // Fall through to the manual-copy dialog.
   }
 
-  window.prompt("Copy login link", link)
   return "manual"
 }
 
 export function DevImpersonationContent() {
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null)
+  const [manualLink, setManualLink] = useState<string | null>(null)
 
   const {
     data: rows = [],
@@ -107,7 +109,7 @@ export function DevImpersonationContent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["dev-impersonation-targets"],
+    queryKey: QUERY_KEYS.devImpersonationTargets(),
     queryFn: fetchTargets,
   })
 
@@ -198,7 +200,7 @@ export function DevImpersonationContent() {
                 if (mode === "copied") {
                   toast.success(`Login link copied for ${row.full_name}`)
                 } else {
-                  toast.info("Clipboard blocked. Copy the link from the prompt.")
+                  setManualLink(link)
                 }
               } catch (actionError) {
                 toast.error(actionError instanceof Error ? actionError.message : "Failed to copy login link")
@@ -291,7 +293,7 @@ export function DevImpersonationContent() {
           title: (row) => row.full_name,
           subtitle: (row) => `${row.department} · ${row.role}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {row.role}
             </Badge>
           ),
@@ -340,6 +342,7 @@ export function DevImpersonationContent() {
         emptyIcon={Users}
         urlSync
       />
+      <ManualLinkDialog link={manualLink} onClose={() => setManualLink(null)} />
     </div>
   )
 }

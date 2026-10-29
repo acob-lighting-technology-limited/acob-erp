@@ -32,6 +32,7 @@ import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document
 import { apiFetch } from "@/lib/api-client"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type DocumentType = "minutes"
 
@@ -107,7 +108,7 @@ export function MeetingDocumentTypeTable({
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["meeting-doc-table", documentType],
+    queryKey: QUERY_KEYS.meetingDocTable(documentType),
     queryFn: async (): Promise<MeetingDocument[]> => {
       const response = await apiFetch(
         `/api/reports/meeting-week-documents?documentType=${documentType}&currentOnly=true`
@@ -119,7 +120,7 @@ export function MeetingDocumentTypeTable({
   })
 
   const { data: selectedWeekLockState } = useQuery({
-    queryKey: ["meeting-doc-selected-week-lock", documentType, weekNumber, yearNumber],
+    queryKey: QUERY_KEYS.meetingDocSelectedWeekLock(documentType, weekNumber, yearNumber),
     enabled: !readOnly,
     queryFn: async () => {
       const { data, error: lockError } = await supabase.rpc("weekly_report_lock_state", {
@@ -139,7 +140,7 @@ export function MeetingDocumentTypeTable({
   )
 
   const { data: uploadedByNameMap = new Map<string, string>() } = useQuery({
-    queryKey: ["meeting-doc-uploaded-by", uploadedByIds],
+    queryKey: QUERY_KEYS.meetingDocUploadedBy(uploadedByIds),
     enabled: uploadedByIds.length > 0,
     queryFn: async () => {
       // staff_directory, not profiles: profiles RLS hides other people from a
@@ -754,11 +755,11 @@ export function MeetingDocumentTypeTable({
             return (
               <>
                 {submittedBy && (
-                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs">
                     👤 {submittedBy}
                   </span>
                 )}
-                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px]">
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs">
                   📄 {row.file_name}
                 </span>
               </>

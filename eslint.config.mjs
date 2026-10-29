@@ -49,6 +49,19 @@ export default defineConfig([
           message:
             "Do not derive business dates/times from toISOString(); use toLocalISODate(), toLocalYearMonth(), or toLocalTimeString() from '@/lib/utils/date'.",
         },
+        // A bare fetch() to our own API sends no CSRF token and no x-dept-context, so inside
+        // a /dept console an admin who also leads a department is served every department's data.
+        {
+          // \x2F is "/": esquery cannot parse a literal slash inside its regex syntax.
+          selector:
+            "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value=/^\\x2Fapi\\x2F/]",
+          message: "Use apiFetch from '@/lib/api-client' for /api calls: it adds the CSRF token and dept context.",
+        },
+        {
+          selector:
+            "CallExpression[callee.name='fetch'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\x2Fapi\\x2F/]",
+          message: "Use apiFetch from '@/lib/api-client' for /api calls: it adds the CSRF token and dept context.",
+        },
       ],
     },
   },
@@ -82,6 +95,14 @@ export default defineConfig([
           ],
         },
       ],
+    },
+  },
+  {
+    // The service worker cannot import modules (and has no csrf cookie access), so it calls
+    // fetch() directly.
+    files: ["public/**/*.js"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   globalIgnores(["scripts/**"]),

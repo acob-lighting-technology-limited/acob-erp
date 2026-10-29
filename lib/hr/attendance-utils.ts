@@ -128,7 +128,7 @@ export function getAttendanceMonthOptions(startDate: string = ATTENDANCE_TRACKIN
   while (y > startYear || (y === startYear && m >= startMonth)) {
     const d = new Date(y, m, 1)
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    const label = d.toLocaleDateString("en-US", { timeZone: "Africa/Lagos", month: "long", year: "numeric" })
     options.push({ value, label })
     m--
     if (m < 0) {

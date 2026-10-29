@@ -15,6 +15,7 @@ import { SendResultPanel } from "./_components/SendResultPanel"
 import { SummarySidebarCard } from "./_components/SummarySidebarCard"
 import { useWeeklySummarySend } from "./_components/use-weekly-summary-send"
 
+import { apiFetch } from "@/lib/api-client"
 type Employee = {
   id: string
   full_name: string
@@ -143,7 +144,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
   const { data: activeSchedules = [] } = useQuery({
     queryKey: QUERY_KEYS.adminWeeklySummaryMail(),
     queryFn: async () => {
-      const res = await fetch("/api/admin/reports/weekly-report-schedules", { cache: "no-store" })
+      const res = await apiFetch("/api/admin/reports/weekly-report-schedules", { cache: "no-store" })
       if (!res.ok) {
         if (res.status === 500) return []
         throw new Error((await res.json().catch(() => null))?.error || "Failed to load schedules")
@@ -168,11 +169,13 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
 
   // Fetch docs for ALL selected weeks so the sidebar and send payload are complete
   const { data: allMeetingDocuments = [] } = useQuery({
-    queryKey: ["meeting-week-documents-all", sortedSelectedWeeks, yearNumber],
+    queryKey: QUERY_KEYS.meetingWeekDocumentsAll(sortedSelectedWeeks, yearNumber),
     queryFn: async (): Promise<MeetingWeekDocument[]> => {
       const results = await Promise.all(
         sortedSelectedWeeks.map(async (w) => {
-          const res = await fetch(`/api/reports/meeting-week-documents?week=${w}&year=${yearNumber}&currentOnly=true`)
+          const res = await apiFetch(
+            `/api/reports/meeting-week-documents?week=${w}&year=${yearNumber}&currentOnly=true`
+          )
           const payload = await res.json()
           if (!res.ok) return []
           return (payload.data || []) as MeetingWeekDocument[]
@@ -183,9 +186,9 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
   })
 
   const { data: resolvedMeetingDate } = useQuery({
-    queryKey: ["meeting-mail-effective-date", representativeWeek, yearNumber],
+    queryKey: QUERY_KEYS.meetingMailEffectiveDate(representativeWeek, yearNumber),
     queryFn: async () => {
-      const res = await fetch(`/api/admin/reports/meeting-date?week=${representativeWeek}&year=${yearNumber}`, {
+      const res = await apiFetch(`/api/admin/reports/meeting-date?week=${representativeWeek}&year=${yearNumber}`, {
         cache: "no-store",
       })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to resolve meeting date")

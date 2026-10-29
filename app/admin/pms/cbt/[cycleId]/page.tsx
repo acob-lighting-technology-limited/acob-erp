@@ -1,16 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+export { default } from "./page-client"
 
-// Regular CBT questions moved to the department-lead view; there's no
-// admin-side cycle deep link to send this to anymore.
-export default function AdminPmsCbtCycleRedirectPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace("/admin/pms/cbt")
-  }, [router])
-
-  return null
-}
+export const metadata: Metadata = { title: "Admin CBT details" }

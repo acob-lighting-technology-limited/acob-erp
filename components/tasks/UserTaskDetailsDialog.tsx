@@ -1,25 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useState, type ReactNode } from "react"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { MessageSquare, AlertTriangle, Send, Building2, CalendarDays, Target, User, Gauge, Star } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 import type { Task } from "@/types/task"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import { statusLabel } from "@/components/tasks/TaskStatusControl"
 import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { cn, formatFullName } from "@/lib/utils"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
+  DetailBody,
   DetailActionBar,
   DetailCallout,
-  DetailField,
-  DetailFieldGrid,
+  DetailComposer,
+  DetailProperties,
+  DetailProperty,
   DetailSectionHeading,
+  DetailTimeline,
   DetailTimelineEntry,
 } from "@/components/ui/detail-dialog"
 
@@ -28,10 +29,19 @@ interface TaskUpdate {
   content?: string
   update_type: string
   created_at: string
+  old_value?: string | null
+  new_value?: string | null
   user?: {
     first_name: string
     last_name: string
   }
+}
+
+type TaskTimelineEntry = {
+  key: string
+  at: string
+  title: ReactNode
+  body?: ReactNode
 }
 
 interface UserTaskDetailsDialogProps {
@@ -48,6 +58,25 @@ interface UserTaskDetailsDialogProps {
   /** Posts a comment and refreshes taskUpdates. */
   onAddComment?: (content: string) => Promise<void>
   isPostingComment?: boolean
+}
+
+/** One sentence telling the viewer what the task needs from them now, given its status and their role. */
+function nextStepFor(status: string, canReview: boolean, ratingBlockedReason: string | null) {
+  switch (status) {
+    case "pending":
+      return "Start the task, then post progress updates below as you go."
+    case "in_progress":
+      return "Post progress updates below. When the work is done, submit it for review."
+    case "submitted_for_review":
+      if (!canReview) return "Submitted. Waiting for a lead or admin to review and rate it."
+      return ratingBlockedReason ?? "Review the work: approve and rate it, or send it back with a reason."
+    case "unable_to_complete":
+      return canReview
+        ? "A blocker was reported. Decide whether to reopen, reassign or close it."
+        : "Blocker reported. Waiting for a lead or admin to decide."
+    default:
+      return "This task is closed. Nothing further is needed."
+  }
 }
 
 export function UserTaskDetailsDialog({
@@ -78,222 +107,219 @@ export function UserTaskDetailsDialog({
   const dueLabel = selectedTask.due_date ? formatWATDate(selectedTask.due_date) : "No deadline"
   const startLabel = selectedTask.task_start_date ? formatWATDate(selectedTask.task_start_date) : null
   const endSource = selectedTask.task_end_date || selectedTask.due_date
+  const isClosed = ["completed", "reassigned", "failed", "cancelled"].includes(selectedTask.status)
+  const activity: TaskTimelineEntry[] = (() => {
+    const entries: TaskTimelineEntry[] = [
+      {
+        key: "assigned",
+        at: selectedTask.created_at,
+        title: <span className="font-medium">Assigned</span>,
+        body: `To ${assignedToName}`,
+      },
+      ...taskUpdates.map((update) => {
+        const actor = update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"
+        const nextStatus = update.new_value as TaskStatus | null
+        const config = nextStatus ? TASK_STATUS_CONFIG[nextStatus] : null
+
+        if (update.update_type === "status_change" && nextStatus && config) {
+          return {
+            key: update.id,
+            at: update.created_at,
+            title: (
+              <Badge variant={config.badgeVariant} className={cn("text-xs font-medium", config.color)}>
+                {statusLabel(nextStatus)}
+              </Badge>
+            ),
+            body: update.content ? `${actor} · ${update.content}` : actor,
+          }
+        }
+
+        return {
+          key: update.id,
+          at: update.created_at,
+          title: <span className="font-medium">{actor}</span>,
+          body: update.content || "Added an update",
+        }
+      }),
+    ]
+
+    const hasRecordedTerminalStatus = taskUpdates.some(
+      (update) => update.update_type === "status_change" && update.new_value === selectedTask.status
+    )
+    if (!hasRecordedTerminalStatus && ["completed", "failed", "cancelled"].includes(selectedTask.status)) {
+      const terminalStatus = selectedTask.status as TaskStatus
+      const config = TASK_STATUS_CONFIG[terminalStatus]
+      entries.push({
+        key: `terminal-${selectedTask.id}`,
+        at: selectedTask.reviewed_at || selectedTask.completed_at || selectedTask.updated_at || selectedTask.created_at,
+        title: (
+          <Badge variant={config.badgeVariant} className={cn("text-xs font-medium", config.color)}>
+            {statusLabel(terminalStatus)}
+          </Badge>
+        ),
+        body: selectedTask.reviewed_by_user
+          ? `${formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}${
+              selectedTask.rating ? ` · ${selectedTask.rating}/5` : ""
+            }`
+          : undefined,
+      })
+    }
+
+    return entries.sort((left, right) => left.at.localeCompare(right.at))
+  })()
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
-        {/* ── Header: identity, and each fact exactly once ─────────────────── */}
-        <SheetHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {selectedTask.work_item_number && (
-              <Badge variant="outline" className="font-mono text-[11px]">
-                {selectedTask.work_item_number}
-              </Badge>
-            )}
-            {(() => {
-              const cfg = TASK_STATUS_CONFIG[selectedTask.status as TaskStatus] || TASK_STATUS_CONFIG.pending
-              return (
-                <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
-                  {cfg.label}
-                </Badge>
-              )
-            })()}
-            <Badge
-              variant="outline"
-              className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
-            >
-              Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+    <DetailSheet
+      wide
+      flush
+      open={open}
+      onOpenChange={onOpenChange}
+      title={selectedTask.title}
+      badges={
+        <>
+          {selectedTask.work_item_number && (
+            <Badge variant="outline" className="font-mono text-xs">
+              {selectedTask.work_item_number}
             </Badge>
-            {isOverdue && (
-              <Badge variant="destructive" className="gap-1 text-[11px]">
-                <AlertTriangle className="h-3 w-3" />
-                Overdue
+          )}
+          {(() => {
+            const cfg = TASK_STATUS_CONFIG[selectedTask.status as TaskStatus] || TASK_STATUS_CONFIG.pending
+            return (
+              <Badge variant={cfg.badgeVariant} className={cn("text-xs capitalize", cfg.color)}>
+                {cfg.label}
               </Badge>
+            )
+          })()}
+          <Badge
+            variant="outline"
+            className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+          >
+            Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+          </Badge>
+          {isOverdue && (
+            <Badge variant="destructive" className="gap-1 text-xs">
+              <AlertTriangle className="h-3 w-3" />
+              Overdue
+            </Badge>
+          )}
+        </>
+      }
+      description={
+        <>
+          <span>Assigned by {assignedByName}</span>
+          {selectedTask.department && (
+            <>
+              <span aria-hidden>·</span>
+              <span>{selectedTask.department}</span>
+            </>
+          )}
+          <span aria-hidden>·</span>
+          <span className={isOverdue ? "text-destructive font-medium" : undefined}>Due {dueLabel}</span>
+        </>
+      }
+      toolbar={
+        !isClosed ? (
+          <DetailActionBar label="Next step" hint={nextStepFor(selectedTask.status, canReview, ratingBlockedReason)}>
+            <TaskStatusControl
+              task={selectedTask}
+              canReview={canReview}
+              ratingBlockedReason={ratingBlockedReason}
+              onChanged={() => onChanged?.()}
+            />
+          </DetailActionBar>
+        ) : undefined
+      }
+    >
+      <DetailBody>
+        {/* Anything that needs answering comes before the reference data. */}
+        {(selectedTask.unable_to_complete_reason || selectedTask.failure_reason || selectedTask.extension_reason) && (
+          <div className="space-y-2">
+            {selectedTask.unable_to_complete_reason && (
+              <DetailCallout tone="amber" label="Reported blocker">
+                {selectedTask.unable_to_complete_reason}
+              </DetailCallout>
+            )}
+            {selectedTask.failure_reason && (
+              <DetailCallout tone="rose" label="Failure note">
+                {selectedTask.failure_reason}
+              </DetailCallout>
+            )}
+            {selectedTask.extension_reason && (
+              <DetailCallout tone="blue" label="Extension granted for">
+                {selectedTask.extension_reason}
+              </DetailCallout>
             )}
           </div>
+        )}
 
-          <SheetTitle className="text-base leading-snug font-semibold">{selectedTask.title}</SheetTitle>
+        {selectedTask.description && (
+          <section className="space-y-2">
+            <DetailSectionHeading>What was asked for</DetailSectionHeading>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
+          </section>
+        )}
 
-          <SheetDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-            <span>Assigned by {assignedByName}</span>
-            {selectedTask.department && (
-              <>
-                <span aria-hidden>·</span>
-                <span>{selectedTask.department}</span>
-              </>
-            )}
-            <span aria-hidden>·</span>
-            <span className={isOverdue ? "text-destructive font-medium" : undefined}>Due {dueLabel}</span>
-          </SheetDescription>
-        </SheetHeader>
+        <section className="space-y-3">
+          <DetailSectionHeading count={activity.length}>Timeline</DetailSectionHeading>
+          {onAddComment && !isClosed && (
+            <DetailComposer
+              value={commentDraft}
+              onChange={setCommentDraft}
+              busy={isPostingComment}
+              onSubmit={async () => {
+                await onAddComment(commentDraft.trim())
+                setCommentDraft("")
+              }}
+            />
+          )}
+          {activity.length > 0 ? (
+            <DetailTimeline>
+              {activity.map((entry) => (
+                <DetailTimelineEntry key={entry.key} title={entry.title} timestamp={formatWATDateTime(entry.at)}>
+                  {entry.body}
+                </DetailTimelineEntry>
+              ))}
+            </DetailTimeline>
+          ) : (
+            <p className="text-muted-foreground text-sm">No task history recorded.</p>
+          )}
+        </section>
 
-        {/* ── The action, pinned directly under the header ─────────────────── */}
-        {/* Moving a task forward is why this dialog gets opened, so it sits above
-            the scroll rather than inside a tab you have to find. */}
-        <DetailActionBar label="Move this task to">
-          <TaskStatusControl
-            task={selectedTask}
-            canReview={canReview}
-            ratingBlockedReason={ratingBlockedReason}
-            onChanged={() => onChanged?.()}
-          />
-        </DetailActionBar>
-
-        <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
-          <div className="border-b px-4 py-2 sm:px-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="activity" className="gap-1.5">
-                <span>Activity</span>
-                {taskUpdates.length > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
-                    {taskUpdates.length}
-                  </Badge>
+        <section className="space-y-2">
+          <DetailSectionHeading>Task details</DetailSectionHeading>
+          <DetailProperties>
+            <DetailProperty label="Assigned to">{assignedToName}</DetailProperty>
+            <DetailProperty label="Period">
+              {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
+            </DetailProperty>
+            <DetailProperty label="Strategic goal">{selectedTask.goal_title}</DetailProperty>
+            <DetailProperty label="Corporate KPI">
+              {selectedTask.kpi_measure ? (
+                <>
+                  {selectedTask.kpi_measure}
+                  {selectedTask.kpi_pillar && (
+                    <span className="text-muted-foreground mt-0.5 block text-xs">{selectedTask.kpi_pillar}</span>
+                  )}
+                </>
+              ) : null}
+            </DetailProperty>
+            <DetailProperty label="Rating">
+              {selectedTask.rating ? `${selectedTask.rating} / 5` : "Not yet rated"}
+            </DetailProperty>
+            <DetailProperty label="Created">{formatWATDateTime(selectedTask.created_at)}</DetailProperty>
+            {selectedTask.reviewed_by_user && (
+              <DetailProperty label="Reviewed by">
+                {formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}
+                {selectedTask.reviewed_at && (
+                  <span className="text-muted-foreground block text-xs">
+                    {formatWATDateTime(selectedTask.reviewed_at)}
+                  </span>
                 )}
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="details" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-            <div className="space-y-5 px-4 py-4 sm:px-6">
-              {/* Anything that needs answering comes before the reference data. */}
-              {(selectedTask.unable_to_complete_reason ||
-                selectedTask.failure_reason ||
-                selectedTask.extension_reason) && (
-                <div className="space-y-2">
-                  {selectedTask.unable_to_complete_reason && (
-                    <DetailCallout tone="amber" label="Reported blocker">
-                      {selectedTask.unable_to_complete_reason}
-                    </DetailCallout>
-                  )}
-                  {selectedTask.failure_reason && (
-                    <DetailCallout tone="rose" label="Failure note">
-                      {selectedTask.failure_reason}
-                    </DetailCallout>
-                  )}
-                  {selectedTask.extension_reason && (
-                    <DetailCallout tone="blue" label="Extension granted for">
-                      {selectedTask.extension_reason}
-                    </DetailCallout>
-                  )}
-                </div>
-              )}
-
-              {selectedTask.description && (
-                <section className="space-y-1.5">
-                  <DetailSectionHeading>What was asked for</DetailSectionHeading>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
-                </section>
-              )}
-
-              <section className="space-y-3">
-                <DetailSectionHeading>Details</DetailSectionHeading>
-                <DetailFieldGrid>
-                  <DetailField icon={User} label="Assigned to">
-                    {assignedToName}
-                  </DetailField>
-                  <DetailField icon={CalendarDays} label="Period">
-                    {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
-                  </DetailField>
-                  <DetailField icon={Target} label="Strategic goal">
-                    {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
-                  </DetailField>
-                  <DetailField icon={Target} label="Corporate KPI">
-                    {selectedTask.kpi_measure ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">{selectedTask.kpi_measure}</span>
-                        {selectedTask.kpi_pillar && (
-                          <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </DetailField>
-                  <DetailField icon={Gauge} label="Weight">
-                    <Badge
-                      variant="outline"
-                      className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
-                    >
-                      {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
-                    </Badge>
-                  </DetailField>
-                  <DetailField icon={Star} label="Rating">
-                    {selectedTask.rating ? (
-                      `${selectedTask.rating}/5`
-                    ) : (
-                      <span className="text-muted-foreground">Not yet rated</span>
-                    )}
-                  </DetailField>
-                  <DetailField icon={Building2} label="Created">
-                    {formatWATDateTime(selectedTask.created_at)}
-                  </DetailField>
-                  {selectedTask.reviewed_by_user && (
-                    <DetailField icon={User} label="Reviewed by">
-                      {formatFullName(
-                        selectedTask.reviewed_by_user.first_name,
-                        selectedTask.reviewed_by_user.last_name
-                      )}
-                      {selectedTask.reviewed_at && (
-                        <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
-                      )}
-                    </DetailField>
-                  )}
-                </DetailFieldGrid>
-              </section>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="activity" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-            <div className="space-y-4 px-4 py-4 sm:px-6">
-              {onAddComment && (
-                <div className="space-y-2">
-                  <Textarea
-                    value={commentDraft}
-                    onChange={(event) => setCommentDraft(event.target.value)}
-                    placeholder="Post an activity note or progress update…"
-                    className="min-h-[72px] text-sm"
-                    aria-label="Add an activity"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={isPostingComment || !commentDraft.trim()}
-                      onClick={async () => {
-                        await onAddComment(commentDraft.trim())
-                        setCommentDraft("")
-                      }}
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      {isPostingComment ? "Posting…" : "Post activity"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {taskUpdates.length > 0 ? (
-                <ul className="space-y-3">
-                  {taskUpdates.map((update) => (
-                    <DetailTimelineEntry
-                      key={update.id}
-                      title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
-                      timestamp={formatWATDateTime(update.created_at)}
-                    >
-                      {update.content}
-                    </DetailTimelineEntry>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
-                  <MessageSquare className="h-4 w-4" />
-                  No activities yet.
-                </p>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </SheetContent>
-    </Sheet>
+              </DetailProperty>
+            )}
+          </DetailProperties>
+        </section>
+      </DetailBody>
+    </DetailSheet>
   )
 }

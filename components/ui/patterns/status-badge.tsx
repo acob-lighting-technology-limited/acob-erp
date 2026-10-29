@@ -1,33 +1,51 @@
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  inactive: "bg-gray-100 text-gray-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  approved: "bg-green-100 text-green-800",
-  open: "bg-blue-100 text-blue-800",
-  in_progress: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
-  resolved: "bg-green-100 text-green-800",
-  cancelled: "bg-gray-100 text-gray-800",
-  rejected: "bg-red-100 text-red-800",
+/**
+ * Tones come from the `--success/--warning/--danger/--info` tokens in
+ * `app/globals.css`, which carry their own dark values: no `dark:` overrides here.
+ */
+export const TONE_CLASSES = {
+  success: "bg-success/15 text-success",
+  warning: "bg-warning/15 text-warning",
+  danger: "bg-danger/15 text-danger",
+  info: "bg-info/15 text-info",
+  purple: "bg-purple/15 text-purple",
+  neutral: "bg-muted text-muted-foreground",
+} as const
+
+export type StatusTone = keyof typeof TONE_CLASSES
+
+const STATUS_TONES: Record<string, StatusTone> = {
+  active: "success",
+  inactive: "neutral",
+  pending: "warning",
+  approved: "success",
+  open: "info",
+  in_progress: "info",
+  completed: "success",
+  resolved: "success",
+  cancelled: "neutral",
+  rejected: "danger",
   // Document validity (Sites register conveyance documents).
-  valid: "bg-green-100 text-green-800",
-  expiring: "bg-yellow-100 text-yellow-800",
-  expired: "bg-red-100 text-red-800",
-  not_required: "bg-gray-100 text-gray-800",
+  valid: "success",
+  expiring: "warning",
+  expired: "danger",
+  not_required: "neutral",
 }
 
 interface StatusBadgeProps {
   status: string
   /** Text to show instead of the status itself; the status still picks the colour. */
   label?: string
+  /** Force a tone for a status this map does not know. */
+  tone?: StatusTone
   className?: string
 }
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
+export function StatusBadge({ status, label, tone, className }: StatusBadgeProps) {
   const key = String(status || "").toLowerCase()
-  const tone = STATUS_STYLES[key] || "bg-gray-100 text-gray-800"
+  const resolved = tone ?? STATUS_TONES[key] ?? "neutral"
   const text = label ?? (key.replaceAll("_", " ") || "unknown")
-  return <Badge className={`${tone} ${className || ""}`.trim()}>{text}</Badge>
+  return <Badge className={cn(TONE_CLASSES[resolved], className)}>{text}</Badge>
 }

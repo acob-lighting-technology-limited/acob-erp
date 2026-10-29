@@ -1,5 +1,6 @@
 import type { Role } from "./role-form-dialog"
 
+import { apiFetch } from "@/lib/api-client"
 export const DEFAULT_ROLES: Role[] = [
   {
     id: "1",
@@ -66,7 +67,7 @@ export const DEFAULT_ROLES: Role[] = [
 export async function fetchRolesData(): Promise<Role[]> {
   // Scoped server route resolves admin scope and reads via the service role;
   // the browser no longer queries Supabase directly (see AGENTS.md).
-  const res = await fetch("/api/admin/settings/roles", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/settings/roles", { cache: "no-store" })
   if (!res.ok) {
     throw new Error(`Failed to load roles (${res.status})`)
   }

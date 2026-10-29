@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
@@ -19,6 +20,10 @@ import { logger } from "@/lib/logger"
 import { taskDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
 import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
+
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Dashboard" }
 
 const log = logger("")
 
@@ -83,8 +88,13 @@ export default async function AdminDashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const scope = user ? await resolveAdminScope(supabase, user.id) : null
-  const departmentScope = scope ? getDepartmentScope(scope, "general") : null
+  // The admin layout redirects these cases too, but layouts and pages render in parallel, so this
+  // page's service-role queries would still run. Below, a null department scope means "unrestricted",
+  // which a missing admin scope must never be mistaken for.
+  if (!user) redirect("/auth/login")
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope) redirect("/profile")
+  const departmentScope = getDepartmentScope(scope, "general")
   const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
   const profileIdsInScope = departmentScope
     ? (queryDepartmentScope && queryDepartmentScope.length > 0
@@ -98,7 +108,7 @@ export default async function AdminDashboardPage() {
     : null
   const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((profileRow) => profileRow.id) : []
 
-  const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
+  const { data: profile } = await dataClient.from("profiles").select("first_name").eq("id", user?.id).single()
   const canSeeAuditActivity = Boolean(scope?.isAdminLike || scope?.isDepartmentLead)
 
   const todayIso = toLocalISODate()
@@ -497,8 +507,8 @@ export default async function AdminDashboardPage() {
             value={clockedIn.count || 0}
             description={`of ${activeStaff.count || 0} active staff`}
             icon={Clock}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconBgColor="bg-info/15"
+            iconColor="text-info"
           />
           <StatCard
             variant="compact"
@@ -506,8 +516,8 @@ export default async function AdminDashboardPage() {
             value={overdueTaskCount}
             description={overdueTaskCount > 0 ? "Past their deadline" : "Nothing overdue"}
             icon={AlertTriangle}
-            iconBgColor={overdueTaskCount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"}
-            iconColor={overdueTaskCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}
+            iconBgColor={overdueTaskCount > 0 ? "bg-danger/15" : "bg-muted"}
+            iconColor={overdueTaskCount > 0 ? "text-danger" : "text-muted-foreground"}
           />
           <StatCard
             variant="compact"
@@ -515,8 +525,8 @@ export default async function AdminDashboardPage() {
             value={pendingLeave.count || 0}
             description="Requests not yet decided"
             icon={CalendarClock}
-            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconBgColor="bg-warning/15"
+            iconColor="text-warning"
           />
           <StatCard
             variant="compact"
@@ -524,8 +534,8 @@ export default async function AdminDashboardPage() {
             value={openTaskRows.length}
             description="Pending, in progress, in review or blocked"
             icon={ClipboardList}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-success/15"
+            iconColor="text-success"
           />
           <StatCard
             variant="compact"
@@ -533,8 +543,8 @@ export default async function AdminDashboardPage() {
             value={activeStaff.count || 0}
             description="Current employees"
             icon={Users}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-purple/15"
+            iconColor="text-purple"
           />
         </StatGrid>
       </Section>

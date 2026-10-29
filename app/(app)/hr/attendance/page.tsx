@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { AttendanceContent } from "./attendance-content"
 import { toLocalISODate } from "@/lib/utils/date"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Attendance" }
+
 export interface AttendanceRecord {
   id: string
   date: string

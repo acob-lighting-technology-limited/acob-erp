@@ -4,7 +4,7 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { RiskRegisterView } from "@/app/admin/corporate-services/risk-register/_components/risk-register-view"
 
 export const metadata: Metadata = {
-  title: "Department Risk Register | Corporate Services | Matrix",
+  title: "Department Risk Register | Corporate Services",
   description: "Departmental risks, inherent ratings, control owners, and mitigation plans.",
 }
 

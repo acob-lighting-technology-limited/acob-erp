@@ -14,6 +14,8 @@ import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { MeetingSyncModal } from "./meeting-sync-modal"
 
+import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 type ArtifactTab = "attendance" | "transcript"
 
 type Row = {
@@ -51,9 +53,9 @@ export function MeetingRecordsContent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["meeting-records", tab],
+    queryKey: QUERY_KEYS.meetingRecords(tab),
     queryFn: async (): Promise<Row[]> => {
-      const res = await fetch(`/api/reports/meeting-week-documents?documentType=${tab}&currentOnly=true`)
+      const res = await apiFetch(`/api/reports/meeting-week-documents?documentType=${tab}&currentOnly=true`)
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load records")
       return payload.data || []
@@ -150,10 +152,9 @@ export function MeetingRecordsContent() {
 
   return (
     <DataTablePage
-      title="Meeting Records"
+      title="Records"
       description="Teams attendance reports and transcripts, auto-synced per meeting week."
       icon={Users}
-      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(key) => setTab(key as ArtifactTab)}
@@ -234,9 +235,9 @@ export function MeetingRecordsContent() {
                 W{r.meeting_week} {r.meeting_year}
               </Badge>
             </div>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">{r.file_name}</span>
-              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => download(r)}>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => download(r)}>
                 <Download className="mr-1 h-3 w-3" /> Download
               </Button>
             </div>

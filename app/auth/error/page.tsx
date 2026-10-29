@@ -2,7 +2,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
 import Link from "next/link"
+import type { Metadata } from "next"
 import { ErrorState } from "@/components/ui/patterns"
+
+export const metadata: Metadata = { title: "Sign-in error" }
 
 export default function AuthErrorPage() {
   return (
@@ -18,16 +21,10 @@ export default function AuthErrorPage() {
             description="Please try again. If the problem persists, contact support."
             className="border-0 bg-transparent p-0"
           />
-          <div className="flex gap-2">
-            <Link href="/auth/login" className="flex-1">
-              <Button className="h-11 w-full text-base">Back to Login</Button>
-            </Link>
-            <Link href="/auth/sign-up" className="flex-1">
-              <Button variant="outline" className="h-11 w-full bg-transparent text-base">
-                Sign Up
-              </Button>
-            </Link>
-          </div>
+          {/* Public sign-up is disabled (see app/auth/sign-up), so login is the only way on from here. */}
+          <Link href="/auth/login" className="block">
+            <Button className="h-11 w-full text-base">Back to Login</Button>
+          </Link>
         </CardContent>
       </Card>
     </AuthShell>

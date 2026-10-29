@@ -119,6 +119,15 @@
      exact brand green here, retinted per surface on html:has(.admin-shell). */
   --logo-ink: oklch(0.24 0 0);
   --logo-accent: #00d056;
+
+  /* Status tones. One readable ink per tone that already works on both the card
+     and its own tint, so call sites write `text-success bg-success/15` and never
+     a `dark:` override. Light inks are the 700 step, dark inks the 400 step. */
+  --success: oklch(0.527 0.154 150.069);
+  --warning: oklch(0.555 0.163 48.4);
+  --danger: oklch(0.505 0.213 27.518);
+  --info: oklch(0.488 0.243 264.376);
+  --purple: oklch(0.496 0.265 301.924);
 }
 
 .dark {
@@ -169,6 +178,12 @@
   --admin-ribbon-bg: oklch(0.19 0.004 72 / 0.88);
 
   --logo-ink: oklch(0.985 0 0);
+
+  --success: oklch(0.792 0.209 151.711);
+  --warning: oklch(0.828 0.189 84.429);
+  --danger: oklch(0.704 0.191 22.216);
+  --info: oklch(0.707 0.165 254.624);
+  --purple: oklch(0.714 0.203 305.504);
 }
 
 .admin-shell {
@@ -242,6 +257,11 @@ html.dark:has(.admin-shell[data-scope="lead"]) {
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-purple: var(--purple);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

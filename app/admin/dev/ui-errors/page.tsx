@@ -7,6 +7,10 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { canAccessAdminSection } from "@/lib/admin/rbac"
 import { notFound } from "next/navigation"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Error Monitor" }
+
 const log = logger("dev-ui-errors")
 
 type UiAuditLogRow = {

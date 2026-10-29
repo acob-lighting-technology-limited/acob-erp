@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export const PERSPECTIVES = ["Financial", "Customer", "Internal Process", "Organizational Capacity"] as const
 
@@ -78,7 +79,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
-    queryKey: ["departments-all"],
+    queryKey: QUERY_KEYS.departmentsAll(),
     queryFn: async () => {
       const res = await apiFetch("/api/departments", { cache: "no-store" })
       const payload = await res.json()
@@ -290,7 +291,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
           {/* Department Ownership */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs font-semibold">Department Ownership (RACI)</Label>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Click a department to assign as <strong className="text-emerald-600">CORE</strong> (scored owner). Click
               again to switch to <strong className="text-foreground">SUPPORT</strong> (collaborator), or remove.
             </p>
@@ -366,7 +367,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
-    queryKey: ["departments-all"],
+    queryKey: QUERY_KEYS.departmentsAll(),
     queryFn: async () => {
       const res = await apiFetch("/api/departments", { cache: "no-store" })
       const payload = await res.json()
@@ -633,15 +634,15 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-xs font-semibold">Department Quotas & Accountability (RACI)</Label>
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-muted-foreground text-xs">
                   Assign Core owners and Support contributors. Define explicit numerical quotas and action commitments.
                 </p>
               </div>
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40">
+                <Badge variant="outline" className="bg-success/15 text-emerald-700">
                   {assignments.filter((a) => a.role === "core").length} Core
                 </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950/40">
+                <Badge variant="outline" className="bg-info/15 text-blue-700">
                   {assignments.filter((a) => a.role === "support").length} Support
                 </Badge>
               </div>
@@ -659,9 +660,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                     <div
                       key={assignment.department}
                       className={`space-y-2.5 rounded-lg border p-3 text-xs transition-colors ${
-                        isCore
-                          ? "border-emerald-200/80 bg-emerald-50/20 dark:border-emerald-900/60 dark:bg-emerald-950/10"
-                          : "border-border/70 bg-card"
+                        isCore ? "border-success/80 bg-success/20" : "border-border/70 bg-card"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -669,9 +668,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
-                              isCore
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
+                              isCore ? "bg-success/15 text-success" : "bg-info/15 text-info"
                             }`}
                           >
                             {isCore ? "Core Owner" : "Support"}
@@ -683,9 +680,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             size="sm"
                             variant="ghost"
                             className={`h-7 px-2 text-[11px] ${
-                              isCore
-                                ? "bg-emerald-100/50 font-bold text-emerald-700 dark:bg-emerald-900/40"
-                                : "text-muted-foreground"
+                              isCore ? "bg-success/50 font-bold text-emerald-700" : "text-muted-foreground"
                             }`}
                             onClick={() => updateAssignment(index, { role: "core" })}
                           >
@@ -696,9 +691,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             size="sm"
                             variant="ghost"
                             className={`h-7 px-2 text-[11px] ${
-                              !isCore
-                                ? "bg-blue-100/50 font-bold text-blue-700 dark:bg-blue-900/40"
-                                : "text-muted-foreground"
+                              !isCore ? "bg-info/50 font-bold text-blue-700" : "text-muted-foreground"
                             }`}
                             onClick={() => updateAssignment(index, { role: "support" })}
                           >
@@ -719,7 +712,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">
+                          <Label className="text-muted-foreground text-xs font-medium">
                             Department Quota / Target Value
                           </Label>
                           <Input
@@ -736,7 +729,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">Target Unit</Label>
+                          <Label className="text-muted-foreground text-xs font-medium">Target Unit</Label>
                           <Input
                             placeholder="e.g. Projects, %, ₦"
                             className="h-8 text-xs"
@@ -747,7 +740,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-muted-foreground text-[11px] font-medium">
+                        <Label className="text-muted-foreground text-xs font-medium">
                           Action Commitment / Deliverable Plan
                         </Label>
                         <Input

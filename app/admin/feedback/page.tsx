@@ -6,6 +6,10 @@ import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } 
 import { logger } from "@/lib/logger"
 import type { FeedbackRecord } from "@/components/feedback/types"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin User Feedback" }
+
 const log = logger("feedback")
 
 export default async function AdminFeedbackPage() {

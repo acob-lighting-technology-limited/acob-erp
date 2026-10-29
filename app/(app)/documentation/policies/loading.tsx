@@ -3,13 +3,13 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function Loading() {
   return (
     <TablePageSkeleton
-      filters={3}
+      filters={2}
       columns={5}
       rows={8}
       showStats={false}
-      statBadges={3}
       actions={0}
-      showBackLink
+      showBackLink={false}
+      statBadges={3}
       list="responsive"
     />
   )

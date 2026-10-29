@@ -11,7 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
+import { DocViewSheet } from "@/components/documentation/doc-view-sheet"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
 import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
@@ -46,9 +46,7 @@ interface PersonalDocumentationContentProps {
 }
 
 function getStatusColor(isDraft: boolean) {
-  return isDraft
-    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+  return isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
 }
 
 export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDocumentationContentProps) {
@@ -166,9 +164,9 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         accessor: (row) => row.visibility ?? "private",
         render: (row) =>
           (row.visibility ?? "private") === "general" ? (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">General</Badge>
+            <Badge className="bg-info/15 text-info">General</Badge>
           ) : (
-            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300">Private</Badge>
+            <Badge className="bg-muted text-foreground">Private</Badge>
           ),
         hideOnMobile: true,
       },
@@ -351,10 +349,9 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
 
   return (
     <DataTablePage
-      title="Personal Documentation"
+      title="Personal"
       description="Create and manage your work documentation."
       icon={FileText}
-      backLink={{ href: "/documentation", label: "Back to Documentation" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -486,14 +483,14 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
               <h4 className="line-clamp-1 text-sm font-semibold">{doc.title}</h4>
               <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
             </div>
-            <p className="text-muted-foreground text-[11px]">{doc.category || "-"}</p>
+            <p className="text-muted-foreground text-xs">{doc.category || "-"}</p>
             <p className="text-muted-foreground mt-2 line-clamp-3 text-xs">{doc.content}</p>
           </div>
         )}
         urlSync
       />
 
-      <DocViewDialog
+      <DocViewSheet
         open={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         doc={selectedDoc}

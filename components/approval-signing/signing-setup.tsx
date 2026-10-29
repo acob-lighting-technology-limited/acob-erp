@@ -156,7 +156,7 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
               Image of your signature (PNG, JPG or WebP)
             </Label>
 
-            {file && filePreview ? (
+            {file && filePreview?.startsWith("blob:") ? (
               <div className="border-primary/40 bg-muted/20 relative rounded-lg border-2 border-dashed p-4">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="rounded-md border bg-white p-3 shadow-xs">
@@ -320,7 +320,7 @@ export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved
       <CardContent className="space-y-4">
         <StatusLine done={status.has_pin} text={status.has_pin ? "PIN set" : "No PIN yet"} />
         {locked ? (
-          <p className="text-sm text-amber-700 dark:text-amber-400">
+          <p className="text-warning text-sm">
             Too many wrong PINs. Signing is locked until {locked}. You can reset it below.
           </p>
         ) : null}
@@ -376,7 +376,7 @@ export function SigningSetup() {
 
   useEffect(() => {
     let active = true
-    fetch("/api/profile/signing")
+    apiFetch("/api/profile/signing")
       .then(async (res) => {
         if (!res.ok) throw new Error(await readError(res, "Could not load your signing setup"))
         return res.json()

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-client"
 const DEFAULT_ANCHOR_DAY = 12
 
 // Module-level cache: year → January day. Populated by initOfficeYearAnchors().
@@ -6,7 +7,7 @@ const anchorCache: Record<number, number> = {}
 /** Call once on app load to populate per-year anchors from the API. */
 export async function initOfficeYearAnchors(): Promise<void> {
   try {
-    const res = await fetch("/api/reports/office-year-config")
+    const res = await apiFetch("/api/reports/office-year-config")
     if (!res.ok) return
     const { data } = (await res.json()) as { data: { year: number; anchor_day: number }[] }
     for (const row of data) anchorCache[row.year] = row.anchor_day

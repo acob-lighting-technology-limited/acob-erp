@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { CbtQuestionManager } from "@/components/pms/cbt-question-manager"
 
+export const metadata: Metadata = { title: "Dept Question" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

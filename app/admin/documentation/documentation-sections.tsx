@@ -35,7 +35,7 @@ export function DocumentationSections({
                 <IconFill
                   icon={ScrollText}
                   fillColor="bg-violet-500"
-                  className="h-8 w-8 rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-600 transition-transform duration-200 group-hover:scale-105 dark:text-violet-400"
+                  className="border-purple/20 bg-purple/10 text-purple h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-violet-500">Company Policies</span>
@@ -55,7 +55,7 @@ export function DocumentationSections({
                 <IconFill
                   icon={ListChecks}
                   fillColor="bg-sky-500"
-                  className="h-8 w-8 rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-600 transition-transform duration-200 group-hover:scale-105 dark:text-sky-400"
+                  className="text-info border-info/20 bg-info/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-sky-500">Standard Operating Procedures</span>
@@ -75,7 +75,7 @@ export function DocumentationSections({
                 <IconFill
                   icon={FileText}
                   fillColor="bg-blue-500"
-                  className="h-8 w-8 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
+                  className="text-info border-info/20 bg-info/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-blue-500">Personal Documentation</span>
@@ -95,7 +95,7 @@ export function DocumentationSections({
                 <IconFill
                   icon={FolderOpen}
                   fillColor="bg-emerald-500"
-                  className="h-8 w-8 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 transition-transform duration-200 group-hover:scale-105 dark:text-emerald-400"
+                  className="text-success border-success/20 bg-success/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-emerald-500">Department Documents</span>

@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
+import { useShellTransition } from "@/hooks/use-shell-transition"
 import {
   BookUser,
   Briefcase,
@@ -26,10 +27,9 @@ import {
   Layers,
 } from "lucide-react"
 
-import { toast } from "sonner"
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { useDrawerA11y } from "@/hooks/use-drawer-a11y"
 import { isActiveChild } from "@/lib/navigation/active-child"
-import { createClient } from "@/lib/supabase/client"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -56,6 +56,7 @@ import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 
+import { useLogout } from "@/hooks/use-logout"
 interface SidebarProps {
   user?: {
     email?: string
@@ -87,12 +88,6 @@ type NavItemDef = {
   /** Expansion or gloss for an abbreviated name, shown on hover. */
   description?: string
   children?: NavChild[]
-  /**
-   * The item points into the /admin shell. Hidden unless the viewer can enter
-   * it — /admin bounces everyone else back to /profile (see AdminLayout), so
-   * showing the link to ordinary staff is a guaranteed dead end.
-   */
-  adminOnly?: boolean
   badge?: number
 }
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
@@ -233,11 +228,12 @@ const NAV_ROUTE_ALIASES: RouteAliases = {}
 
 export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const drawerProps = useDrawerA11y(isMobileMenuOpen, () => setIsMobileMenuOpen(false))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const departmentCode = useDepartmentCode(profile?.department)
   const { isCollapsed } = useSidebar()
+  const shellTransition = useShellTransition()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const calendarBadge = useCalendarBadgeCount()
@@ -300,12 +296,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     }
   }, [pathname])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    toast.success("Logged out successfully")
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
@@ -328,14 +319,12 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
   const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
-    const items = section.items
-      .filter((item) => !item.adminOnly || canAccessAdmin)
-      .map((item) => {
-        if (item.href === "/calendar" && calendarBadge > 0) {
-          return { ...item, badge: calendarBadge }
-        }
-        return item
-      })
+    const items = section.items.map((item) => {
+      if (item.href === "/calendar" && calendarBadge > 0) {
+        return { ...item, badge: calendarBadge }
+      }
+      return item
+    })
     const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
     return {
       ...section,
@@ -365,7 +354,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             {isCollapsed ? (
               section.key !== "overview" && <div className="mx-1.5 my-1.5 border-t" />
             ) : (
-              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
@@ -429,7 +418,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           {!isCollapsed && item.badge != null && item.badge > 0 && (
                             <span
                               className={cn(
-                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tracking-tight",
                                 highlighted
                                   ? "bg-primary-foreground text-primary"
                                   : "bg-emerald-600 text-white dark:bg-emerald-500"
@@ -513,7 +502,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150 max-lg:min-h-10",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -634,7 +623,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
       <motion.aside
         initial={false}
         animate={{ width: isCollapsed ? 80 : 256 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={shellTransition}
         className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         {sidebarJSX}
@@ -651,6 +640,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
         />
         {/* Mobile sidebar — slides in from the LEFT */}
         <aside
+          {...drawerProps}
           className={cn(
             "bg-card fixed inset-y-0 left-0 z-[60] flex w-64 flex-col border-r shadow-xl transition-transform duration-300 ease-out lg:hidden",
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"

@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Pencil, Layers } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 
 interface ManageContractCategoriesDialogProps {
@@ -46,7 +47,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: categories = [], isLoading } = useQuery<ContractCategory[]>({
-    queryKey: ["contract-categories-all"],
+    queryKey: QUERY_KEYS.contractCategoriesAll(),
     queryFn: async () => {
       const response = await apiFetch("/api/admin/hr/employment-categories?include_inactive=true")
       if (!response.ok) throw new Error("Failed to fetch contract categories")
@@ -108,8 +109,8 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
 
       toast.success(editingId ? "Category updated successfully" : "Category created successfully")
       resetForm()
-      queryClient.invalidateQueries({ queryKey: ["contract-categories-all"] })
-      queryClient.invalidateQueries({ queryKey: ["contract-categories"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesAll() })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesKey() })
     } catch (err: any) {
       toast.error(err.message || "An error occurred")
     } finally {
@@ -135,8 +136,8 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
       if (!res.ok) throw new Error(result.error || "Failed to toggle status")
 
       toast.success(`Category is now ${!cat.is_active ? "active" : "inactive"}`)
-      queryClient.invalidateQueries({ queryKey: ["contract-categories-all"] })
-      queryClient.invalidateQueries({ queryKey: ["contract-categories"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesAll() })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesKey() })
     } catch (err: any) {
       toast.error(err.message || "Failed to update status")
     }
@@ -186,7 +187,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                 required
                 disabled={!!editingId}
               />
-              <p className="text-muted-foreground text-[10px]">Must be letters/numbers (unique prefix code).</p>
+              <p className="text-muted-foreground text-xs">Must be letters/numbers (unique prefix code).</p>
             </div>
 
             <div className="space-y-1.5">

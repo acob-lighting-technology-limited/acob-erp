@@ -15,7 +15,7 @@ export function describeTimeline(risk: Pick<RiskRow, "timeline_type" | "target_d
 export function TimelineText({ risk, today, className }: { risk: RiskRow; today: string; className?: string }) {
   const overdue = isRiskOverdue(risk, today)
   return (
-    <span className={cn("text-xs", overdue && "font-semibold text-rose-600 dark:text-rose-400", className)}>
+    <span className={cn("text-xs", overdue && "text-danger font-semibold", className)}>
       {describeTimeline(risk)}
       {overdue && " · Overdue"}
     </span>

@@ -1,14 +1,19 @@
+"use client"
+
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, FolderKanban, Satellite } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import type { Payment } from "./payment-types"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface PaymentMetaCardProps {
   payment: Payment
 }
 
 export function PaymentMetaCard({ payment }: PaymentMetaCardProps) {
+  const shell = useShellBase()
+  const projectHref = payment.project ? shell.href(`/admin/projects/${payment.project.id}`) : null
   return (
     <Card>
       <CardHeader>
@@ -50,9 +55,13 @@ export function PaymentMetaCard({ payment }: PaymentMetaCardProps) {
                   <div>
                     <dt className="text-muted-foreground text-xs">Project</dt>
                     <dd className="font-medium">
-                      <Link href={`/admin/projects/${payment.project.id}`} className="text-primary hover:underline">
-                        {payment.project.project_name}
-                      </Link>
+                      {projectHref ? (
+                        <Link href={projectHref} className="text-primary hover:underline">
+                          {payment.project.project_name}
+                        </Link>
+                      ) : (
+                        payment.project.project_name
+                      )}
                     </dd>
                   </div>
                 )}

@@ -108,7 +108,7 @@ function Field({
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="text-muted-foreground text-[11px]">{hint}</p>}
+      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   )
 }

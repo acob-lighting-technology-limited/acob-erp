@@ -16,7 +16,7 @@ export default function NotificationLoading() {
       {/* Statistics Cards */}
       <div className="grid grid-cols-3 gap-2 md:grid-cols-3 md:gap-4">
         {[...Array(3)].map((_, i) => (
-          <Card key={i}>
+          <Card key={`skeleton-${i}`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2.5 pb-1 sm:p-4 sm:pb-2">
               <Skeleton className="h-3 w-14 sm:h-4 sm:w-24" />
               <Skeleton className="h-3.5 w-3.5 rounded sm:h-4 sm:w-4" />
@@ -41,7 +41,7 @@ export default function NotificationLoading() {
       {/* Notification List */}
       <div className="space-y-3">
         {[...Array(8)].map((_, i) => (
-          <Card key={i}>
+          <Card key={`skeleton-${i}`}>
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
                 <Skeleton className="h-10 w-10 flex-shrink-0 rounded-full" />

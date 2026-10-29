@@ -64,7 +64,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
   )
 
   const weightBadge = (t: Task) => (
-    <Badge variant="outline" className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(t.weight))}>
+    <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
       W{t.weight || TASK_WEIGHT_DEFAULT}
     </Badge>
   )
@@ -148,7 +148,6 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       title="Task Reviews"
       description="Tasks that leads and admins assigned to themselves. Nobody rates their own work, so they wait for the MD."
       icon={ClipboardCheck}
-      backLink={{ href: `${basePath}/overview`, label: "Back to MD's Desk" }}
       stats={
         <StatGrid>
           <StatCard
@@ -203,6 +202,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
         pagination={{ pageSize: 25 }}
         viewToggle
         defaultViewMode={{ mobile: "card", desktop: "list" }}
+        cards
         cardRenderer={(t) => (
           <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
             <div className="flex items-start justify-between gap-3">

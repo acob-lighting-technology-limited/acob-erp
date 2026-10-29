@@ -302,13 +302,13 @@ export function CbtUploadDialog({
               {/* Errors List */}
               {parseResult.errors.length > 0 && (
                 <div className="mt-3 max-h-36 space-y-1.5 overflow-y-auto rounded-md border border-red-500/20 bg-red-500/5 p-3 text-xs">
-                  <p className="flex items-center gap-1.5 font-semibold text-red-600 dark:text-red-400">
+                  <p className="text-danger flex items-center gap-1.5 font-semibold">
                     <AlertCircle className="h-3.5 w-3.5" />
                     Some rows could not be parsed:
                   </p>
                   <ul className="text-muted-foreground list-disc space-y-1 pl-4">
                     {parseResult.errors.slice(0, 15).map((err, i) => (
-                      <li key={i}>
+                      <li key={`row-${i}`}>
                         Row {err.rowNumber}: {err.message}
                       </li>
                     ))}

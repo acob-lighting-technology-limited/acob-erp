@@ -14,6 +14,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { BillFormDialog } from "./_components/bill-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 export interface Bill {
   id: string
   bill_number: string
@@ -39,7 +40,7 @@ const statusColors: Record<Bill["status"], BillStatusVariant> = {
 }
 
 async function fetchBillsList(): Promise<Bill[]> {
-  const res = await fetch("/api/admin/finance/bills", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/finance/bills", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load bills")
   const json = await res.json()
   return (json.data || []) as Bill[]
@@ -338,7 +339,7 @@ export function BillsPage({
           title: (bill) => `${bill.bill_number} · ${bill.supplier_name}`,
           subtitle: (bill) => `${formatCurrency(bill.total_amount, bill.currency)} · Due ${formatDate(bill.due_date)}`,
           trailing: (bill) => (
-            <Badge variant={statusColors[bill.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[bill.status]} className="text-xs capitalize">
               {bill.status}
             </Badge>
           ),

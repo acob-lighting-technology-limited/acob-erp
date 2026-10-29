@@ -76,7 +76,7 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
         render: (r) => (
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.title}</span>
-            {r.category && <span className="text-muted-foreground text-[11px]">{r.category}</span>}
+            {r.category && <span className="text-muted-foreground text-xs">{r.category}</span>}
           </div>
         ),
       },
@@ -192,7 +192,6 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
           : "Step-by-step procedures for your work — company-wide ones plus your department's own."
       }
       icon={Icon}
-      backLink={{ href: "/documentation", label: "Back to Documentation" }}
       statBadgeStyle="line"
       statBadges={[
         { label: `${rows.length} ${meta.shortPlural.toLowerCase()}`, icon: FileText },
@@ -201,7 +200,7 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
               {
                 label: `${pendingCount} to acknowledge`,
                 icon: CircleAlert,
-                tone: pendingCount > 0 ? "text-amber-600 dark:text-amber-400" : undefined,
+                tone: pendingCount > 0 ? "text-warning" : undefined,
               },
             ]
           : []),

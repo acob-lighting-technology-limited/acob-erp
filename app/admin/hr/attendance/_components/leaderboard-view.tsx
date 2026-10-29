@@ -21,6 +21,7 @@ import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 interface LeaderboardReport {
   user_id: string
@@ -178,7 +179,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Clock In",
     description: "Average arrival time for departments as a whole",
     iconColor: "text-amber-500",
-    accentClass: "border-amber-500/20 bg-amber-500/5 dark:bg-amber-500/10",
+    accentClass: "border-amber-500/20 bg-warning/5",
     getValue: (d) => d.avg_clock_in_minutes,
     formatValue: formatMinutesAsTime,
     sort: "asc",
@@ -188,7 +189,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Clock Out",
     description: "Average departure time for departments as a whole",
     iconColor: "text-indigo-500",
-    accentClass: "border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-500/10",
+    accentClass: "border-indigo-500/20 bg-info/5",
     getValue: (d) => d.avg_clock_out_minutes,
     formatValue: formatMinutesAsTime,
     sort: "desc",
@@ -198,7 +199,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Time Spent in Office",
     description: "Average physical hours logged per employee (clock-in to clock-out)",
     iconColor: "text-blue-500",
-    accentClass: "border-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10",
+    accentClass: "border-blue-500/20 bg-info/5",
     getValue: (d) => d.avg_physical_hours ?? (d.employee_count > 0 ? (d.physical_hours ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)}h avg`,
     sort: "desc",
@@ -208,7 +209,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Overtime",
     description: "Average overtime hours logged per employee",
     iconColor: "text-purple-500",
-    accentClass: "border-purple-500/20 bg-purple-500/5 dark:bg-purple-500/10",
+    accentClass: "border-purple-500/20 bg-purple/5",
     getValue: (d) => d.avg_overtime_hours ?? (d.employee_count > 0 ? (d.overtime_hours ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)}h avg`,
     sort: "desc",
@@ -219,7 +220,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Absences",
     description: "Average absent days per employee in department",
     iconColor: "text-red-500",
-    accentClass: "border-red-500/20 bg-red-500/5 dark:bg-red-500/10",
+    accentClass: "border-red-500/20 bg-danger/5",
     getValue: (d) => d.avg_absent_days ?? (d.employee_count > 0 ? (d.absent_days ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)} days avg`,
     sort: "desc",
@@ -230,7 +231,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Incomplete Records",
     description: "Average missing clock-outs per employee",
     iconColor: "text-cyan-500",
-    accentClass: "border-cyan-500/20 bg-cyan-500/5 dark:bg-cyan-500/10",
+    accentClass: "border-cyan-500/20 bg-info/5",
     getValue: (d) => d.avg_incomplete_days ?? (d.employee_count > 0 ? (d.incomplete_days ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)} days avg`,
     sort: "desc",
@@ -241,7 +242,7 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     title: "Dept. Avg Appeals Filed",
     description: "Average attendance appeals submitted per employee",
     iconColor: "text-rose-500",
-    accentClass: "border-rose-500/20 bg-rose-500/5 dark:bg-rose-500/10",
+    accentClass: "border-rose-500/20 bg-danger/5",
     getValue: (d) => d.avg_appeal_count ?? (d.employee_count > 0 ? (d.appeal_count ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)} avg`,
     sort: "desc",
@@ -335,7 +336,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {loading ? (
             <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
+            <EmptyState compact title="No data for this period" />
           ) : (
             <ScrollArea className="h-64">
               <div className="space-y-1 pr-3">
@@ -345,12 +346,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{row.report.user_name}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">{row.report.department}</div>
+                        <div className="text-muted-foreground truncate text-xs">{row.report.department}</div>
                       </div>
                     </div>
                     <span className="shrink-0 text-xs font-semibold">{metric.formatValue(row.value)}</span>
@@ -387,7 +388,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {loading ? (
             <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">No department data for this period.</p>
+            <EmptyState compact title="No department data for this period" />
           ) : (
             <ScrollArea className="h-64">
               <div className="space-y-1 pr-3">
@@ -397,12 +398,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{dept.department}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">
+                        <div className="text-muted-foreground truncate text-xs">
                           {dept.employee_count} employee{dept.employee_count === 1 ? "" : "s"}
                         </div>
                       </div>

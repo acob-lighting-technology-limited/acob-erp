@@ -1,5 +1,7 @@
-"use client"
-
+import { QUERY_KEYS } from "@/lib/query-keys"
+// Plain module on purpose, not "use client": it has no React in it and guards every browser global,
+// and lib code that is shared with route handlers imports it. Calling it on the server just sends a
+// plain fetch.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 /**
@@ -42,27 +44,49 @@ export function readDeptContext(): string | null {
  *
  * Use this instead of the global fetch() for any client-side call to /api/*.
  */
-export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const method = (init.method || "GET").toUpperCase()
   const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null
   const deptContext = readDeptContext()
-
-  if (!csrfToken && !deptContext) {
-    return fetch(input, init)
-  }
 
   const headers = new Headers(init.headers)
   if (csrfToken) headers.set("x-csrf-token", csrfToken)
   if (deptContext) headers.set("x-dept-context", deptContext)
 
-  return fetch(input, { ...init, headers })
+  // A hung request on bad mobile data would leave a button spinning forever. Uploads (FormData) and callers
+  // that bring their own signal are left alone.
+  const signal =
+    init.signal ?? (typeof FormData !== "undefined" && init.body instanceof FormData ? undefined : timeoutSignal())
+
+  const response = await fetch(input, { ...init, headers, signal })
+  if (response.status === 401) redirectToLogin()
+  return response
+}
+
+const REQUEST_TIMEOUT_MS = 60_000
+function timeoutSignal(): AbortSignal | undefined {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+    ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    : undefined
+}
+
+let redirectingToLogin = false
+/** The session lapsed mid-use: send the user to log in and bring them back, once, instead of a wall of failed toasts. */
+function redirectToLogin() {
+  if (typeof window === "undefined" || redirectingToLogin) return
+  const { pathname, search } = window.location
+  if (pathname.startsWith("/auth")) return
+  redirectingToLogin = true
+  const url = new URL("/auth/login", window.location.origin)
+  url.searchParams.set("next", pathname + search)
+  window.location.assign(url.toString())
 }
 
 /**
  * apiFetch + JSON parse + throw on a non-2xx status, using the route's
  * `{ error }` body as the message. The standard queryFn for React Query:
  *
- *   useQuery({ queryKey: ["maintenance"], queryFn: () => apiJson<State>("/api/dev/maintenance") })
+ *   useQuery({ queryKey: QUERY_KEYS.maintenance(), queryFn: () => apiJson<State>("/api/dev/maintenance") })
  */
 export async function apiJson<T = unknown>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
   const response = await apiFetch(input, init)

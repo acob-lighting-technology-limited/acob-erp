@@ -1,6 +1,5 @@
 "use client"
 
-import { TableExportButton } from "./export-button"
 import {
   Fragment,
   useState,
@@ -78,7 +77,10 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
 import { ColumnHelp } from "./column-help"
+import { RowActionButtons } from "./row-action-buttons"
 import type { DataTableDetailConfig, DataTableProps, PaginationConfig, SortConfig } from "./types"
+import { columnsToSheetFields, deriveSheetActions } from "./detail-sheet-model"
+import { DataTableDetailSheet } from "./data-table-detail-sheet"
 import { logger } from "@/lib/logger"
 
 const log = logger("components-ui-data-table-data-table")
@@ -296,11 +298,13 @@ export function DataTable<TData>({
   // Actions
   rowActions,
   forceRowActionsDropdown,
+  inlineRowActions,
   bulkActions,
   selectable = false,
   // View
   viewToggle = false,
-  cardRenderer,
+  cardRenderer: cardRendererProp,
+  cards = false,
   contactsView = false,
   defaultViewMode,
   mobileRow,
@@ -312,18 +316,19 @@ export function DataTable<TData>({
   showRowNumbers = true,
   columnToggle = true,
   stickyToolbar = false,
-  export: exportConfig = false,
   skeletonRows = 8,
   // State
   isLoading = false,
   error = null,
   onRetry,
-  // Empty
   emptyIcon: EmptyIcon = Inbox,
   emptyTitle = "No results found",
   emptyDescription = "Try adjusting your search or filters.",
   emptyAction,
 }: DataTableProps<TData>) {
+  // The Cards mode is opt-in: on most tables a card repeats the phone list row.
+  const cardRenderer = cards ? cardRendererProp : undefined
+
   // A table with no pagination renders every row. Past AUTO_PAGINATE_AFTER rows
   // that is thousands of DOM nodes on a phone, so page it at 50 unless the
   // caller chose otherwise (audit 7.3).
@@ -396,24 +401,23 @@ export function DataTable<TData>({
   // `hideOnMobile` columns are deliberately *included*: that flag means "too wide
   // for the mobile table", and the sheet is exactly where that data belongs.
   const detailConfig = useMemo<DataTableDetailConfig<TData> | undefined>(() => {
-    if (mobileRow?.detail) return mobileRow.detail
     if (!mobileRow) return undefined
-    const fieldColumns = columns.filter((column) => column.accessor)
     const onSelect = mobileRow.onSelect
+
+    // A page that wrote its own `detail` keeps its own actions. One that left them out gets the table's row
+    // actions, so what the desktop menu can do, a phone can too. (`onSelect` is ignored when `detail` is set.)
+    if (mobileRow.detail) {
+      if (mobileRow.detail.actions) return mobileRow.detail
+      return { ...mobileRow.detail, actions: (row: TData) => deriveSheetActions(rowActions, row) }
+    }
+
     return {
       title: mobileRow.title,
       subtitle: mobileRow.subtitle,
-      fields: (row: TData) =>
-        fieldColumns
-          .map((column) => ({ label: column.label, value: String(column.accessor?.(row) ?? "") }))
-          // A synthesized sheet has no editorial eye on it, so blanks and the
-          // placeholders a table renders in their place are dropped here instead.
-          .filter((field) => field.value !== "" && field.value !== "-" && field.value !== "—"),
-      actions: onSelect
-        ? (row: TData) => [{ label: "Open", icon: ExternalLink, onClick: () => onSelect(row) }]
-        : undefined,
+      fields: (row: TData) => columnsToSheetFields(columns, row),
+      actions: (row: TData) => deriveSheetActions(rowActions, row, { onSelect, openIcon: ExternalLink }),
     }
-  }, [mobileRow, columns])
+  }, [mobileRow, columns, rowActions])
 
   // ─── View mode (user-controlled; never auto-switch) ──────────────────────
   // Declared above the URL sync because it is part of it: a shared link that
@@ -441,7 +445,10 @@ export function DataTable<TData>({
       : defaultViewMode
 
   const requestedViewMode = manualViewMode ?? resolvedDefaultViewMode ?? "list"
-  const viewMode = requestedViewMode === "contacts" && !contactsAvailable ? "list" : requestedViewMode
+  const viewMode =
+    (requestedViewMode === "contacts" && !contactsAvailable) || (requestedViewMode === "card" && !cardRenderer)
+      ? "list"
+      : requestedViewMode
 
   /**
    * The one pair CSS can settle without JS: row list below `md`, table from `md`
@@ -557,10 +564,6 @@ export function DataTable<TData>({
   const visibleColumns = useMemo(
     () => orderedColumns.filter((c) => !hiddenColumns.has(c.key)),
     [orderedColumns, hiddenColumns]
-  )
-  const exportColumns = useMemo(
-    () => visibleColumns.map((c) => ({ label: c.label, accessor: c.accessor })),
-    [visibleColumns]
   )
 
   // ─── DnD sensors ─────────────────────────────────────────────────────────
@@ -844,7 +847,7 @@ export function DataTable<TData>({
   ]
   const showViewToggle = viewToggle && viewOptions.length > 1
 
-  const showToolbar = !searchDisabled || filters.length > 0 || columnToggle || showViewToggle || Boolean(exportConfig)
+  const showToolbar = !searchDisabled || filters.length > 0 || columnToggle || showViewToggle
 
   const pinnedFilters = filters.filter((filter) => filter.pinned)
   const sheetFilters = filters.filter((filter) => !filter.pinned)
@@ -921,7 +924,7 @@ export function DataTable<TData>({
                 <Button variant="outline" size="icon" className="relative h-9 w-9 md:hidden" aria-label="Filters">
                   <FiltersIcon className="h-4 w-4" />
                   {sheetFilterCount > 0 && (
-                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold">
+                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold">
                       {sheetFilterCount}
                     </span>
                   )}
@@ -952,8 +955,6 @@ export function DataTable<TData>({
               </SheetContent>
             </Sheet>
           )}
-
-          {exportConfig && <TableExportButton rows={sortedData} columns={exportColumns} config={exportConfig} />}
 
           {columnToggle && columns.length > 1 && (
             <DropdownMenu>
@@ -1209,6 +1210,7 @@ export function DataTable<TData>({
 
   const tableInner = (
     <DndContext
+      id="data-table-columns"
       sensors={sensors}
       collisionDetection={closestCenter}
       modifiers={[restrictToHorizontalAxis]}
@@ -1412,21 +1414,8 @@ export function DataTable<TData>({
                           {(() => {
                             const visible = rowActions.filter((a) => !a.hidden || !a.hidden(row))
                             if (visible.length === 0) return null
-                            if (visible.length === 1 && !forceRowActionsDropdown) {
-                              const action = visible[0]
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant={action.variant === "destructive" ? "destructive" : "outline"}
-                                  onClick={() => {
-                                    action.onClick(row)
-                                  }}
-                                  className="h-7 gap-1 px-2 text-xs"
-                                >
-                                  {action.icon && <action.icon className="h-3.5 w-3.5" />}
-                                  {action.label}
-                                </Button>
-                              )
+                            if (inlineRowActions || (visible.length === 1 && !forceRowActionsDropdown)) {
+                              return <RowActionButtons actions={visible} row={row} />
                             }
                             return (
                               <DropdownMenu>
@@ -1549,10 +1538,13 @@ export function DataTable<TData>({
               const isExpanded = expandedRows.has(rowId)
               const sn = snByRowId.get(rowId) ?? 1
 
+              // The sheet is the phone's surface for a row, with the expandable panel inside it. Only a page
+              // that asks for an inline accordion keeps expanding in place.
               const handleSelect = () => {
-                if (canExpand) toggleExpand(rowId)
+                if (mobileRow.expandInline && canExpand) toggleExpand(rowId)
                 else if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
+                else if (canExpand) toggleExpand(rowId)
               }
 
               const leadingContent = mobileRow.leading ? (
@@ -1621,143 +1613,19 @@ export function DataTable<TData>({
   ) : null
 
   // ─── Standard mobile detail sheet ─────────────────────────────────────────
-  // One sheet anatomy for the whole app: avatar, title, badges, tap-to-copy
-  // fields, footer actions. Pages supply values, never markup.
+  // What it shows is worked out in detail-sheet-model.ts; how it looks is in data-table-detail-sheet.tsx.
   const detailSheet = detailConfig ? (
-    <Sheet open={detailRow !== null} onOpenChange={(open) => !open && setDetailRow(null)}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto px-4 sm:px-6">
-        {detailRow && (
-          <div className="mx-auto w-full max-w-lg space-y-4 py-2">
-            <SheetHeader className="items-center text-center">
-              {detailConfig.avatar?.(detailRow)}
-              <SheetTitle className="mt-1 text-base">{detailConfig.title(detailRow)}</SheetTitle>
-              {detailConfig.subtitle && (
-                <div className="text-muted-foreground text-sm">{detailConfig.subtitle(detailRow)}</div>
-              )}
-              {detailConfig.badges && (
-                <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5">
-                  {detailConfig.badges(detailRow)}
-                </div>
-              )}
-            </SheetHeader>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {detailConfig.fields(detailRow).map((field) => {
-                if (!field.value) return null
-                const canOpen = Boolean(field.href)
-                const canCopy = !canOpen && Boolean(field.copyable)
-                const Icon = field.icon
-                const strValue = String(field.value)
-                const isLong =
-                  Boolean(field.fullWidth) ||
-                  (field.colSpan != null && field.colSpan > 1) ||
-                  strValue.length > 35 ||
-                  strValue.includes("\n") ||
-                  canOpen
-                const spanClass =
-                  field.fullWidth || (isLong && !field.colSpan)
-                    ? "col-span-2 sm:col-span-3"
-                    : field.colSpan === 3
-                      ? "col-span-2 sm:col-span-3"
-                      : field.colSpan === 2
-                        ? "col-span-2"
-                        : "col-span-1"
-
-                const tileContent = (
-                  <div className="flex h-full min-w-0 flex-col justify-between">
-                    <div className="text-muted-foreground flex items-center gap-1.5">
-                      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate text-[11px] font-medium tracking-tight">{field.label}</span>
-                      {canOpen && <ExternalLink className="text-primary/70 ml-auto h-3 w-3 shrink-0" />}
-                      {canCopy && <Copy className="text-muted-foreground/60 ml-auto h-3 w-3 shrink-0" />}
-                    </div>
-                    <span
-                      className={cn(
-                        "mt-1.5 block text-xs leading-snug font-medium break-words",
-                        field.muted && "text-muted-foreground font-normal",
-                        canOpen && "text-primary font-medium hover:underline",
-                        isLong && "text-xs font-normal whitespace-pre-wrap"
-                      )}
-                    >
-                      {field.value}
-                    </span>
-                  </div>
-                )
-
-                if (canOpen) {
-                  return (
-                    <a
-                      key={field.label}
-                      href={field.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={cn(
-                        "hover:bg-muted/40 bg-muted/20 focus-visible:ring-ring rounded-lg border p-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                        spanClass
-                      )}
-                    >
-                      {tileContent}
-                    </a>
-                  )
-                }
-
-                return canCopy ? (
-                  <button
-                    key={field.label}
-                    type="button"
-                    onClick={() => copyField(strValue, field.label)}
-                    className={cn(
-                      "hover:bg-muted/40 bg-muted/20 focus-visible:ring-ring rounded-lg border p-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                      spanClass
-                    )}
-                  >
-                    {tileContent}
-                  </button>
-                ) : (
-                  <div key={field.label} className={cn("bg-muted/20 rounded-lg border p-2.5 text-left", spanClass)}>
-                    {tileContent}
-                  </div>
-                )
-              })}
-            </div>
-
-            {detailConfig.actions && detailConfig.actions(detailRow).length > 0 && (
-              <SheetFooter className="flex-row gap-2 pt-2">
-                {detailConfig.actions(detailRow).map((action) => {
-                  const Icon = action.icon
-                  return action.href ? (
-                    <Button
-                      key={action.label}
-                      asChild
-                      variant={action.variant ?? "default"}
-                      className={cn("flex-1 gap-2", action.className)}
-                    >
-                      <a href={action.href} onClick={() => setDetailRow(null)}>
-                        {Icon && <Icon className="h-4 w-4" />}
-                        {action.label}
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      key={action.label}
-                      variant={action.variant ?? "default"}
-                      className={cn("flex-1 gap-2", action.className)}
-                      onClick={() => {
-                        setDetailRow(null)
-                        action.onClick?.()
-                      }}
-                    >
-                      {Icon && <Icon className="h-4 w-4" />}
-                      {action.label}
-                    </Button>
-                  )
-                })}
-              </SheetFooter>
-            )}
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+    <DataTableDetailSheet
+      row={detailRow}
+      config={detailConfig}
+      expanded={
+        detailRow && expandable && (!expandable.canExpand || expandable.canExpand(detailRow))
+          ? expandable.render(detailRow)
+          : null
+      }
+      onClose={() => setDetailRow(null)}
+      onCopy={copyField}
+    />
   ) : null
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1787,15 +1655,13 @@ export function DataTable<TData>({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {paginatedData.map((row) => {
                 const rowId = getRowId(row)
-                const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
                 const handleCardClick = (e: ReactMouseEvent<HTMLDivElement>) => {
                   const target = e.target as HTMLElement
                   if (isInteractiveTarget(target)) {
                     return
                   }
-                  if (canExpand) {
-                    toggleExpand(rowId)
-                  } else if (detailConfig) {
+                  // Cards never render the expandable panel, so a tap opens the sheet (which does).
+                  if (detailConfig) {
                     setDetailRow(row)
                   } else if (mobileRow?.onSelect) {
                     mobileRow.onSelect(row)
@@ -1808,7 +1674,7 @@ export function DataTable<TData>({
                     onClick={handleCardClick}
                     className={cn(
                       "h-full",
-                      (Boolean(canExpand) || Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
+                      (Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
                     )}
                   >
                     {cardRenderer(row)}
@@ -1831,7 +1697,7 @@ export function DataTable<TData>({
                 <>
                   <div className="divide-y md:hidden">
                     {Array.from({ length: Math.min(skeletonRows, 6) }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3">
+                      <div key={`skeleton-${i}`} className="flex items-center gap-3 p-3">
                         <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                         <div className="min-w-0 flex-1 space-y-1.5">
                           <Skeleton className="h-4 w-36 max-w-full" />

@@ -58,6 +58,8 @@ export const RELEASES: Release[] = [
       {
         area: "Mailboxes",
         items: [
+          "Activity history drawer on the Mailboxes page showing a full timeline of cPanel operations (creations, password resets, quota changes and suspensions)",
+          "New mailboxes default to 250 MB quota with preset buttons up to 5 GB and custom quota support",
           "Create, suspend, restore and forward staff mailboxes from Matrix, and reset mailbox passwords",
           "Admin Mailboxes page with storage usage and alerts when a mailbox is nearly full",
           "Staff email updates automatically when a name is edited",
@@ -91,6 +93,7 @@ export const RELEASES: Release[] = [
           "Multiple employees in the same department can now apply for overlapping leave without being blocked, with soft overlap notices shown to applicants and approvers",
           "Leave details now open in a unified side sheet with complete approval timelines, prominent rejection reasons, and handover attachments",
           "Admin leave queue shows staff avatars, resolves approver names by stage, and streamlines approval queues",
+          "Leave side sheet and expanded rows redesigned: tighter layout, no repeated dates, and the rejection reason shown once on the stage that rejected",
         ],
       },
       {
@@ -126,6 +129,25 @@ export const RELEASES: Release[] = [
         items: ["Corporate KPIs have a plan year with a year picker", "Upload CBT questions in bulk from Excel or CSV"],
       },
       {
+        area: "Tasks",
+        items: [
+          "Completed task sheets are quieter, with activity kept read-only after closure",
+          "Task sheets now show assignment, status changes, notes and review decisions in one timeline",
+          "Task creation excludes closed and cancelled projects from new task assignments",
+        ],
+      },
+      {
+        area: "Operations",
+        items: [
+          "Asset history now follows a clear event timeline",
+          "Fleet booking decisions are confirmed separately from the booking record",
+        ],
+      },
+      {
+        area: "Staff",
+        items: ["Employee profiles now open as a focused view, with editing and signature work in separate workspaces"],
+      },
+      {
         area: "Tools",
         items: [
           "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",
@@ -138,6 +160,10 @@ export const RELEASES: Release[] = [
           "Detail views open as a side panel instead of a pop-up",
           "Every dialog becomes a bottom sheet on phones",
           "Data tables can export what they show",
+          "Tapping a row on a phone opens its sheet with every column, the row's own panel and all of its actions (edit, approve, delete), not just a single Open button",
+          "The Cards view now appears only where a card shows more than the row does",
+          "Browser tabs now show the page name first, followed by Matrix, so several open tabs can be told apart",
+          "Department leads' consoles keep every link inside the console: the dashboard's View all links, activity feed, back links and shortcuts no longer send them to admin pages they cannot open",
         ],
       },
     ],

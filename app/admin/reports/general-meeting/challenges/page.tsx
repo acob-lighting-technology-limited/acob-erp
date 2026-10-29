@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ChallengesView } from "@/components/reports/challenges/challenges-view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Departmental Challenges" }
+
 export default async function AdminChallengesPage() {
   const supabase = await createClient()
   const {

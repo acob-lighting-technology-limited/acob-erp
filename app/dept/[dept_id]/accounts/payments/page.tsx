@@ -2,7 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { normalizeDepartmentName } from "@/shared/departments"
+import type { Metadata } from "next"
 import { PaymentsTable } from "@/components/payments/payments-table"
+
+export const metadata: Metadata = { title: "Dept Payments" }
 
 interface Payment {
   id: string

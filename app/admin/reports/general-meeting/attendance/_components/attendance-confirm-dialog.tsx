@@ -49,7 +49,7 @@ function formatTimeString(value: string | null): string {
   }
   const date = new Date(value)
   if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+    return date.toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })
   }
   return value
 }
@@ -126,7 +126,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
         <DialogHeader>
           <div className="flex items-center gap-2">
             {isPhysical ? (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-9 w-9 items-center justify-center rounded-lg">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
             ) : (
@@ -156,10 +156,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
               </div>
             </div>
             {isPhysical ? (
-              <Badge
-                variant="outline"
-                className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-400"
-              >
+              <Badge variant="outline" className="text-success border-success/30 bg-success/10 shrink-0 text-xs">
                 Physical
               </Badge>
             ) : (
@@ -194,7 +191,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-primary hover:text-primary h-6 px-2 text-[11px]"
+                className="text-primary hover:text-primary h-6 px-2 text-xs"
                 onClick={handleSetNow}
               >
                 Set to current time
@@ -209,7 +206,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
                 className="h-10 text-sm font-medium"
               />
             </div>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Adjust if the employee joined earlier or at a specific time.
             </p>
           </div>

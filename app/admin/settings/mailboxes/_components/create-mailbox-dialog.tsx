@@ -10,6 +10,10 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { apiFetch } from "@/lib/api-client"
+import { DEFAULT_MAILBOX_QUOTA_MB, formatBytes } from "@/lib/cpanel/quota"
+import { QUERY_KEYS } from "@/lib/query-keys"
+
+const PRESET_QUOTAS_MB = [250, 500, 1024, 2048, 5120] as const
 
 interface EmployeeOption {
   id: string
@@ -29,7 +33,8 @@ interface MailboxOptionsData {
   employees: EmployeeOption[]
   projects: ProjectOption[]
   staffDomain: string
-  quotaPresetsGb: number[]
+  quotaPresetsGb?: number[]
+  quotaPresetsMb?: number[]
 }
 
 function generateRandomPassword(): string {
@@ -72,8 +77,9 @@ export function CreateMailboxDialog({
   const [prefix, setPrefix] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [quotaGb, setQuotaGb] = useState<number>(1)
-  const [customQuota, setCustomQuota] = useState("")
+  const [quotaMb, setQuotaMb] = useState<number>(DEFAULT_MAILBOX_QUOTA_MB)
+  const [customAmount, setCustomAmount] = useState("")
+  const [customUnit, setCustomUnit] = useState<"MB" | "GB">("MB")
   const [isCustomQuota, setIsCustomQuota] = useState(false)
   const [linkType, setLinkType] = useState<"staff" | "project" | "none">("staff")
   const [selectedProfileId, setSelectedProfileId] = useState("")
@@ -82,13 +88,13 @@ export function CreateMailboxDialog({
   const [createdSummary, setCreatedSummary] = useState<{
     email: string
     password: string
-    quotaGb: number
+    quotaMb: number
     linkedLabel: string
   } | null>(null)
   const [copied, setCopied] = useState(false)
 
   const { data: optionsData } = useQuery({
-    queryKey: ["admin-mailbox-options"],
+    queryKey: QUERY_KEYS.adminMailboxOptions(),
     queryFn: async () => {
       const res = await apiFetch("/api/admin/mailboxes/options")
       const json = await res.json().catch(() => null)
@@ -125,9 +131,10 @@ export function CreateMailboxDialog({
       setPrefix("")
       setPassword(generateRandomPassword())
       setShowPassword(false)
-      setQuotaGb(1)
+      setQuotaMb(DEFAULT_MAILBOX_QUOTA_MB)
       setIsCustomQuota(false)
-      setCustomQuota("")
+      setCustomAmount("")
+      setCustomUnit("MB")
       setLinkType("staff")
       setSelectedProfileId("")
       setSelectedProjectId("")
@@ -167,14 +174,19 @@ export function CreateMailboxDialog({
 
   const handleCopyCredentials = async () => {
     if (!createdSummary) return
-    const text = `Mailbox: ${createdSummary.email}\nPassword: ${createdSummary.password}\nQuota: ${createdSummary.quotaGb} GB\nAssigned: ${createdSummary.linkedLabel}`
+    const text = `Mailbox: ${createdSummary.email}\nPassword: ${createdSummary.password}\nQuota: ${formatBytes(createdSummary.quotaMb * 1024 * 1024)}\nAssigned: ${createdSummary.linkedLabel}`
     await navigator.clipboard.writeText(text)
     setCopied(true)
     toast.success("Credentials copied to clipboard")
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const effectiveQuotaGb = isCustomQuota ? parseInt(customQuota, 10) || 1 : quotaGb
+  const parsedCustom = parseInt(customAmount, 10)
+  const effectiveQuotaMb = isCustomQuota
+    ? !isNaN(parsedCustom) && parsedCustom > 0
+      ? parsedCustom * (customUnit === "GB" ? 1024 : 1)
+      : DEFAULT_MAILBOX_QUOTA_MB
+    : quotaMb
   const fullEmail = `${prefix.trim().toLowerCase()}@${staffDomain}`
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,8 +203,8 @@ export function CreateMailboxDialog({
       return
     }
 
-    if (effectiveQuotaGb < 1 || effectiveQuotaGb > 500) {
-      toast.error("Quota must be between 1 GB and 500 GB")
+    if (effectiveQuotaMb < 100 || effectiveQuotaMb > 500 * 1024) {
+      toast.error("Quota must be between 100 MB and 500 GB")
       return
     }
 
@@ -214,7 +226,7 @@ export function CreateMailboxDialog({
         body: JSON.stringify({
           email: fullEmail,
           password,
-          quotaGb: effectiveQuotaGb,
+          quotaMb: effectiveQuotaMb,
           linkType,
           profileId: linkType === "staff" ? selectedProfileId : null,
           projectId: linkType === "project" ? selectedProjectId : null,
@@ -238,7 +250,7 @@ export function CreateMailboxDialog({
       setCreatedSummary({
         email: fullEmail,
         password,
-        quotaGb: effectiveQuotaGb,
+        quotaMb: effectiveQuotaMb,
         linkedLabel,
       })
     } catch (err) {
@@ -258,7 +270,7 @@ export function CreateMailboxDialog({
       description={
         createdSummary
           ? "The mailbox is active on cPanel. Be sure to copy credentials before closing."
-          : "Provision a new mailbox on cPanel, allocate storage quota in GB, and link to an employee or project."
+          : "Provision a new mailbox on cPanel, allocate storage quota, and link to an employee or project."
       }
       desktopClassName="max-w-lg"
     >
@@ -286,7 +298,7 @@ export function CreateMailboxDialog({
             <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
               <div>
                 <span className="text-muted-foreground">Storage Quota:</span>{" "}
-                <span className="font-medium">{createdSummary.quotaGb} GB</span>
+                <span className="font-medium">{formatBytes(createdSummary.quotaMb * 1024 * 1024)}</span>
               </div>
               <div className="truncate">
                 <span className="text-muted-foreground">Assigned To:</span>{" "}
@@ -355,26 +367,28 @@ export function CreateMailboxDialog({
             <p className="text-muted-foreground text-xs">Generated secure password (minimum 8 characters).</p>
           </div>
 
-          {/* Storage Quota (GB) */}
+          {/* Storage Quota */}
           <div className="min-w-0 space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Mailbox Quota (GB)</Label>
-              <span className="text-muted-foreground text-xs font-semibold">Allocating: {effectiveQuotaGb} GB</span>
+              <Label>Mailbox Quota</Label>
+              <span className="text-muted-foreground text-xs font-semibold">
+                Allocating: {formatBytes(effectiveQuotaMb * 1024 * 1024)}
+              </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-              {[1, 2, 5, 10, 25].map((gb) => (
+              {PRESET_QUOTAS_MB.map((mb) => (
                 <Button
-                  key={gb}
+                  key={mb}
                   type="button"
-                  variant={!isCustomQuota && quotaGb === gb ? "default" : "outline"}
+                  variant={!isCustomQuota && quotaMb === mb ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
                     setIsCustomQuota(false)
-                    setQuotaGb(gb)
+                    setQuotaMb(mb)
                   }}
                   className="h-8 w-full text-xs"
                 >
-                  {gb} GB
+                  {formatBytes(mb * 1024 * 1024)}
                 </Button>
               ))}
               <Button
@@ -393,14 +407,37 @@ export function CreateMailboxDialog({
                 <Input
                   type="number"
                   min={1}
-                  max={500}
-                  value={customQuota}
-                  onChange={(e) => setCustomQuota(e.target.value)}
-                  placeholder="e.g. 15"
-                  className="w-32 text-sm"
+                  max={customUnit === "GB" ? 500 : 500 * 1024}
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  placeholder={customUnit === "GB" ? "e.g. 10" : "e.g. 750"}
+                  className="w-28 text-sm"
                   autoFocus
                 />
-                <span className="text-muted-foreground text-sm font-medium">GB</span>
+                <div className="border-input flex rounded-md border p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCustomUnit("MB")}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                      customUnit === "MB"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    MB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomUnit("GB")}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                      customUnit === "GB"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    GB
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -462,7 +499,7 @@ export function CreateMailboxDialog({
                   className="w-full min-w-0 text-sm"
                 />
                 {selectedEmployee?.companyEmail && (
-                  <p className="text-xs break-words text-amber-600 dark:text-amber-400">
+                  <p className="text-warning text-xs break-words">
                     Will update {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                     {fullEmail}.
                   </p>

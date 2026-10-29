@@ -3,6 +3,10 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { LunchRegisterPage } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Lunch Register" }
+
 export const dynamic = "force-dynamic"
 
 export default async function Page() {
@@ -15,7 +19,7 @@ export default async function Page() {
   const dataClient = getServiceRoleClientOrFallback(supabase)
 
   // Get today's local date (e.g. 2026-07-16)
-  const today = new Date().toLocaleDateString("en-CA") // YYYY-MM-DD format
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" }) // YYYY-MM-DD format
 
   const [employeesRes, logsRes, settingsRes] = await Promise.all([
     dataClient

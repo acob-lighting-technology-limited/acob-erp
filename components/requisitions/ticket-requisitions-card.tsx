@@ -11,6 +11,7 @@ import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { RequisitionFormType, RequisitionStatus } from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 
+import { apiFetch } from "@/lib/api-client"
 interface LinkedRequisition {
   id: string
   requisition_number: string
@@ -36,7 +37,7 @@ export function TicketRequisitionsCard({
   const [open, setOpen] = useState(false)
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/help-desk/tickets/${ticket.id}/requisitions`)
+    const res = await apiFetch(`/api/help-desk/tickets/${ticket.id}/requisitions`)
     if (!res.ok) return
     const json = await res.json()
     setRows(json.data || [])

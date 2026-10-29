@@ -230,13 +230,13 @@ export function getTaskWeightBadgeClass(weight?: number | null): string {
   const w = clampWeight(weight)
   switch (w) {
     case 5:
-      return "border-purple-300 bg-purple-500/15 text-purple-700 dark:border-purple-800 dark:text-purple-300 font-semibold"
+      return "border-purple/30 bg-purple/15 text-purple font-semibold"
     case 4:
-      return "border-sky-300 bg-sky-500/15 text-sky-700 dark:border-sky-800 dark:text-sky-300 font-medium"
+      return "border-info/30 bg-info/15 text-info font-medium"
     case 3:
-      return "border-teal-300 bg-teal-500/15 text-teal-700 dark:border-teal-800 dark:text-teal-300 font-medium"
+      return "border-success/30 bg-teal-500/15 text-success font-medium"
     case 2:
-      return "border-slate-300 bg-slate-500/10 text-slate-700 dark:border-slate-700 dark:text-slate-300"
+      return "border-border bg-slate-500/10 text-foreground"
     case 1:
     default:
       return "border-border/70 bg-muted/40 text-muted-foreground"

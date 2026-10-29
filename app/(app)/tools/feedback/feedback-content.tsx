@@ -17,7 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { FeedbackForm } from "@/components/feedback-form"
 import { FeedbackEditModal } from "@/components/feedback-edit-modal"
 import { SystemSurveyModal } from "@/components/survey/system-survey-modal"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -27,6 +26,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
 import { logger } from "@/lib/logger"
+import { SubmitFeedbackDialog } from "./_components/submit-feedback-dialog"
 
 const log = logger("feedback-feedback-content")
 
@@ -47,19 +47,19 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
   const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
 
   const getTypeColor = (type: string) => {
-    if (type === "concern") return "bg-yellow-100 text-yellow-800"
-    if (type === "complaint") return "bg-red-100 text-red-800"
-    if (type === "suggestion") return "bg-blue-100 text-blue-800"
-    if (type === "required_item") return "bg-violet-100 text-violet-800"
-    return "bg-gray-100 text-gray-800"
+    if (type === "concern") return "bg-warning/15 text-warning"
+    if (type === "complaint") return "bg-danger/15 text-danger"
+    if (type === "suggestion") return "bg-info/15 text-info"
+    if (type === "required_item") return "bg-purple/15 text-purple"
+    return "bg-muted text-muted-foreground"
   }
 
   const getStatusColor = (status: string) => {
-    if (status === "open") return "bg-green-100 text-green-800"
-    if (status === "in_progress") return "bg-blue-100 text-blue-800"
-    if (status === "resolved") return "bg-violet-100 text-violet-800"
-    if (status === "closed") return "bg-gray-100 text-gray-800"
-    return "bg-gray-100 text-gray-800"
+    if (status === "open") return "bg-success/15 text-success"
+    if (status === "in_progress") return "bg-info/15 text-info"
+    if (status === "resolved") return "bg-purple/15 text-purple"
+    if (status === "closed") return "bg-muted text-muted-foreground"
+    return "bg-muted text-muted-foreground"
   }
 
   const handleFeedbackSubmitted = (newFeedback: Feedback) => {
@@ -161,10 +161,9 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
 
   return (
     <DataTablePage
-      title="Feedback & Suggestions"
+      title="Feedback"
       description="Share concerns, complaints, suggestions, or required items with management."
       icon={MessageSquare}
-      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as "non_anonymous" | "anonymous")}
@@ -216,17 +215,11 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">ACOB Matrix ERP Experience Pulse</h3>
                 {userSurvey ? (
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/30 bg-emerald-50 text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  >
+                  <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-xs">
                     Completed
                   </Badge>
                 ) : (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                  >
+                  <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-xs">
                     Pending Feedback
                   </Badge>
                 )}
@@ -270,7 +263,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
           title: (row) => row.title,
           subtitle: (row) => `${row.feedback_type.replaceAll("_", " ")} · ${row.is_anonymous ? "anonymous" : "named"}`,
           trailing: (row) => (
-            <Badge className={`${getStatusColor(row.status)} text-[10px] capitalize`}>
+            <Badge className={`${getStatusColor(row.status)} text-xs capitalize`}>
               {row.status.replaceAll("_", " ")}
             </Badge>
           ),
@@ -280,7 +273,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <span className="text-muted-foreground text-xs capitalize">{row.feedback_type.replaceAll("_", " ")}</span>
             ),
             badges: (row) => (
-              <Badge className={`${getStatusColor(row.status)} text-[10px] capitalize`}>
+              <Badge className={`${getStatusColor(row.status)} text-xs capitalize`}>
                 {row.status.replaceAll("_", " ")}
               </Badge>
             ),
@@ -328,9 +321,9 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
         )}
         expandable={{
           render: (row) => (
-            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+            <div className="space-y-3 text-xs">
               <div className="space-y-1">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Feedback Description
                 </span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
@@ -340,17 +333,15 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Category / Type
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Category / Type</span>
                   <span className="font-medium capitalize">{row.feedback_type.replaceAll("_", " ")}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Status</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Status</span>
                   <span className="font-medium capitalize">{row.status.replaceAll("_", " ")}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Submitted</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Submitted</span>
                   <span className="font-medium">{formatWATDate(row.created_at)}</span>
                 </div>
               </div>
@@ -395,15 +386,11 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
         urlSync
       />
 
-      <Dialog open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Submit Feedback</DialogTitle>
-            <DialogDescription>Share your thoughts with management.</DialogDescription>
-          </DialogHeader>
-          <FeedbackForm onFeedbackSubmitted={handleFeedbackSubmitted} variant="modal" />
-        </DialogContent>
-      </Dialog>
+      <SubmitFeedbackDialog
+        isSubmitOpen={isSubmitOpen}
+        setIsSubmitOpen={setIsSubmitOpen}
+        handleFeedbackSubmitted={handleFeedbackSubmitted}
+      />
 
       {showEditModal && selectedFeedback ? (
         <FeedbackEditModal

@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { WeeklySummaryContent } from "./weekly-summary-content"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
+export const metadata: Metadata = { title: "Admin Report Mail-out" }
+import type { Metadata } from "next"
+
 export default async function CommunicationsMeetingsMailPage() {
   const supabase = await createClient()
 

@@ -1,10 +1,18 @@
 {
+  "missingLoading": ["app/birthday1", "app/birthday3", "app/birthday4", "app/lunch", "app/lunch/[date]"],
   "header": [
+    "app/(app)/accounts/requisitions/[id]/page.tsx",
+    "app/birthday/page.tsx",
+    "app/birthday1/page.tsx",
+    "app/birthday3/page.tsx",
+    "app/birthday4/page.tsx",
     "app/cbt/page.tsx",
     "app/kss/it/cybersecurity/page.tsx",
     "app/kss/it/software-development/erp/page.tsx",
-    "app/kss/page.tsx"
+    "app/kss/page.tsx",
+    "app/lunch/[date]/page.tsx",
+    "app/lunch/page.tsx"
   ],
   "table": [],
-  "stats": []
+  "stats": ["app/(app)/reports/general-meeting/attendance/page.tsx"]
 }

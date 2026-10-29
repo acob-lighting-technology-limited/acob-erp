@@ -372,7 +372,6 @@ export function PortalReferenceGeneratorContent({
       title="Correspondence"
       description="Create and manage correspondence references."
       icon={FileCode2}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       actions={
         <>
           <CreateReferenceDialog
@@ -460,7 +459,7 @@ export function PortalReferenceGeneratorContent({
           ),
           subtitle: (row) => row.subject,
           trailing: (row) => (
-            <Badge className={cn("text-[10px]", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
+            <Badge className={cn("text-xs", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
           ),
           detail: {
             title: (row) =>
@@ -469,7 +468,7 @@ export function PortalReferenceGeneratorContent({
                 : "Reference Pending",
             subtitle: (row) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-[10px] font-medium uppercase">
+                <Badge variant="outline" className="text-xs font-medium uppercase">
                   {row.letter_type || "external"}
                 </Badge>
                 {(row.department_name || row.assigned_department_name) && (
@@ -481,7 +480,7 @@ export function PortalReferenceGeneratorContent({
               </div>
             ),
             badges: (row) => (
-              <Badge className={cn("text-[10px]", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
+              <Badge className={cn("text-xs", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
             ),
             fields: (row) => [
               // Restored from the old expandable row: the amber pill says the record

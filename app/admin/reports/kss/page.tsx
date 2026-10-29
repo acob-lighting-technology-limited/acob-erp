@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { canOverrideReportsWeekLock, resolveAdminScope } from "@/lib/admin/rbac"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
+export const metadata: Metadata = { title: "Admin KSS" }
+import type { Metadata } from "next"
+
 export default async function AdminKssPage() {
   const supabase = await createClient()
 

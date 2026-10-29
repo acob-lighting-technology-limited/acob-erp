@@ -30,6 +30,7 @@ import {
   formatSignaturePhone,
   type EmailContactOrder,
 } from "@/lib/signature/default-signature"
+import { escapeHtml } from "@/lib/email-templates/utils"
 
 interface SignatureCreatorProps {
   profile: {
@@ -256,8 +257,8 @@ export function SignatureCreator({
 
     return renderLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
-  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${formData.companyRole}</p>
+  <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(fullName)}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${escapeHtml(formData.companyRole)}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -515,8 +516,8 @@ export function SignatureCreator({
           </div>
 
           {activeVariant === "anniversary-hosted" && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
-              <p className="text-xs text-amber-800 dark:text-amber-300">
+            <div className="border-warning/30 bg-warning/15 rounded-md border p-3">
+              <p className="text-warning text-xs">
                 <strong>Hosted Images Edition</strong> — This signature uses absolute HTTPS URLs for all images instead
                 of embedded base64 data. Images will only display correctly when the receiving email client can reach{" "}
                 <code>{HOSTED_IMAGES_BASE || window?.location?.origin}</code>.

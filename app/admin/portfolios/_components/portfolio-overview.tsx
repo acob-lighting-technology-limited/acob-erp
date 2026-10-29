@@ -54,7 +54,7 @@ function StatusMix({ rollup }: { rollup: PortfolioHealth }) {
           />
         ))}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
         {present.map((status) => (
           <span key={status} className="text-muted-foreground inline-flex items-center gap-1">
             <span className={cn("h-1.5 w-1.5 rounded-full", HEALTH_TONE[status].dot)} />
@@ -122,7 +122,7 @@ export function PortfolioOverview({ rows, unassigned, isAdmin }: PortfolioOvervi
                         {line.name}
                       </Link>
                     )}
-                    {line.code && <p className="text-muted-foreground font-mono text-[11px]">{line.code}</p>}
+                    {line.code && <p className="text-muted-foreground font-mono text-xs">{line.code}</p>}
                   </div>
                 </div>
                 <StatusMix rollup={line.rollup} />

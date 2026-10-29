@@ -34,7 +34,7 @@ export function FormPageSkeleton({ sections = 2, fieldsPerSection = 4, showSideb
           {/* Main Form */}
           <div className={showSidebar ? "space-y-6 lg:col-span-2" : "space-y-6"}>
             {[...Array(sections)].map((_, i) => (
-              <Card key={i}>
+              <Card key={`skeleton-${i}`}>
                 <CardHeader>
                   <Skeleton className="h-6 w-40" />
                 </CardHeader>
@@ -69,7 +69,7 @@ export function FormPageSkeleton({ sections = 2, fieldsPerSection = 4, showSideb
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {[...Array(4)].map((_, i) => (
-                    <div key={i} className="flex justify-between">
+                    <div key={`skeleton-${i}`} className="flex justify-between">
                       <Skeleton className="h-4 w-16" />
                       <Skeleton className="h-4 w-24" />
                     </div>

@@ -445,10 +445,7 @@ export function PdfTools() {
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedBytes > LARGE_FILE_BYTES && (
-              <div
-                role="status"
-                className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-              >
+              <div role="status" className="border-warning/30 bg-warning/15 text-warning rounded-lg border p-3 text-sm">
                 This is a large file ({formatBytes(selectedBytes)}). If it fails on a phone, try a laptop or desktop.
               </div>
             )}
@@ -593,7 +590,7 @@ export function PdfTools() {
                   <div
                     className={
                       compressionResult.targetMissed
-                        ? "rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-900 dark:bg-amber-950/30"
+                        ? "border-warning/30 bg-warning/15 rounded-lg border p-3 text-xs"
                         : "rounded-lg border p-3 text-xs"
                     }
                   >
@@ -603,7 +600,7 @@ export function PdfTools() {
                       <span>Target: {formatBytes(compressionResult.targetBytes)}</span>
                     </div>
                     {compressionResult.targetMissed && (
-                      <p className="mt-2 text-amber-800 dark:text-amber-200">
+                      <p className="text-warning mt-2">
                         {compressionResult.hadImages
                           ? "The target could not be reached. This is as small as the images can go and still be readable."
                           : "This PDF has no photos or scans to shrink. Text-only PDFs are already compact."}

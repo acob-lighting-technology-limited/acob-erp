@@ -25,30 +25,26 @@ interface AppealsViewProps {
 
 function renderStatusBadge(r: AppealRow) {
   if (r.status === "approved") {
-    return (
-      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
-    )
+    return <Badge className="bg-success/15 text-success">Approved</Badge>
   }
 
   if (r.status === "rejected") {
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+    return <Badge className="bg-danger/15 text-danger">Rejected</Badge>
   }
 
   // Closed because the day was changed directly rather than through the appeal.
   if (r.status === "resolved") {
-    return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
+    return <Badge className="bg-info/15 text-info">Resolved</Badge>
   }
 
   if (r.stage === "pending_lead") {
     if (r.initiated_by_role === "admin_manual") {
-      return (
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
-      )
+      return <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
     }
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
-        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
+        <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
+        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
       </div>
     )
   }
@@ -56,10 +52,8 @@ function renderStatusBadge(r: AppealRow) {
   if (r.stage === "pending_admin") {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
-        {r.lead_reviewer_name ? (
-          <span className="pl-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Lead Endorsed ✓</span>
-        ) : null}
+        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
+        {r.lead_reviewer_name ? <span className="text-success pl-0.5 text-xs font-medium">Lead Endorsed ✓</span> : null}
       </div>
     )
   }
@@ -67,15 +61,13 @@ function renderStatusBadge(r: AppealRow) {
   if (r.stage === "pending_hr_lead") {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-          Pending HR Lead
-        </Badge>
+        <Badge className="bg-purple/15 text-purple">Pending HR Lead</Badge>
         <span className="text-muted-foreground pl-0.5 text-xs font-medium">Admin Endorsed ✓</span>
       </div>
     )
   }
 
-  return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
+  return <Badge className="bg-warning/15 text-warning">Pending</Badge>
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
@@ -204,7 +196,8 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge
                 className={
-                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
+                  "bg-muted text-muted-foreground"
                 }
               >
                 {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
@@ -212,7 +205,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               <span className="text-muted-foreground text-xs font-semibold">→</span>
               <Badge
                 className={
-                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
+                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-info/15 text-info"
                 }
               >
                 {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
@@ -220,7 +213,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             </div>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
-              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-warning text-xs font-medium">
                 Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
               </span>
             )}
@@ -407,7 +400,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-3.5 border-y p-4 text-sm">
+            <div className="space-y-3.5 text-sm">
               <div>
                 <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
                   {r.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
@@ -451,9 +444,9 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground w-28 shrink-0 font-semibold">Lead Endorsement</span>
                         {r.lead_reviewed_at ? (
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
+                          <span className="text-success font-medium">Endorsed</span>
                         ) : r.stage === "pending_lead" ? (
-                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                          <span className="text-warning font-medium">
                             Awaiting {r.department_lead_name || "Department Lead"}
                           </span>
                         ) : (
@@ -488,16 +481,12 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                         <span className="text-muted-foreground w-28 shrink-0 font-semibold">Admin Review</span>
                         {r.admin_reviewed_at || r.status === "approved" || r.status === "rejected" ? (
                           <span
-                            className={
-                              r.status === "rejected"
-                                ? "font-medium text-red-600 dark:text-red-400"
-                                : "font-medium text-emerald-600 dark:text-emerald-400"
-                            }
+                            className={r.status === "rejected" ? "text-danger font-medium" : "text-success font-medium"}
                           >
                             {r.status === "rejected" ? "Rejected" : "Approved"}
                           </span>
                         ) : r.stage === "pending_admin" ? (
-                          <span className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin Review</span>
+                          <span className="text-info font-medium">Awaiting Admin Review</span>
                         ) : (
                           <span className="text-muted-foreground">
                             Pending lead then {r.admin_hr_lead_name || "Admin & HR Lead"}

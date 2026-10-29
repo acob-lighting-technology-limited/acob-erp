@@ -35,6 +35,13 @@ jobs:
       - name: Typecheck
         run: npm run type-check
 
+      # UI standards (scripts/ui/README.md): the audit needs a loading screen and the shared page
+      # header on every page, and the ratchet fails if any known-bad pattern (tiny text, bare
+      # dialogs in pages, select("*"), `any`, ...) shows up in a file more often than the committed
+      # baseline allows. The baseline only moves down.
+      - name: UI guard
+        run: npm run ui:guard
+
       # `npm test` chains every unit suite, so a new suite is picked up by
       # adding it there rather than here. e2e and the campaign scripts are
       # excluded: they need a running app and a signed-in session.

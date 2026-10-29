@@ -4,6 +4,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Payments" }
+
 const log = logger("payments-page")
 
 interface Payment {

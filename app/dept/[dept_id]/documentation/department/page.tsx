@@ -6,7 +6,10 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { departmentToLibraryKey } from "@/lib/onedrive/access"
 import { AdminDocumentationContent } from "@/app/admin/documentation/admin-documentation-content"
 import type { UserProfile, employeeMember } from "@/app/admin/documentation/admin-documentation-content"
+import type { Metadata } from "next"
 import type { UserRole } from "@/types/database"
+
+export const metadata: Metadata = { title: "Dept Department" }
 
 interface Props {
   params: Promise<{ dept_id: string }>

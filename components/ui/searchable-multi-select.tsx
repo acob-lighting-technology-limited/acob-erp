@@ -139,7 +139,7 @@ export function SearchableMultiSelect({
               <Badge
                 key={option.value}
                 variant="secondary"
-                className="hover:bg-destructive/20 hover:text-destructive cursor-pointer text-[11px] transition-colors"
+                className="hover:bg-destructive/20 hover:text-destructive cursor-pointer text-xs transition-colors"
                 onClick={(e) => removeValue(option.value, e)}
               >
                 <span className="max-w-[180px] truncate">{option.label}</span>

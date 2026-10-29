@@ -62,29 +62,29 @@ const TYPE_ICONS: Record<string, typeof Info> = {
 }
 
 const TYPE_CARD_BG: Record<string, string> = {
-  task_assigned: "bg-blue-50/50 dark:bg-blue-950/10",
-  task_updated: "bg-amber-50/50 dark:bg-amber-950/10",
-  task_completed: "bg-emerald-50/50 dark:bg-emerald-950/10",
-  mention: "bg-violet-50/50 dark:bg-violet-950/10",
-  feedback: "bg-violet-50/50 dark:bg-violet-950/10",
-  asset_assigned: "bg-cyan-50/50 dark:bg-cyan-950/10",
-  approval_request: "bg-orange-50/50 dark:bg-orange-950/10",
-  approval_granted: "bg-emerald-50/50 dark:bg-emerald-950/10",
-  system: "bg-slate-50/50 dark:bg-slate-950/10",
-  announcement: "bg-red-50/50 dark:bg-red-950/10",
-  task_due_soon: "bg-amber-50/50 dark:bg-amber-950/10",
-  task_overdue: "bg-red-50/50 dark:bg-red-950/10",
-  task_awaiting_review: "bg-orange-50/50 dark:bg-orange-950/10",
-  task_needs_rating: "bg-orange-50/50 dark:bg-orange-950/10",
-  task_blocked: "bg-red-50/50 dark:bg-red-950/10",
-  project_delayed: "bg-red-50/50 dark:bg-red-950/10",
+  task_assigned: "bg-info/50",
+  task_updated: "bg-warning/50",
+  task_completed: "bg-success/50",
+  mention: "bg-purple/50",
+  feedback: "bg-purple/50",
+  asset_assigned: "bg-info/50",
+  approval_request: "bg-warning/50",
+  approval_granted: "bg-success/50",
+  system: "bg-muted/50",
+  announcement: "bg-danger/50",
+  task_due_soon: "bg-warning/50",
+  task_overdue: "bg-danger/50",
+  task_awaiting_review: "bg-warning/50",
+  task_needs_rating: "bg-warning/50",
+  task_blocked: "bg-danger/50",
+  project_delayed: "bg-danger/50",
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-danger/40 bg-danger/10 text-danger",
+  high: "border-warning/40 bg-warning/10 text-warning",
+  normal: "border-info/40 bg-info/10 text-info",
+  low: "border-success/40 bg-success/10 text-success",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {
@@ -447,11 +447,11 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           subtitle: (n) => n.message,
           trailing: (n) =>
             !n.read ? (
-              <Badge variant="default" className="text-[10px]">
+              <Badge variant="default" className="text-xs">
                 New
               </Badge>
             ) : (
-              <span className="text-muted-foreground text-[10px] whitespace-nowrap">
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
                 {formatRelativeTime(n.created_at)}
               </span>
             ),
@@ -461,14 +461,14 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
             badges: (n) => (
               <>
                 {!n.read && (
-                  <Badge variant="default" className="text-[10px]">
+                  <Badge variant="default" className="text-xs">
                     New
                   </Badge>
                 )}
-                <Badge variant="outline" className={cn("text-[10px] capitalize", getPriorityBadgeClass(n.priority))}>
+                <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
                   {n.priority}
                 </Badge>
-                <Badge variant="outline" className="text-[10px] capitalize">
+                <Badge variant="outline" className="text-xs capitalize">
                   {n.category}
                 </Badge>
               </>
@@ -518,7 +518,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         cardRenderer={(n) => {
           const iconKey = n.type as NotificationType
           const Icon = TYPE_ICONS[iconKey] || Info
-          const typeBg = TYPE_CARD_BG[iconKey] || "bg-slate-50/50 dark:bg-slate-950/10"
+          const typeBg = TYPE_CARD_BG[iconKey] || "bg-muted/50"
           return (
             <div
               className={cn(
@@ -542,25 +542,25 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="px-1.5 py-0 text-xs">
                     {n.category}
                   </Badge>
                   {!n.read && (
-                    <Badge variant="default" className="px-1.5 py-0 text-[10px]">
+                    <Badge variant="default" className="px-1.5 py-0 text-xs">
                       New
                     </Badge>
                   )}
                 </div>
-                <span className="text-muted-foreground text-[10px]">{formatRelativeTime(n.created_at)}</span>
+                <span className="text-muted-foreground text-xs">{formatRelativeTime(n.created_at)}</span>
               </div>
             </div>
           )
         }}
         expandable={{
           render: (n) => (
-            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+            <div className="space-y-3 text-xs">
               <div className="space-y-1">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Notification Message
                 </span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">{n.message}</p>
@@ -568,21 +568,21 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Category</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Category</span>
                   <span className="font-medium capitalize">{n.category}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Priority</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Priority</span>
                   <span className="font-medium capitalize">{n.priority}</span>
                 </div>
                 {n.actor_name && (
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">From</span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">From</span>
                     <span className="font-medium">{n.actor_name}</span>
                   </div>
                 )}
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Received</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Received</span>
                   <span className="font-medium">{formatWATDate(n.created_at)}</span>
                 </div>
               </div>

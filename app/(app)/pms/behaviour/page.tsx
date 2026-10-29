@@ -3,6 +3,10 @@ import { BehaviourContent } from "./page-content"
 import { getCurrentUserPmsData } from "../_lib"
 import { CycleSelector } from "../_components/cycle-selector"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "PMS Behaviour" }
+
 type ReviewDetailRow = {
   behaviour_score: number | null
   behaviour_competencies: Record<string, unknown> | null

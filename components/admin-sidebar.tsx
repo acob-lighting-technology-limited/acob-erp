@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { useDrawerA11y } from "@/hooks/use-drawer-a11y"
 import { isActiveChild } from "@/lib/navigation/active-child"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -35,9 +36,6 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { useSidebar } from "@/components/sidebar-context"
 import {
   AlertDialog,
@@ -55,6 +53,7 @@ import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { motion } from "framer-motion"
+import { useShellTransition } from "@/hooks/use-shell-transition"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
@@ -70,6 +69,7 @@ import {
 } from "@/lib/admin/policy-v2"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 
+import { useLogout } from "@/hooks/use-logout"
 interface AdminSidebarProps {
   user?: {
     email?: string
@@ -131,7 +131,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Dashboard",
       href: base,
       icon: LayoutDashboard,
-      roles: [],
     },
     {
       section: "management",
@@ -139,7 +138,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       description: "Human Resources",
       href: `${base}/hr`,
       icon: Users,
-      roles: [],
       children: [
         { name: "Employees", href: `${base}/hr/employees` },
         // No "Departments" here — the dept shell is already scoped to one
@@ -155,7 +153,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       description: "Performance Management System",
       href: `${base}/pms`,
       icon: TrendingUp,
-      roles: [],
       children: pmsNavChildren(`${base}/pms`),
     },
     {
@@ -163,7 +160,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Accounts",
       href: `${base}/accounts`,
       icon: Landmark,
-      roles: [],
       children: [
         { name: "Requisitions", href: `${base}/accounts/requisitions` },
         { name: "Assets", href: `${base}/assets` },
@@ -174,7 +170,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Corporate Services",
       href: `${base}/corporate-services`,
       icon: Target,
-      roles: [],
       children: [
         { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
         { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
@@ -185,21 +180,18 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Tasks",
       href: `${base}/tasks`,
       icon: ClipboardList,
-      roles: [],
     },
     {
       section: "operations",
       name: "Help Desk",
       href: `${base}/help-desk`,
       icon: Ticket,
-      roles: [],
     },
     {
       section: "operations",
       name: "Reports",
       href: `${base}/reports`,
       icon: FileBarChart,
-      roles: [],
       children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
     },
     {
@@ -207,14 +199,12 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Correspondence",
       href: `${base}/correspondence`,
       icon: Mail,
-      roles: [],
     },
     {
       section: "operations",
       name: "Communications",
       href: `${base}/communications`,
       icon: Megaphone,
-      roles: [],
       children: [{ name: "Broadcast", href: `${base}/communications/broadcast` }],
     },
     {
@@ -222,7 +212,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Documentation",
       href: `${base}/documentation`,
       icon: FileText,
-      roles: [],
       children: [
         { name: "Policies", href: `${base}/documentation/policies` },
         { name: "SOPs", href: `${base}/documentation/sops` },
@@ -235,7 +224,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Feedback",
       href: `${base}/feedback`,
       icon: MessageSquare,
-      roles: [],
     },
   ]
 }
@@ -260,7 +248,6 @@ type NavItem = {
   name: string
   href: string
   icon: React.ElementType
-  roles: string[]
   /** Expansion or gloss for an abbreviated name, shown on hover. */
   description?: string
   children?: NavChild[]
@@ -294,7 +281,6 @@ const adminNavigation: NavItem[] = [
     name: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "management",
@@ -302,7 +288,6 @@ const adminNavigation: NavItem[] = [
     description: "Human Resources",
     href: "/admin/hr",
     icon: Users,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Employees", href: "/admin/hr/employees" },
       { name: "Departments", href: "/admin/hr/departments" },
@@ -320,7 +305,6 @@ const adminNavigation: NavItem[] = [
     description: "Information Technology",
     href: "/admin/it",
     icon: Server,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Mailboxes", href: "/admin/settings/mailboxes" },
@@ -335,7 +319,6 @@ const adminNavigation: NavItem[] = [
     name: "MD's Desk",
     href: "/admin/md-desk",
     icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
     children: mdDeskNavChildren("/admin/md-desk"),
   },
   {
@@ -347,7 +330,6 @@ const adminNavigation: NavItem[] = [
     description: "Performance Management System",
     href: "/admin/pms",
     icon: TrendingUp,
-    roles: ["developer", "super_admin", "admin"],
     children: pmsNavChildren("/admin/pms"),
   },
   {
@@ -359,7 +341,6 @@ const adminNavigation: NavItem[] = [
     name: "Accounts",
     href: "/admin/accounts",
     icon: Landmark,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
       { name: "Payroll", href: "/admin/payroll" },
@@ -384,7 +365,6 @@ const adminNavigation: NavItem[] = [
     name: "Portfolios",
     href: "/admin/portfolios",
     icon: Layers,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Portfolios", href: "/admin/portfolios" },
       { name: "Projects", href: "/admin/projects" },
@@ -396,7 +376,6 @@ const adminNavigation: NavItem[] = [
     name: "Corporate Services",
     href: "/admin/corporate-services",
     icon: Target,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
       { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
@@ -409,28 +388,24 @@ const adminNavigation: NavItem[] = [
     name: "Tasks",
     href: "/admin/tasks",
     icon: ClipboardList,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Help Desk",
     href: "/admin/help-desk",
     icon: Ticket,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Events",
     href: "/admin/events",
     icon: CalendarDays,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Reports",
     href: "/admin/reports",
     icon: FileBarChart,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       {
         name: "General Meeting",
@@ -452,14 +427,12 @@ const adminNavigation: NavItem[] = [
     name: "Correspondence",
     href: "/admin/correspondence",
     icon: Mail,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Communications",
     href: "/admin/communications",
     icon: Megaphone,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Broadcast", href: "/admin/communications/broadcast" },
       {
@@ -481,7 +454,6 @@ const adminNavigation: NavItem[] = [
     name: "Documentation",
     href: "/admin/documentation",
     icon: FileText,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Policies", href: "/admin/documentation/policies" },
       { name: "SOPs", href: "/admin/documentation/sops" },
@@ -494,21 +466,18 @@ const adminNavigation: NavItem[] = [
     name: "Audit Logs",
     href: "/admin/audit-logs",
     icon: ShieldCheck,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "system",
     name: "Version History",
     href: "/admin/version-history",
     icon: History,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "system",
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
       { name: "Roles", href: "/admin/settings/roles" },
@@ -527,7 +496,6 @@ const adminNavigation: NavItem[] = [
     name: "Developer",
     href: "/admin/dev",
     icon: FlaskConical,
-    roles: ["developer"],
     children: [
       { name: "Login Logs", href: "/admin/dev/login-logs" },
       { name: "Role Escalations", href: "/admin/dev/role-escalations" },
@@ -565,14 +533,14 @@ export function AdminSidebar({
   showMdDesk = false,
 }: AdminSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const drawerProps = useDrawerA11y(isMobileMenuOpen, () => setIsMobileMenuOpen(false))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { isCollapsed } = useSidebar()
+  const shellTransition = useShellTransition()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const { data: pendingRsvps } = usePendingRsvpCount()
-  const supabase = createClient()
 
   // Listen for toggle event from navbar
   useEffect(() => {
@@ -581,12 +549,9 @@ export function AdminSidebar({
       e.stopPropagation()
       setIsMobileMenuOpen((prev) => !prev)
     }
-    window.addEventListener("toggle-mobile-sidebar", handleToggle)
-    document.addEventListener("toggle-mobile-sidebar", handleToggle)
-    return () => {
-      window.removeEventListener("toggle-mobile-sidebar", handleToggle)
-      document.removeEventListener("toggle-mobile-sidebar", handleToggle)
-    }
+    const targets = [window, document]
+    targets.forEach((target) => target.addEventListener("toggle-mobile-sidebar", handleToggle))
+    return () => targets.forEach((target) => target.removeEventListener("toggle-mobile-sidebar", handleToggle))
   }, [])
 
   // Notify navbar of sidebar state changes
@@ -639,11 +604,7 @@ export function AdminSidebar({
     }
   }, [pathname, deptId])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    toast.success("Logged out successfully")
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const adminRoutes = useMemo(() => normalizeAdminRoutes(profile?.admin_routes), [profile?.admin_routes])
   const accessContext = useMemo<AccessContextV2 | null>(() => {
@@ -678,17 +639,16 @@ export function AdminSidebar({
     profile?.role,
   ])
 
-  const canAccessRoute = (requiredRoles: string[], href: string) => {
+  const canAccessRoute = (href: string) => {
     if (!profile?.role || !accessContext) return false
     // Legacy role arrays are no longer authoritative under RBAC V2.
     // Use centralized policy evaluation so department leads with base role "employee"
     // still see allowed admin routes.
-    void requiredRoles
     return canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href))
   }
 
-  // In the dept shell use dept-scoped hrefs; roles[] is empty so canAccessRoute
-  // is bypassed — access is already guarded by requireDeptScope on the server.
+  // In the dept shell use dept-scoped hrefs. That navigation is not filtered here:
+  // access is guarded by requireDeptScope on the server.
   const activeNavigation = deptId ? buildDeptNavigation(deptId) : adminNavigation
 
   /**
@@ -703,8 +663,8 @@ export function AdminSidebar({
     if (!children) return undefined
     const kept: NavChild[] = []
     for (const child of children) {
-      const grandchildren = child.children?.filter((gc) => canAccessRoute([], gc.href))
-      const selfAllowed = canAccessRoute([], child.href)
+      const grandchildren = child.children?.filter((gc) => canAccessRoute(gc.href))
+      const selfAllowed = canAccessRoute(child.href)
       if (!selfAllowed && !grandchildren?.length) continue
       kept.push({
         ...child,
@@ -721,7 +681,7 @@ export function AdminSidebar({
     : activeNavigation.reduce<NavItem[]>((acc, item) => {
         if (item.href === "/admin/md-desk" && !showMdDesk) return acc
         const children = filterNavChildren(item.children)
-        const selfAllowed = canAccessRoute(item.roles, item.href)
+        const selfAllowed = canAccessRoute(item.href)
         if (!selfAllowed && !children) return acc
         const badge = item.href === "/admin/events" && pendingRsvps && pendingRsvps > 0 ? pendingRsvps : undefined
         acc.push({
@@ -782,7 +742,7 @@ export function AdminSidebar({
                 <div className="mx-1.5 my-1.5 border-t border-[var(--admin-sidebar-border)]" />
               )
             ) : (
-              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
@@ -867,7 +827,7 @@ export function AdminSidebar({
                           {!isCollapsed && item.badge != null && item.badge > 0 && (
                             <span
                               className={cn(
-                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tracking-tight",
                                 highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
                               )}
                             >
@@ -960,7 +920,7 @@ export function AdminSidebar({
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150 max-lg:min-h-10",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -1109,11 +1069,7 @@ export function AdminSidebar({
         animate={{
           width: isCollapsed ? 80 : 256,
         }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 30,
-        }}
+        transition={shellTransition}
         className="hidden overflow-hidden border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         {sidebarJSX}
@@ -1131,6 +1087,7 @@ export function AdminSidebar({
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <aside
+          {...drawerProps}
           className={cn(
             "fixed inset-y-0 left-0 z-[60] flex w-64 flex-col border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] shadow-xl transition-transform duration-300 ease-out lg:hidden",
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"

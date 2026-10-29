@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/app-layout"
 import { ErrorBoundary } from "@/components/error-boundary"
 
 export const metadata: Metadata = {
-  title: "Dashboard | ACOB Lighting Technology Limited",
+  title: "Dashboard",
   description: "Access your workspace and company tools",
 }
 

@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { OfficeLocationsPage as AdminOfficeLocationPage } from "@/app/admin/hr/offices-rooms/view"
 
+export const metadata: Metadata = { title: "Dept Offices & Rooms" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

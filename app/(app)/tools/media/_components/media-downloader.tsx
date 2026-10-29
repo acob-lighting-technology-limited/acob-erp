@@ -495,7 +495,7 @@ export function MediaDownloader() {
               </CardHeader>
               <CardContent className="max-h-96 divide-y overflow-y-auto p-0">
                 {info.tracks?.map((track, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 text-xs">
+                  <div key={`row-${idx}`} className="flex items-center justify-between p-3 text-xs">
                     <div className="min-w-0 pr-2">
                       <p className="truncate font-medium">{track.title}</p>
                       <p className="text-muted-foreground truncate">

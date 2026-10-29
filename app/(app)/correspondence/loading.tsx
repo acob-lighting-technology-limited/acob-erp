@@ -6,15 +6,16 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function Loading() {
   return (
     <TablePageSkeleton
-      filters={2}
-      rows={8}
-      showStats
       statCards={4}
+      filters={2}
+      columns={5}
+      rows={8}
+      showStats={true}
+      actions={0}
+      statBadges={4}
       spacing="tight"
       inlineActions
-      actions={1}
       list="responsive"
-      groups={1}
     />
   )
 }

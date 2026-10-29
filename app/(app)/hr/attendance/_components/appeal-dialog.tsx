@@ -224,7 +224,7 @@ export function AppealDialog({
           </div>
 
           {isQuotaReached && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <div className="border-warning/30 bg-warning/15 text-warning rounded-md border p-2.5 text-xs">
               <strong>Monthly Limit Reached (3/3):</strong> You have used all 3 allowed permissions for this month.
               Department leads cannot grant additional permissions. You can select <em>Out of Station (OOS)</em> or
               contact an admin.
@@ -355,9 +355,7 @@ export function AppealDialog({
                       disabled={submitting}
                       className="resize-none text-xs"
                     />
-                    <p className="text-muted-foreground text-[11px]">
-                      {oosReason.trim().length} / 10 minimum characters
-                    </p>
+                    <p className="text-muted-foreground text-xs">{oosReason.trim().length} / 10 minimum characters</p>
                   </div>
                 )}
               </div>
@@ -393,7 +391,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {lwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>
@@ -430,7 +428,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {iwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>

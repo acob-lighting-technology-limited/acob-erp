@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { AdminPeerFeedbackPage } from "./view"
+export { default } from "./page-client"
 
-export default function AdminPeerFeedbackPageRoute() {
-  return <AdminPeerFeedbackPage />
-}
+export const metadata: Metadata = { title: "Admin Peer Feedback" }

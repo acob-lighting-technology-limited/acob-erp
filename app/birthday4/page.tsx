@@ -4,7 +4,7 @@ import { BirthdayClothesline } from "../birthday/birthday-clothesline"
 import { BirthdayShell } from "../birthday/birthday-spotlight"
 
 // Style option 4 (Clothesline on ropes) — temporary preview route, removed once a style is picked.
-export const metadata: Metadata = { title: "Birthday Spotlight · Style 4 | ACOB Lighting Technology Limited" }
+export const metadata: Metadata = { title: "Birthday Spotlight · Style 4" }
 
 export default async function BirthdayStyle4Page() {
   await requireAdminSectionAccess("hr")

@@ -153,11 +153,11 @@ export function getRoleDisplayName(role: UserRole): string {
 
 export function getRoleBadgeColor(role: UserRole): string {
   const colors: Record<UserRole, string> = {
-    visitor: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
-    employee: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-    admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-    super_admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    developer: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    visitor: "bg-muted text-foreground",
+    employee: "bg-muted text-foreground",
+    admin: "bg-purple/15 text-purple",
+    super_admin: "bg-danger/15 text-danger",
+    developer: "bg-warning/15 text-warning",
   }
   return colors[role] || "bg-gray-100 text-gray-800"
 }

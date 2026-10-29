@@ -202,7 +202,7 @@ export function KssRosterTable({
     isLoading: isRosterLoading,
     error: rosterError,
   } = useQuery({
-    queryKey: ["kss-roster-table"],
+    queryKey: QUERY_KEYS.kssRosterTable(),
     queryFn: async (): Promise<KssRosterEntry[]> => {
       const res = await apiFetch("/api/reports/kss-roster")
       const payload = await res.json()
@@ -217,7 +217,7 @@ export function KssRosterTable({
     isLoading: isDocsLoading,
     error: docsError,
   } = useQuery({
-    queryKey: ["kss-documents-table"],
+    queryKey: QUERY_KEYS.kssDocumentsTable(),
     queryFn: async (): Promise<KssDocument[]> => {
       const res = await apiFetch(
         "/api/reports/meeting-week-documents?documentType=knowledge_sharing_session&currentOnly=true"
@@ -229,7 +229,7 @@ export function KssRosterTable({
   })
 
   const { data: kssResults = [], refetch: refetchKssResults } = useQuery({
-    queryKey: ["kss-results-table"],
+    queryKey: QUERY_KEYS.kssResultsTable(),
     enabled: enableScoring && Boolean(currentUserId),
     queryFn: async (): Promise<KssResult[]> => {
       const res = await apiFetch("/api/reports/kss-results")
@@ -240,7 +240,7 @@ export function KssRosterTable({
   })
 
   const { data: selectedWeekLockRow } = useQuery({
-    queryKey: ["kss-selected-week-lock", weekNumber, yearNumber],
+    queryKey: QUERY_KEYS.kssSelectedWeekLock(weekNumber, yearNumber),
     enabled: !readOnly,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("weekly_report_lock_state", {
@@ -520,7 +520,7 @@ export function KssRosterTable({
         refetchRoster(),
         refetchDocs(),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekNumber, yearNumber) }),
-        queryClient.invalidateQueries({ queryKey: ["general-meeting-week-setup", weekNumber, yearNumber] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.meetingWeekSetup(weekNumber, yearNumber) }),
       ])
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to save KSS")
@@ -558,7 +558,7 @@ export function KssRosterTable({
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.adminWeeklyReportLockState(row.meeting_week, row.meeting_year),
         }),
-        queryClient.invalidateQueries({ queryKey: ["general-meeting-week-setup", row.meeting_week, row.meeting_year] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.meetingWeekSetup(row.meeting_week, row.meeting_year) }),
       ])
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Delete failed")
@@ -764,11 +764,7 @@ export function KssRosterTable({
               </Tooltip>
             )
           }
-          return (
-            <Badge className="bg-emerald-100 text-xs text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-              Uploaded
-            </Badge>
-          )
+          return <Badge className="bg-success/15 text-success text-xs">Uploaded</Badge>
         },
       },
       {
@@ -1255,7 +1251,7 @@ export function KssRosterTable({
                   </p>
                 ) : null}
                 {hasGraceOverride && editingId && isSelectedWeekLocked ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <p className="text-warning text-xs">
                     Override active: you are editing this KSS entry outside the normal grace period.
                   </p>
                 ) : null}

@@ -5,6 +5,10 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { logger } from "@/lib/logger"
 import { OfficeLocationsPage, type OfficeLocationsData } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Offices & Rooms" }
+
 const log = logger("offices-rooms-page")
 
 export const dynamic = "force-dynamic"

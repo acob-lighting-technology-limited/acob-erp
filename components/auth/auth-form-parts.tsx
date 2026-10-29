@@ -231,7 +231,7 @@ export function AuthOtpInput({
     <div className="flex justify-between gap-2">
       {digits.map((digit, index) => (
         <input
-          key={index}
+          key={`row-${index}`}
           ref={(element) => {
             refs.current[index] = element
           }}

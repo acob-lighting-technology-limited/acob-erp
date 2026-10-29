@@ -296,7 +296,7 @@ export function ManageUsersDialog({
   })
 
   const { data: approvalEmailPreview, isLoading: isLoadingApprovalPreview } = useQuery<ApprovalEmailPreview>({
-    queryKey: ["pending-approval-email-preview", selectedUser?.id],
+    queryKey: QUERY_KEYS.pendingApprovalEmailPreview(selectedUser?.id),
     queryFn: async () => {
       if (!selectedUser?.id) throw new Error("Missing context")
       const res = await apiFetch(`/api/admin/pending-users/${selectedUser.id}/approval-preview`)
@@ -576,7 +576,7 @@ export function ManageUsersDialog({
                     {tab.icon}
                     {tab.label}
                     {"badge" in tab && tab.badge && (
-                      <Badge variant="destructive" className="ml-1.5 h-4 px-1.5 text-[10px]">
+                      <Badge variant="destructive" className="ml-1.5 h-4 px-1.5 text-xs">
                         {tab.badge}
                       </Badge>
                     )}
@@ -881,7 +881,7 @@ export function ManageUsersDialog({
                               >
                                 {formatName(user.first_name)} {formatName(user.last_name)}
                               </p>
-                              <p className="text-muted-foreground mt-0.5 text-[11px]">
+                              <p className="text-muted-foreground mt-0.5 text-xs">
                                 Applied {format(new Date(user.created_at), "MMM d, yyyy")}
                               </p>
                             </div>
@@ -908,7 +908,7 @@ export function ManageUsersDialog({
                             <h3 className="text-lg font-bold">Applicant Verification Profile</h3>
                             <div className="flex items-center gap-3">
                               <div className="flex flex-col items-end">
-                                <span className="text-muted-foreground mb-1 text-[10px] font-bold uppercase">
+                                <span className="text-muted-foreground mb-1 text-xs font-bold uppercase">
                                   Hire Date
                                 </span>
                                 <Input
@@ -919,7 +919,7 @@ export function ManageUsersDialog({
                                 />
                               </div>
                               <div className="flex flex-col items-start gap-1">
-                                <span className="text-muted-foreground text-[10px] font-bold uppercase">
+                                <span className="text-muted-foreground text-xs font-bold uppercase">
                                   Staff Classification
                                 </span>
                                 <Select
@@ -959,7 +959,7 @@ export function ManageUsersDialog({
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <Badge variant="outline" className="self-end text-[10px] font-bold">
+                              <Badge variant="outline" className="self-end text-xs font-bold">
                                 PENDING
                               </Badge>
                             </div>
@@ -998,7 +998,7 @@ export function ManageUsersDialog({
                               }
                             />
                             <div>
-                              <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-[10px] font-bold uppercase">
+                              <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-xs font-bold uppercase">
                                 Organisational
                               </div>
                               <DetailRow
@@ -1093,7 +1093,7 @@ export function ManageUsersDialog({
                               />
                             </div>
                             <div>
-                              <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-[10px] font-bold uppercase">
+                              <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-xs font-bold uppercase">
                                 Personal & Contact
                               </div>
                               <DetailRow
@@ -1309,7 +1309,7 @@ export function ManageUsersDialog({
                                       <span className="text-muted-foreground ml-2 text-xs">{emp.department}</span>
                                     </div>
                                     {hasOverride && (
-                                      <Badge variant="outline" className="text-[10px]">
+                                      <Badge variant="outline" className="text-xs">
                                         Custom
                                       </Badge>
                                     )}

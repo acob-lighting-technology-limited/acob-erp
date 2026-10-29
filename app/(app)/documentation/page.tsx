@@ -11,6 +11,10 @@ import { getControlledDocSummary } from "@/lib/documentation/controlled-summary"
 import { getDocumentationData } from "./data"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Documentation" }
+
 export interface Documentation {
   id: string
   title: string
@@ -54,13 +58,10 @@ export default async function DocumentationPage() {
       enabled: true,
       color:
         pendingPolicies > 0
-          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-          : "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+          ? "bg-warning/10 text-warning border-warning/20"
+          : "bg-purple/10 text-purple border-purple/20",
       fill: pendingPolicies > 0 ? "bg-amber-500" : "bg-violet-500",
-      hoverBorder:
-        pendingPolicies > 0
-          ? "hover:border-amber-500/60 dark:hover:border-amber-400/60"
-          : "hover:border-violet-500/60 dark:hover:border-violet-400/60",
+      hoverBorder: pendingPolicies > 0 ? "hover:border-warning/50" : "hover:border-purple/50",
       hoverText: pendingPolicies > 0 ? "group-hover:text-amber-500" : "group-hover:text-violet-500",
     },
     {
@@ -71,9 +72,9 @@ export default async function DocumentationPage() {
       tag: `${summary.sops} SOPs`,
       subLabel: "How we do things",
       enabled: true,
-      color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+      color: "bg-info/10 text-info border-info/20",
       fill: "bg-sky-500",
-      hoverBorder: "hover:border-sky-500/60 dark:hover:border-sky-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-sky-500",
     },
     {
@@ -84,9 +85,9 @@ export default async function DocumentationPage() {
       tag: `${docsData.docs.length} Docs`,
       subLabel: "Your work docs",
       enabled: true,
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-info/10 text-info border-info/20",
       fill: "bg-blue-500",
-      hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-blue-500",
     },
     {
@@ -98,12 +99,10 @@ export default async function DocumentationPage() {
       subLabel: docsData.departmentDocs.enabled ? "OneDrive repository" : "Access disabled",
       enabled: docsData.departmentDocs.enabled,
       color: docsData.departmentDocs.enabled
-        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+        ? "bg-success/10 text-success border-success/20"
         : "bg-muted text-muted-foreground border-muted-foreground/20",
       fill: "bg-emerald-500",
-      hoverBorder: docsData.departmentDocs.enabled
-        ? "hover:border-emerald-500/60 dark:hover:border-emerald-400/60"
-        : "",
+      hoverBorder: docsData.departmentDocs.enabled ? "hover:border-success/50" : "",
       hoverText: docsData.departmentDocs.enabled ? "group-hover:text-emerald-500" : "",
     },
   ]
@@ -157,7 +156,7 @@ export default async function DocumentationPage() {
                   <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.subLabel}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{item.subLabel}</span>
                   {item.enabled ? (
                     <IconFill
                       icon={ChevronRight}

@@ -101,7 +101,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <div>
           <h4 className="text-foreground text-sm font-semibold">CBT Performance Summary</h4>
           {attempt.submitted_at && (
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               Completed at: {formatWATDateTime(attempt.submitted_at)}
             </p>
           )}
@@ -128,9 +128,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                 <Badge
                   variant="outline"
                   className={
-                    count > 0
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      : "border-border text-foreground"
+                    count > 0 ? "text-warning border-warning/30 bg-warning/10" : "border-border text-foreground"
                   }
                 >
                   {count}
@@ -146,7 +144,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Detailed Responses</p>
 
         {isGated ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400">
+          <div className="text-warning border-warning/20 bg-warning/10 flex items-start gap-2 rounded-lg border p-4 text-xs">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {gatedReason ||
@@ -188,23 +186,20 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                         isCorrect ? (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-500"
+                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-500"
                           >
                             <CheckCircle2 className="h-3 w-3" /> Correct
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-red-500/20 bg-red-500/10 text-[10px] text-red-500"
+                            className="gap-1 border-red-500/20 bg-red-500/10 text-xs text-red-500"
                           >
                             <XCircle className="h-3 w-3" /> Incorrect
                           </Badge>
                         )
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/20 bg-amber-500/10 text-[10px] text-amber-500"
-                        >
+                        <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-xs text-amber-500">
                           Unanswered
                         </Badge>
                       )}

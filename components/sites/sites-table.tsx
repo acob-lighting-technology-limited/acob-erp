@@ -19,6 +19,7 @@ import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { ConveyanceStandingBadge, DocumentBadges } from "./conveyance-badges"
 import { DeleteSiteDialog } from "./delete-site-dialog"
 import { SiteDialog } from "./site-dialog"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type SiteRow = SiteRecord & { standing: ConveyanceStanding }
 
@@ -58,7 +59,7 @@ export function SitesTable({
   )
 
   // Every sites list (whole register and per-portfolio) shares the "sites" prefix.
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["sites"] })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sitesKey() })
 
   const columns = useMemo<DataTableColumn<SiteRow>[]>(
     () => [

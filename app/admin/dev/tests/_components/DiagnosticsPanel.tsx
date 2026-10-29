@@ -126,12 +126,10 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
                       const hint = row.resolved ? undefined : fixHint?.(row)
                       return (
                         <div
-                          key={i}
+                          key={`row-${i}`}
                           className={cn(
                             "rounded-md border px-3 py-2 text-xs",
-                            row.resolved
-                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                              : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                            row.resolved ? "border-success/30 bg-success/15" : "border-danger/30 bg-danger/15"
                           )}
                         >
                           <div className="flex items-start gap-2">
@@ -152,7 +150,7 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
                                 <div className="mt-1 space-y-1">
                                   <p className="text-red-500">{row.fail_reason}</p>
                                   {hint && (
-                                    <p className="text-yellow-600 dark:text-yellow-400">
+                                    <p className="text-warning">
                                       <strong>Fix:</strong> {hint}
                                     </p>
                                   )}

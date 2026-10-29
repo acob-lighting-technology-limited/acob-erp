@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Users, UserPlus, Mail, Plus, Search, X, UserCheck } from "lucide-react"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 type Employee = {
   id: string
@@ -108,7 +109,7 @@ export function RecipientSelector({
               <label
                 key={emp.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                  selectedEmployeeIds.has(emp.id) ? "bg-orange-50 dark:bg-orange-950/20" : "hover:bg-muted/50"
+                  selectedEmployeeIds.has(emp.id) ? "bg-warning/15" : "hover:bg-muted/50"
                 }`}
               >
                 <Checkbox checked={selectedEmployeeIds.has(emp.id)} onCheckedChange={() => toggleEmployee(emp.id)} />
@@ -125,9 +126,7 @@ export function RecipientSelector({
                 )}
               </label>
             ))}
-            {filteredEmployees.length === 0 && (
-              <div className="text-muted-foreground py-8 text-center text-sm">No employees found</div>
-            )}
+            {filteredEmployees.length === 0 && <EmptyState compact title="No employees found" />}
           </div>
           <p className="text-muted-foreground text-xs">
             {selectedEmployeeIds.size} of {employees.length} selected

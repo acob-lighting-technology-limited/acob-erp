@@ -386,31 +386,29 @@ export function LeaveRequestFormDialog({
                     }}
                     modifiersClassNames={{
                       blackout: "line-through opacity-40",
-                      holiday: "bg-violet-100 text-violet-900 font-medium dark:bg-violet-950/60 dark:text-violet-300",
-                      department_approved: "bg-red-100 text-red-900 font-medium dark:bg-red-950/60 dark:text-red-300",
-                      department_pending:
-                        "bg-amber-100 text-amber-900 font-medium dark:bg-amber-950/60 dark:text-amber-300",
-                      committed:
-                        "bg-emerald-100 text-emerald-900 font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
-                      selected_range: "bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
+                      holiday: "bg-purple/15 text-purple font-medium",
+                      department_approved: "bg-danger/15 text-danger font-medium",
+                      department_pending: "bg-warning/15 text-warning font-medium",
+                      committed: "bg-success/15 text-success font-medium",
+                      selected_range: "bg-info/15 text-info",
                     }}
                     className="mx-auto"
                   />
                   <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded border border-emerald-300 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60" />
+                      <span className="border-success/30 bg-success/15 h-3 w-3 rounded border" />
                       Added to request
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded border border-red-300 bg-red-100 dark:border-red-800 dark:bg-red-950/60" />
+                      <span className="border-danger/30 bg-danger/15 h-3 w-3 rounded border" />
                       Booked (Approved)
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded border border-amber-300 bg-amber-100 dark:border-amber-800 dark:bg-amber-950/60" />
+                      <span className="border-warning/30 bg-warning/15 h-3 w-3 rounded border" />
                       Booked (Pending)
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded border border-violet-300 bg-violet-100 dark:border-violet-800 dark:bg-violet-950/60" />
+                      <span className="border-purple/30 bg-purple/15 h-3 w-3 rounded border" />
                       Public holiday (free)
                     </span>
                     <span className="inline-flex items-center gap-1.5">
@@ -440,7 +438,7 @@ export function LeaveRequestFormDialog({
                       <Label htmlFor="calendar-emergency-override" className="cursor-pointer text-xs font-medium">
                         Emergency leave override
                       </Label>
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-xs">
                         Allow selecting dates during the Dec/Jan blocked period
                       </p>
                     </div>
@@ -453,9 +451,9 @@ export function LeaveRequestFormDialog({
                   </div>
 
                   {departmentOverlapSummary.hasOverlap && (
-                    <div className="mt-2.5 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                    <div className="border-warning/80 bg-warning/70 text-warning mt-2.5 rounded-md border p-3 text-xs">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <AlertCircle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
                         <div className="space-y-1">
                           <p className="font-semibold">Department Overlap Notice</p>
                           <p className="leading-relaxed">

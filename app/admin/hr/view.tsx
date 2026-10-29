@@ -24,6 +24,7 @@ import { IconFill } from "@/components/ui/icon-fill"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useAdminScope } from "@/components/admin-scope-context"
 
+import { apiFetch } from "@/lib/api-client"
 interface DashboardStats {
   pendingLeaveRequests: number
   todayAttendance: number
@@ -44,7 +45,7 @@ interface HRAdminDashboardProps {
 async function fetchHrDashboardStats(): Promise<DashboardStats> {
   // Department scoping is resolved server-side via getScopedDepartments() —
   // no client-side scope derivation needed.
-  const res = await fetch("/api/admin/hr/dashboard-stats", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/hr/dashboard-stats", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load HR dashboard stats")
   return res.json()
 }
@@ -123,14 +124,14 @@ export function HRAdminDashboard({
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {/* Employees Management */}
           <Link href={`${basePath}/employees`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/60 hover:shadow-xl dark:hover:border-blue-400/60">
+            <div className="bg-card border-border hover:border-info/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <IconFill
                       icon={Users}
                       fillColor="bg-blue-500"
-                      className="h-9 w-9 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
+                      className="text-info border-info/20 bg-info/10 h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-blue-500">
@@ -139,7 +140,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                    className="text-info border-info/20 bg-info/10 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.totalEmployees} Staff
                   </Badge>
@@ -149,12 +150,12 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Employee Roster</span>
+                <span className="text-muted-foreground text-xs font-medium">Employee Roster</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-blue-500"
                   hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-blue-500/60 dark:hover:border-blue-400/60"
+                  className="border-border hover:border-info/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />
@@ -164,14 +165,14 @@ export function HRAdminDashboard({
 
           {/* Departments */}
           <Link href={`${basePath}/departments`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-500/60 hover:shadow-xl dark:hover:border-purple-400/60">
+            <div className="bg-card border-border hover:border-purple/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <IconFill
                       icon={Building}
                       fillColor="bg-purple-500"
-                      className="h-9 w-9 rounded-lg border border-purple-500/20 bg-purple-500/10 text-purple-600 transition-transform duration-200 group-hover:scale-105 dark:text-purple-400"
+                      className="border-purple/20 bg-purple/10 text-purple h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-purple-500">
@@ -180,7 +181,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-xs font-bold text-purple-600 dark:text-purple-400"
+                    className="border-purple/20 bg-purple/10 text-purple shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.totalDepartments} Depts
                   </Badge>
@@ -188,12 +189,12 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Manage company departments</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Department Units</span>
+                <span className="text-muted-foreground text-xs font-medium">Department Units</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-purple-500"
                   hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-purple-500/60 dark:hover:border-purple-400/60"
+                  className="border-border hover:border-purple/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />
@@ -203,14 +204,14 @@ export function HRAdminDashboard({
 
           {/* Offices & Rooms */}
           <Link href={`${basePath}/offices-rooms`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/60 hover:shadow-xl dark:hover:border-teal-400/60">
+            <div className="bg-card border-border hover:border-success/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <IconFill
                       icon={MapPin}
                       fillColor="bg-teal-500"
-                      className="h-9 w-9 rounded-lg border border-teal-500/20 bg-teal-500/10 text-teal-600 transition-transform duration-200 group-hover:scale-105 dark:text-teal-400"
+                      className="text-success h-9 w-9 rounded-lg border border-teal-500/20 bg-teal-500/10 transition-transform duration-200 group-hover:scale-105"
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-teal-500">
@@ -219,7 +220,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-teal-500/20 bg-teal-500/10 px-2.5 py-0.5 text-xs font-bold text-teal-600 dark:text-teal-400"
+                    className="text-success shrink-0 rounded-full border-teal-500/20 bg-teal-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.totalOfficeLocations} Rooms
                   </Badge>
@@ -227,12 +228,12 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View rooms and assigned employees</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Offices & Rooms</span>
+                <span className="text-muted-foreground text-xs font-medium">Offices & Rooms</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-teal-500"
                   hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-teal-500/60 dark:hover:border-teal-400/60"
+                  className="border-border hover:border-success/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />
@@ -242,14 +243,14 @@ export function HRAdminDashboard({
 
           {/* Leave Approvals */}
           <Link href={leavePath} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/60 hover:shadow-xl dark:hover:border-amber-400/60">
+            <div className="bg-card border-border hover:border-warning/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <IconFill
                       icon={Calendar}
                       fillColor="bg-amber-500"
-                      className="h-9 w-9 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-600 transition-transform duration-200 group-hover:scale-105 dark:text-amber-400"
+                      className="text-warning border-warning/20 bg-warning/10 h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-amber-500">
@@ -258,7 +259,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                    className="text-warning border-warning/20 bg-warning/10 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.pendingLeaveRequests} Pending
                   </Badge>
@@ -266,12 +267,12 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Review and approve leave requests</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Leave Queue</span>
+                <span className="text-muted-foreground text-xs font-medium">Leave Queue</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-amber-500"
                   hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-amber-500/60 dark:hover:border-amber-400/60"
+                  className="border-border hover:border-warning/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />
@@ -282,14 +283,14 @@ export function HRAdminDashboard({
           {/* Resource Booking */}
           {canAccessHrResources && (
             <Link href={`${basePath}/resources`} className="group block">
-              <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-500/60 hover:shadow-xl dark:hover:border-indigo-400/60">
+              <div className="bg-card border-border hover:border-info/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
                 <div className="space-y-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <IconFill
                         icon={Calendar}
                         fillColor="bg-indigo-500"
-                        className="h-9 w-9 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-600 transition-transform duration-200 group-hover:scale-105 dark:text-indigo-400"
+                        className="text-info h-9 w-9 rounded-lg border border-indigo-500/20 bg-indigo-500/10 transition-transform duration-200 group-hover:scale-105"
                         iconClassName="h-5 w-5"
                       />
                       <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-indigo-500">
@@ -298,7 +299,7 @@ export function HRAdminDashboard({
                     </div>
                     <Badge
                       variant="outline"
-                      className="shrink-0 rounded-full border-indigo-500/20 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-bold text-indigo-600 dark:text-indigo-400"
+                      className="text-info shrink-0 rounded-full border-indigo-500/20 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-bold"
                     >
                       Admin
                     </Badge>
@@ -308,12 +309,12 @@ export function HRAdminDashboard({
                   </p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">Shared Assets</span>
+                  <span className="text-muted-foreground text-xs font-medium">Shared Assets</span>
                   <IconFill
                     icon={ChevronRight}
                     fillColor="bg-indigo-500"
                     hoverTextClassName="group-hover:text-white"
-                    className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-indigo-500/60 dark:hover:border-indigo-400/60"
+                    className="border-border hover:border-info/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                     iconClassName="text-muted-foreground h-3.5 w-3.5"
                     aria-hidden="true"
                   />
@@ -324,14 +325,14 @@ export function HRAdminDashboard({
 
           {/* Attendance Reports */}
           <Link href={`${basePath}/attendance`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/60 hover:shadow-xl dark:hover:border-emerald-400/60">
+            <div className="bg-card border-border hover:border-success/50 flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <IconFill
                       icon={Clock}
                       fillColor="bg-emerald-500"
-                      className="h-9 w-9 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 transition-transform duration-200 group-hover:scale-105 dark:text-emerald-400"
+                      className="text-success border-success/20 bg-success/10 h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-emerald-500">
@@ -340,7 +341,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400"
+                    className="text-success border-success/20 bg-success/10 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.todayAttendance} Today
                   </Badge>
@@ -348,12 +349,12 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View and export attendance data</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Clocking Logs</span>
+                <span className="text-muted-foreground text-xs font-medium">Clocking Logs</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-emerald-500"
                   hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-emerald-500/60 dark:hover:border-emerald-400/60"
+                  className="border-border hover:border-success/50 h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />

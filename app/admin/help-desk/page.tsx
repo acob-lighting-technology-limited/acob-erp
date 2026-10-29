@@ -5,6 +5,10 @@ import { AdminHelpDeskContent } from "./management/admin-help-desk-content"
 import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { loadHelpDeskConsole } from "./_lib/load-help-desk"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Help Desk" }
+
 export default async function AdminHelpDeskPage() {
   const supabase = await createClient()
   const {

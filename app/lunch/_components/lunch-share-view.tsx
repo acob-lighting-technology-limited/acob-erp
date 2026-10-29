@@ -31,7 +31,7 @@ export function lunchShareMetadata(preview: LunchSharePreview | null, path: stri
   if (!preview) {
     return {
       metadataBase: new URL(SITE_URL),
-      title: "Lunch poll | Matrix",
+      title: "Lunch poll",
       description: "Vote for your lunch on Matrix.",
       openGraph: { title: "Lunch poll | Matrix", description: "Vote for your lunch on Matrix.", siteName: "Matrix" },
     }
@@ -63,7 +63,7 @@ export function LunchShareView({ preview }: { preview: LunchSharePreview | null 
             </CardHeader>
             <CardContent className="space-y-5">
               {preview.groups.map((group, index) => (
-                <div key={index} className="space-y-1.5">
+                <div key={`row-${index}`} className="space-y-1.5">
                   {group.name && <p className="text-muted-foreground text-xs font-semibold uppercase">{group.name}</p>}
                   <ul className="space-y-1">
                     {group.dishes.map((dish) => (

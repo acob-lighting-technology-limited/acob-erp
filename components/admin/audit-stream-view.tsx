@@ -146,7 +146,6 @@ export function AuditStreamView({
       title={title}
       description={description}
       icon={Icon}
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       stats={
         <StatGrid>
           {statClasses.map((c) => (

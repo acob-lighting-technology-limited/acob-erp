@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -24,7 +24,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  RefreshCw,
   ShieldCheck,
   Users,
 } from "lucide-react"
@@ -98,7 +97,7 @@ function CopyValue({ value, className, muted }: { value: string | null; classNam
         >
           <span className="truncate">{value}</span>
           {copied ? (
-            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <Check className="text-success h-3.5 w-3.5 shrink-0" />
           ) : (
             <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />
           )}
@@ -151,7 +150,6 @@ function displayName(row: DirectoryRow): string {
 const fetchDirectory = () => fetchDirectoryRows<DirectoryRow>()
 
 export function DirectoryContent() {
-  const queryClient = useQueryClient()
   const [exportOpen, setExportOpen] = useState(false)
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRows, setProcessedRows] = useState<DirectoryRow[]>([])
@@ -250,7 +248,7 @@ export function DirectoryContent() {
               <div className="flex items-center gap-2">
                 <CopyValue value={displayName(r)} className="font-medium" />
                 {r.is_department_lead && (
-                  <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400">
+                  <Badge variant="outline" className="text-success">
                     Lead
                   </Badge>
                 )}
@@ -335,7 +333,7 @@ export function DirectoryContent() {
 
   return (
     <DataTablePage
-      title="Staff Directory"
+      title="Directory"
       description="Contact details for everyone at ACOB — search by name, department or office."
       tabs={tabs}
       activeTab={activeTab}
@@ -345,15 +343,6 @@ export function DirectoryContent() {
       }}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.directory() })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} disabled={rows.length === 0}>
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
@@ -474,7 +463,7 @@ export function DirectoryContent() {
           subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
           trailing: (r) =>
             r.is_department_lead ? (
-              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400">
+              <Badge variant="outline" className="text-success text-xs">
                 Lead
               </Badge>
             ) : null,
@@ -484,10 +473,7 @@ export function DirectoryContent() {
             avatar: (r) => <DirectoryAvatar row={r} size="xl" />,
             badges: (r) =>
               r.is_department_lead ? (
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
-                >
+                <Badge variant="outline" className="text-success border-success/40 bg-success/10 text-xs">
                   Lead
                 </Badge>
               ) : null,
@@ -525,6 +511,7 @@ export function DirectoryContent() {
         viewToggle
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        cards
         cardRenderer={(r) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-start justify-between gap-3">
@@ -536,7 +523,7 @@ export function DirectoryContent() {
                 </div>
               </div>
               {r.is_department_lead && (
-                <Badge variant="outline" className="shrink-0 text-emerald-600 dark:text-emerald-400">
+                <Badge variant="outline" className="text-success shrink-0">
                   Lead
                 </Badge>
               )}

@@ -7,6 +7,10 @@ import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Assets" }
+
 const log = logger("assets")
 
 type AdminAssetsPageClient = Awaited<ReturnType<typeof createClient>>

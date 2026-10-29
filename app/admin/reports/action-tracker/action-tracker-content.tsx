@@ -27,15 +27,16 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { type ActionItem } from "@/lib/export-utils"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { DirectiveFormDialog, type EditableDirective } from "@/components/admin/action-tracker/directive-form-dialog"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
+import { ActionPointsSheet } from "@/components/admin/action-tracker/action-points-sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import {
@@ -284,13 +285,13 @@ export function ActionTrackerContent({
       <Button
         size="sm"
         variant={hasBlocker ? "secondary" : "ghost"}
-        className={`h-8 gap-1.5 ${hasBlocker ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}
+        className={`h-8 gap-1.5 ${hasBlocker ? "text-warning" : "text-muted-foreground"}`}
         onClick={() => openBlockerDialog(task)}
       >
         <TriangleAlert className="h-3.5 w-3.5" />
         <span className="text-xs">{hasBlocker ? "Hindrance" : "Add"}</span>
         {evidenceCount > 0 ? (
-          <span className="flex items-center gap-0.5 text-[11px]">
+          <span className="flex items-center gap-0.5 text-xs">
             <Paperclip className="h-3 w-3" />
             {evidenceCount}
           </span>
@@ -442,21 +443,21 @@ export function ActionTrackerContent({
             parts.push({
               label: "Done",
               count: row.completedPoints,
-              colorClass: "text-green-600 dark:text-green-400 font-medium",
+              colorClass: "text-success font-medium",
             })
           }
           if (row.inProgressPoints > 0) {
             parts.push({
               label: "In Progress",
               count: row.inProgressPoints,
-              colorClass: "text-blue-600 dark:text-blue-400 font-medium",
+              colorClass: "text-info font-medium",
             })
           }
           if (row.notStartedPoints > 0) {
             parts.push({
               label: "Not Started",
               count: row.notStartedPoints,
-              colorClass: "text-orange-600 dark:text-orange-400 font-medium",
+              colorClass: "text-warning font-medium",
             })
           }
           if (row.pendingPoints > 0) {
@@ -580,7 +581,7 @@ export function ActionTrackerContent({
           row.assignees && row.assignees.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {row.assignees.map((person) => (
-                <Badge key={person.id} variant="secondary" className="text-[11px] font-normal">
+                <Badge key={person.id} variant="secondary" className="text-xs font-normal">
                   {person.name}
                 </Badge>
               ))}
@@ -768,10 +769,11 @@ export function ActionTrackerContent({
               <span className="hidden sm:inline">Export</span>
             </Button>
           ) : null}
-          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding} size="sm" className="h-8">
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Carry Forward</span>
-          </Button>
+          <HeaderMoreMenu
+            items={[
+              { label: "Carry forward", icon: RefreshCw, onSelect: handleCarryForward, disabled: isCarryForwarding },
+            ]}
+          />
         </div>
       }
       stats={
@@ -841,9 +843,8 @@ export function ActionTrackerContent({
           }}
           isLoading={isLoading}
           error={error instanceof Error ? error.message : null}
-          onRetry={() => {
-            void refetch()
-          }}
+          onRetry={() => void refetch()}
+          inlineRowActions
           rowActions={[
             {
               label: "View",
@@ -866,16 +867,16 @@ export function ActionTrackerContent({
           expandable={{
             render: (row) => (
               <div className="space-y-3">
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Action Points</p>
+                <p className="text-muted-foreground text-xs font-semibold">Action Points</p>
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Action Point</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Hindrance</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Due Date</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Action Point</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Hindrance</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Due Date</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -925,13 +926,13 @@ export function ActionTrackerContent({
             title: (row) => row.department,
             subtitle: (row) => `${row.totalPoints} action points · ${row.completedPoints} completed`,
             trailing: (row) => (
-              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
             ),
             detail: {
               title: (row) => row.department,
               subtitle: (row) => `${row.totalPoints} total action point${row.totalPoints === 1 ? "" : "s"}`,
               badges: (row) => (
-                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
               ),
               fields: (row) => [
                 { label: "Department", value: row.department },
@@ -1007,9 +1008,8 @@ export function ActionTrackerContent({
             {
               label: "Delete",
               icon: Trash2,
-              onClick: (row) => {
-                void handleDeleteDirective(row)
-              },
+              variant: "destructive",
+              onClick: (row) => void handleDeleteDirective(row),
             },
           ]}
           viewToggle
@@ -1021,7 +1021,7 @@ export function ActionTrackerContent({
             subtitle: (row) =>
               `${(row.assignees || []).map((person) => person.name).join(", ") || row.department} · ${row.timeline_text || "No timeline"}`,
             trailing: (row) => (
-              <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+              <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                 {row.status.replace(/_/g, " ")}
               </Badge>
             ),
@@ -1032,7 +1032,7 @@ export function ActionTrackerContent({
                   .filter(Boolean)
                   .join(" · "),
               badges: (row) => (
-                <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+                <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                   {row.status.replace(/_/g, " ")}
                 </Badge>
               ),
@@ -1091,9 +1091,7 @@ export function ActionTrackerContent({
           setDirectiveDialogOpen(false)
           setEditingDirective(null)
         }}
-        onComplete={() => {
-          void refetch()
-        }}
+        onComplete={refetch}
         departments={canGlobalEdit ? initialDepartments : editableDepartments}
         editingDirective={editingDirective}
         defaultWeek={weekFilter}
@@ -1104,64 +1102,20 @@ export function ActionTrackerContent({
       <BlockerDialog
         isOpen={Boolean(blockerTarget)}
         onClose={() => setBlockerTarget(null)}
-        onComplete={() => {
-          void refetch()
-        }}
+        onComplete={refetch}
         target={blockerTarget}
         canEdit={canGlobalEdit || (blockerTarget ? editableDepartments.includes(blockerTarget.department) : false)}
       />
 
-      <Dialog open={Boolean(viewingDepartment)} onOpenChange={(open) => !open && setViewingDepartment(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{viewingDepartment?.department || "Department"} Action Points</DialogTitle>
-            <DialogDescription>Update individual action point statuses.</DialogDescription>
-          </DialogHeader>
-          {viewingDepartment ? (
-            <div className="space-y-3">
-              {viewingDepartment.tasks.map((task, index) => (
-                <div key={task.id} className="rounded-lg border p-3">
-                  <div className="mb-2 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">#{index + 1}</p>
-                      <p className="font-medium">{task.title}</p>
-                      {task.description ? <p className="text-muted-foreground text-xs">{task.description}</p> : null}
-                    </div>
-                    <div className="min-w-[170px]">
-                      <Select
-                        value={task.status}
-                        disabled={!canMutateTask(task)}
-                        onValueChange={(newStatus) => {
-                          void handleStatusChange(task.id, newStatus)
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs font-semibold uppercase">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="not_started">Not Started</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className={`text-xs ${getDueDateClassName(task)}`}>Due: {formatDueDate(task)}</p>
-                    {renderBlockerButton(task)}
-                  </div>
-                  {task.blocker_note ? (
-                    <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-800 dark:text-amber-300">
-                      {task.blocker_note}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ActionPointsSheet
+        department={viewingDepartment}
+        week={weekFilter}
+        year={yearFilter}
+        onClose={() => setViewingDepartment(null)}
+        canMutateTask={canMutateTask}
+        onStatusChange={handleStatusChange}
+        renderBlockerButton={renderBlockerButton}
+      />
 
       <ExportOptionsDialog
         open={exportOptionsOpen}

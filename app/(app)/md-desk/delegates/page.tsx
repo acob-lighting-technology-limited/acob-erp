@@ -3,7 +3,7 @@ import { MdDeskDelegates } from "@/components/md-desk/md-desk-delegates"
 import { requireMdDeskMember } from "@/lib/md-desk/gate"
 
 export const metadata: Metadata = {
-  title: "MD's Desk Delegates | ACOB Lighting Technology Limited",
+  title: "MD's Desk Delegates",
 }
 
 export const dynamic = "force-dynamic"

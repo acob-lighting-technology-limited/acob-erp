@@ -15,6 +15,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
 import Link from "next/link"
 
+export const metadata: Metadata = { title: "Sign Up" }
+import type { Metadata } from "next"
+
 export default function SignUpPage() {
   return (
     <AuthShell>

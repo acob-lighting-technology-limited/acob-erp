@@ -175,14 +175,14 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
           </div>
 
           {!employee.personal_email && (
-            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-400">
+            <div className="text-warning bg-warning/10 flex items-center gap-2 rounded-md p-2 text-xs">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>Cannot dispatch: This employee does not have a personal email on file.</span>
             </div>
           )}
 
           {employee.mailbox_status === "failed" && (
-            <div className="flex items-start gap-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-400">
+            <div className="text-danger bg-danger/10 flex items-start gap-2 rounded-md p-2 text-xs">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 The last automatic attempt to create this mailbox failed
@@ -196,7 +196,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
               <Label htmlFor="dispatch-manual" className="text-xs font-semibold">
                 I set the password in cPanel myself
               </Label>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 {manual
                   ? "Matrix will not touch the mailbox — enter the password you chose."
                   : "Matrix creates the mailbox on cPanel (or resets its password if it exists) with a strong generated password."}
@@ -217,7 +217,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground hover:text-foreground h-6 px-2 text-[11px]"
+                    className="text-muted-foreground hover:text-foreground h-6 px-2 text-xs"
                     onClick={handlePaste}
                   >
                     Paste from cPanel
@@ -226,7 +226,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-6 gap-1 px-2 text-[11px]"
+                    className="h-6 gap-1 px-2 text-xs"
                     onClick={() => setPassword(generateRandomPassword())}
                   >
                     <Sparkles className="h-3 w-3" />
@@ -286,13 +286,13 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                   </Tooltip>
                 </div>
               </div>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Paste the password you entered in cPanel when creating the account. This will be securely emailed to the
                 employee.
               </p>
             </div>
           ) : (
-            <div className="text-muted-foreground flex items-start gap-2 text-[11px]">
+            <div className="text-muted-foreground flex items-start gap-2 text-xs">
               <Wand2 className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 If the mailbox already exists its password is replaced, so the employee must use the new one from this

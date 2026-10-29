@@ -10,7 +10,7 @@ export const MAILBOX_ALERT_PERCENT = 90
 /** A mailbox must fall back under this before it can alert again. */
 export const MAILBOX_ALERT_RESET_PERCENT = 85
 /** Quota given to staff mailboxes Matrix creates. */
-export const DEFAULT_MAILBOX_QUOTA_MB = 1024
+export const DEFAULT_MAILBOX_QUOTA_MB = 250
 
 export type MailboxLevel = "ok" | "warn" | "alert"
 

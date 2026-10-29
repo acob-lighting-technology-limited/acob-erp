@@ -1,16 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Calendar, CheckCircle2, Loader2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { Calendar, CheckCircle2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
@@ -33,8 +30,9 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { NewReviewCycleDialog } from "./_components/new-review-cycle-dialog"
 
-type CycleStatus = "planned" | "active" | "closed" | "locked"
+export type CycleStatus = "planned" | "active" | "closed" | "locked"
 
 type ReviewCycle = {
   id: string
@@ -323,7 +321,6 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
       title="Review Cycles"
       description="Create and manage performance review cycles. Only one cycle can be active at a time."
       icon={RefreshCw}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       actions={
         <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
@@ -432,85 +429,23 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         skeletonRows={6}
       />
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Review Cycle</DialogTitle>
-            <DialogDescription>Define a new performance review period.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Cycle Name *</Label>
-              <Input
-                placeholder="e.g. Q1 2026 Performance Review"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Review Type *</Label>
-              <Select value={reviewType} onValueChange={setReviewType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="mid_year">Mid-Year</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="probation">Probation</SelectItem>
-                  <SelectItem value="ad_hoc">Ad Hoc</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>End Date *</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  required
-                  min={startDate}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Initial Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as CycleStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="planned">Planned</SelectItem>
-                  <SelectItem value="active">Active (starts immediately)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsCreateOpen(false)
-                  resetForm()
-                }}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Create Cycle
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <NewReviewCycleDialog
+        isCreateOpen={isCreateOpen}
+        setIsCreateOpen={setIsCreateOpen}
+        handleCreate={handleCreate}
+        name={name}
+        setName={setName}
+        reviewType={reviewType}
+        setReviewType={setReviewType}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
+        status={status}
+        setStatus={setStatus}
+        resetForm={resetForm}
+        isSubmitting={isSubmitting}
+      />
 
       <AlertDialog open={Boolean(statusTarget)} onOpenChange={() => setStatusTarget(null)}>
         <AlertDialogContent>

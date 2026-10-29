@@ -39,6 +39,7 @@ import { portfolioLabel } from "@/lib/tasks/work-links"
 interface ProjectOption {
   id: string
   project_name: string
+  status?: string
 }
 
 interface KpiOption {
@@ -317,16 +318,23 @@ export function TaskFormDialog({
   const projectOptions = useMemo(() => {
     const map = new Map<string, ProjectOption>()
     for (const p of initialProjects) map.set(p.id, p)
-    for (const p of fetchedProjects ?? []) map.set(p.id, { id: p.id, project_name: p.project_name })
+    for (const p of fetchedProjects ?? []) map.set(p.id, { id: p.id, project_name: p.project_name, status: p.status })
     if (selectedTask?.project_id) {
       const existing = map.get(selectedTask.project_id)
       map.set(selectedTask.project_id, {
         id: selectedTask.project_id,
         project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
+        status: existing?.status,
       })
     }
-    return Array.from(map.values())
-  }, [initialProjects, fetchedProjects, selectedTask?.project_id, selectedTask?.project_name])
+    const all = Array.from(map.values())
+    // Exclude completed and cancelled projects from new task assignments.
+    // If editing an existing task, preserve its currently-linked project.
+    if (!selectedTask) {
+      return all.filter((p) => p.status !== "completed" && p.status !== "cancelled")
+    }
+    return all.filter((p) => p.id === selectedTask.project_id || (p.status !== "completed" && p.status !== "cancelled"))
+  }, [initialProjects, fetchedProjects, selectedTask])
 
   // Portfolio-wide work (e.g. a group of sites in development) that no single
   // project owns. Optional like projects, so a failed load never blocks saving.
@@ -419,7 +427,7 @@ export function TaskFormDialog({
         </DialogHeader>
 
         {lockLevel === "full" && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <div className="text-warning border-warning/30 bg-warning/10 rounded-md border px-3 py-2 text-xs">
             {statusLabel(selectedTask?.status || "")} work is locked. Use the status control to reopen it, or the review
             decision dialog to reassign it or extend its deadline.
           </div>
@@ -564,7 +572,7 @@ export function TaskFormDialog({
                 <Scale className="text-primary h-3.5 w-3.5" />
                 Task Weight
               </Label>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Required
               </Badge>
             </div>
@@ -586,7 +594,7 @@ export function TaskFormDialog({
                 )}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
               much as a weight-2 one. Weights do not need to add up to anything.
             </p>
@@ -627,7 +635,7 @@ export function TaskFormDialog({
                     <Target className="text-primary h-3.5 w-3.5" />
                     Department Goal
                   </Label>
-                  <Badge variant="secondary" className="text-[10px] font-normal">
+                  <Badge variant="secondary" className="text-xs font-normal">
                     Auto-selected from KPI
                   </Badge>
                 </div>
@@ -638,14 +646,14 @@ export function TaskFormDialog({
                   className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
                 />
                 {selectedKpi.strategic_priority && (
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-xs">
                     🎯 Strategic Pillar:{" "}
                     <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
                   </p>
                 )}
               </div>
             )}
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Which corporate target this work serves. Every task must link to an approved Corporate KPI.
             </p>
           </div>
@@ -680,7 +688,7 @@ export function TaskFormDialog({
                   <FolderKanban className="text-primary h-3.5 w-3.5" />
                   Project
                 </Label>
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-xs">
                   {lockedProjectId ? "Fixed" : "Optional"}
                 </Badge>
               </div>
@@ -712,7 +720,7 @@ export function TaskFormDialog({
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
               </p>
             </div>
@@ -792,9 +800,7 @@ export function TaskFormDialog({
               {isCreating && (
                 <p
                   id="due_date_hint"
-                  className={
-                    deadlineError ? "text-destructive mt-1 text-[11px]" : "text-muted-foreground mt-1 text-[11px]"
-                  }
+                  className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
                 >
                   {deadlineError ??
                     `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}

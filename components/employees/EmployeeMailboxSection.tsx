@@ -6,6 +6,7 @@ import { Inbox } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import type { EmployeeMailboxActions, EmployeeMailboxState } from "@/lib/employees/mailbox-state"
 
 async function fetchEmployeeMailbox(employeeId: string): Promise<EmployeeMailboxState | null> {
@@ -51,7 +52,7 @@ export function EmployeeMailboxSection({
   const relevant = toStatus !== fromStatus && (leaving || returning)
 
   const { data: mailbox, isFetching } = useQuery({
-    queryKey: ["hr-employee-mailbox", employeeId],
+    queryKey: QUERY_KEYS.hrEmployeeMailbox(employeeId),
     queryFn: () => fetchEmployeeMailbox(employeeId),
     enabled: Boolean(employeeId) && relevant,
     staleTime: 60 * 1000,
@@ -114,7 +115,7 @@ export function EmployeeMailboxSection({
       ) : !mailbox?.email ? (
         <p className="text-muted-foreground">No company email on this profile.</p>
       ) : mailbox.error ? (
-        <p className="text-amber-600 dark:text-amber-400">
+        <p className="text-warning">
           Could not reach cPanel ({mailbox.error}). The status will still change; update the mailbox in cPanel.
         </p>
       ) : !mailbox.managed ? (
@@ -167,7 +168,7 @@ export function EmployeeMailboxSection({
                     className="h-8 font-mono text-xs"
                     aria-invalid={forwardInvalid}
                   />
-                  <p className={forwardInvalid ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}>
+                  <p className={forwardInvalid ? "text-danger" : "text-muted-foreground"}>
                     {!forwardInvalid
                       ? "Defaults to their department lead."
                       : forwardTo.trim() === "" && !mailbox.suggestedForward

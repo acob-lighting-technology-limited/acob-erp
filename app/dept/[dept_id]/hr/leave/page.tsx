@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { LeaveApprovePage } from "@/app/admin/hr/leave/view"
 
+export const metadata: Metadata = { title: "Dept Leave" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

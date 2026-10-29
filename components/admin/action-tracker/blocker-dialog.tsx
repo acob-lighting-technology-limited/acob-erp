@@ -21,6 +21,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
 import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("action-tracker-blocker-dialog")
 
@@ -85,7 +86,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
     isLoading: isLoadingEvidence,
     refetch: refetchEvidence,
   } = useQuery({
-    queryKey: ["action-tracker", "evidence", targetId],
+    queryKey: QUERY_KEYS.actionTracker("evidence", targetId),
     enabled: isOpen && Boolean(targetId),
     queryFn: async (): Promise<EvidenceRow[]> => {
       const response = await apiFetch(`/api/reports/action-tracker/${targetId}/evidence`, { cache: "no-store" })
@@ -144,7 +145,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
       if (!response.ok) throw new Error(payload?.error || "Failed to save the hindrance note")
 
       const uploaded = await uploadPendingFiles()
-      queryClient.invalidateQueries({ queryKey: ["action-tracker", "evidence", targetId] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTracker("evidence", targetId) })
       toast.success(note.trim() ? "Hindrance recorded" : "Hindrance cleared")
       onComplete()
       if (uploaded) onClose()
@@ -192,7 +193,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
         <div className="grid gap-5 py-2">
           <div className="bg-muted/30 rounded-lg border p-3">
-            <p className="text-muted-foreground text-[10px] font-bold uppercase">Action Point</p>
+            <p className="text-muted-foreground text-xs font-bold uppercase">Action Point</p>
             <p className="text-sm font-medium">{target?.title}</p>
           </div>
 
@@ -297,7 +298,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-xs font-medium">{row.file_name}</p>
-                        <p className="text-muted-foreground text-[11px]">
+                        <p className="text-muted-foreground text-xs">
                           {formatSize(row.file_size)} ·{" "}
                           {formatWATDateTime(new Date(row.created_at), { day: "2-digit", month: "short" })}
                         </p>
@@ -319,12 +320,12 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                         href={row.signed_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary text-[11px] underline"
+                        className="text-primary text-xs underline"
                       >
                         Open original
                       </a>
                     ) : (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-xs">
                         Link unavailable
                       </Badge>
                     )}

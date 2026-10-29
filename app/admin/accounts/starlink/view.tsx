@@ -23,16 +23,16 @@ export const STARLINK_KITS_QUERY_KEY = ["starlink-kits"] as const
 const MONTH_LABELS: Record<StarlinkMonthStatus, { label: string; className: string }> = {
   confirmed: {
     label: "Paid · confirmed",
-    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    className: "bg-success/15 text-success",
   },
   autopay: {
     label: "Paid · autopay",
-    className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
+    className: "bg-success/15 text-success",
   },
-  failed: { label: "Payment failed", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  failed: { label: "Payment failed", className: "bg-danger/15 text-danger" },
   pending: {
     label: "Awaiting payment",
-    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    className: "bg-warning/15 text-warning",
   },
 }
 
@@ -266,7 +266,6 @@ export function StarlinkKitsPage() {
       title="Starlink Kits"
       description="Each Starlink kit, the project it serves and how its bills stand. Bills are read from the ict mailbox every hour."
       icon={Satellite}
-      backLink={{ href: "/admin/accounts", label: "Back to Accounts" }}
       tabs={TABS.map((t) => (t.key === "new" ? { ...t, label: `New accounts (${unmatched.length})` } : t))}
       activeTab={tab}
       onTabChange={(next) => router.replace(next === "new" ? "?tab=new" : "?", { scroll: false })}

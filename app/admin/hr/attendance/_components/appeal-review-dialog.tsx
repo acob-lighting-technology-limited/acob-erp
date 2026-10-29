@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
@@ -130,209 +130,28 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const isPending = appeal?.status === "pending"
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex w-full flex-col justify-between overflow-y-auto p-6 sm:max-w-md md:max-w-lg"
-      >
-        <SheetHeader className="border-b pb-3">
-          <div className="flex items-center justify-between pr-6">
-            <SheetTitle>{isPending ? "Review Appeal" : "Appeal Details"}</SheetTitle>
-            {appeal && appeal.status !== "pending" && (
-              <Badge
-                className={
-                  appeal.status === "approved"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                    : appeal.status === "rejected"
-                      ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                      : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
-                }
-              >
-                {appeal.status.toUpperCase()}
-              </Badge>
-            )}
-          </div>
-          <SheetDescription>
-            {appeal ? `${appeal.user_name} — ${appeal.appeal_date}` : "No appeal selected"}
-          </SheetDescription>
-        </SheetHeader>
-
-        {appeal && (
-          <div className="flex-1 space-y-4 py-2">
-            {/* Employee & date summary */}
-            <div className="bg-muted/50 space-y-2 rounded-lg border p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Employee</span>
-                <div className="text-right">
-                  <div className="font-medium">{appeal.user_name}</div>
-                  <div className="text-muted-foreground text-xs">{appeal.department}</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Appeal Date</span>
-                <span className="font-medium">{appeal.appeal_date}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Submitted</span>
-                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.created_at)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t pt-2">
-                <span className="text-muted-foreground">Origin</span>
-                <div className="text-right">
-                  {appeal.initiated_by_role === "admin_manual" ? (
-                    <div>
-                      <Badge variant="outline" className="border-blue-200 text-blue-600">
-                        Admin Manual Alteration
-                      </Badge>
-                      <div className="text-muted-foreground mt-0.5 text-xs">By {appeal.created_by_name || "Admin"}</div>
-                    </div>
-                  ) : appeal.initiated_by_role === "lead_on_behalf" ? (
-                    <div>
-                      <Badge variant="outline" className="border-purple-200 text-purple-600">
-                        Lead on Behalf
-                      </Badge>
-                      <div className="text-muted-foreground mt-0.5 text-xs">
-                        By {appeal.created_by_name || "Department Lead"}
-                      </div>
-                    </div>
-                  ) : (
-                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:text-emerald-400">
-                      Employee Appeal
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Status change preview */}
-            <div className="space-y-1.5">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Status Change</p>
-              <div className="flex items-center gap-2 text-sm">
-                <Badge
-                  className={
-                    ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
-                    "bg-gray-100 text-gray-800"
-                  }
-                >
-                  {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
-                </Badge>
-                <span className="text-muted-foreground font-medium">→</span>
-                <Badge
-                  className={
-                    ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                    "bg-blue-100 text-blue-800"
-                  }
-                >
-                  {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                    appeal.requested_status}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Reason */}
-            <div className="space-y-1">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                {appeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Employee's Reason"}
-              </p>
-              <p className="text-sm leading-relaxed">{appeal.appeal_reason || "No reason specified"}</p>
-            </div>
-
-            {/* Lead Endorsement card */}
-            {appeal.lead_reviewed_at ? (
-              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-                <div className="text-foreground flex items-center justify-between font-medium">
-                  <span>Lead Endorsement</span>
-                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.lead_reviewed_at)}</span>
-                </div>
-                <div className="text-muted-foreground">
-                  Endorsed by{" "}
-                  <span className="text-foreground font-medium">{appeal.lead_reviewer_name || "Department Lead"}</span>
-                </div>
-                {appeal.lead_resolution_note && (
-                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                    &ldquo;{appeal.lead_resolution_note}&rdquo;
-                  </p>
-                )}
-              </div>
-            ) : appeal.stage === "pending_lead" ? (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-                Awaiting {appeal.department_lead_name || `${appeal.department} Department Lead`}
-              </div>
-            ) : null}
-
-            {/* Admin Review card */}
-            {appeal.admin_reviewed_at ? (
-              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-                <div className="text-foreground flex items-center justify-between font-medium">
-                  <span>Admin Review</span>
-                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.admin_reviewed_at)}</span>
-                </div>
-                <div className="text-muted-foreground">
-                  Reviewed by{" "}
-                  <span className="text-foreground font-medium">
-                    {appeal.admin_reviewer_name || appeal.reviewer_name || "Admin"}
-                  </span>
-                </div>
-                {(appeal.admin_resolution_note || appeal.resolution_note) && (
-                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                    &ldquo;{appeal.admin_resolution_note || appeal.resolution_note}&rdquo;
-                  </p>
-                )}
-              </div>
-            ) : appeal.status === "approved" || appeal.status === "rejected" ? (
-              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-                <div className="text-foreground flex items-center justify-between font-medium">
-                  <span>Admin Review</span>
-                  {appeal.reviewed_at && (
-                    <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.reviewed_at)}</span>
-                  )}
-                </div>
-                {appeal.reviewer_name && (
-                  <div className="text-muted-foreground">
-                    Reviewed by <span className="text-foreground font-medium">{appeal.reviewer_name}</span>
-                  </div>
-                )}
-                {appeal.resolution_note && (
-                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                    &ldquo;{appeal.resolution_note}&rdquo;
-                  </p>
-                )}
-              </div>
-            ) : appeal.stage === "pending_admin" ? (
-              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
-                Awaiting Admin Review by{" "}
-                <span className="font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
-                {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-              </div>
-            ) : appeal.stage === "pending_lead" ? (
-              <div className="border-muted bg-muted/30 text-muted-foreground rounded-lg border p-2.5 text-xs">
-                Pending lead then{" "}
-                <span className="text-foreground font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
-                {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-              </div>
-            ) : null}
-
-            {/* Resolution note input for pending review */}
-            {isPending && (
-              <div className="space-y-2">
-                <Label htmlFor="resolution-note">
-                  Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
-                </Label>
-                <Textarea
-                  id="resolution-note"
-                  placeholder="Add a note explaining your decision…"
-                  value={displayNote}
-                  onChange={(e) => handleNoteChange(e.target.value)}
-                  rows={3}
-                  disabled={isLoading}
-                  className="resize-none"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        <SheetFooter className="mt-4 gap-2 border-t pt-4 sm:gap-2">
+    <DetailSheet
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={isPending ? "Review Appeal" : "Appeal Details"}
+      description={appeal ? `${appeal.user_name} — ${appeal.appeal_date}` : "No appeal selected"}
+      badges={
+        appeal && appeal.status !== "pending" ? (
+          <Badge
+            className={
+              appeal.status === "approved"
+                ? "bg-success/15 text-success"
+                : appeal.status === "rejected"
+                  ? "bg-danger/15 text-danger"
+                  : "bg-info/15 text-info"
+            }
+          >
+            {appeal.status.toUpperCase()}
+          </Badge>
+        ) : null
+      }
+      footer={
+        <div className="ml-auto flex gap-2">
           {isPending ? (
             <>
               <Button variant="outline" onClick={onClose} disabled={isLoading}>
@@ -358,8 +177,182 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               Close
             </Button>
           )}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </div>
+      }
+    >
+      {appeal && (
+        <div className="space-y-4">
+          {/* Employee & date summary */}
+          <div className="bg-muted/50 space-y-2 rounded-lg border p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Employee</span>
+              <div className="text-right">
+                <div className="font-medium">{appeal.user_name}</div>
+                <div className="text-muted-foreground text-xs">{appeal.department}</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Appeal Date</span>
+              <span className="font-medium">{appeal.appeal_date}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Submitted</span>
+              <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.created_at)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="text-muted-foreground">Origin</span>
+              <div className="text-right">
+                {appeal.initiated_by_role === "admin_manual" ? (
+                  <div>
+                    <Badge variant="outline" className="border-blue-200 text-blue-600">
+                      Admin Manual Alteration
+                    </Badge>
+                    <div className="text-muted-foreground mt-0.5 text-xs">By {appeal.created_by_name || "Admin"}</div>
+                  </div>
+                ) : appeal.initiated_by_role === "lead_on_behalf" ? (
+                  <div>
+                    <Badge variant="outline" className="border-purple-200 text-purple-600">
+                      Lead on Behalf
+                    </Badge>
+                    <div className="text-muted-foreground mt-0.5 text-xs">
+                      By {appeal.created_by_name || "Department Lead"}
+                    </div>
+                  </div>
+                ) : (
+                  <Badge variant="outline" className="text-success border-emerald-200">
+                    Employee Appeal
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Status change preview */}
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Status Change</p>
+            <div className="flex items-center gap-2 text-sm">
+              <Badge
+                className={
+                  ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
+                  "bg-muted text-muted-foreground"
+                }
+              >
+                {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
+              </Badge>
+              <span className="text-muted-foreground font-medium">→</span>
+              <Badge
+                className={
+                  ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ?? "bg-info/15 text-info"
+                }
+              >
+                {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??
+                  appeal.requested_status}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Reason */}
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              {appeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Employee's Reason"}
+            </p>
+            <p className="text-sm leading-relaxed">{appeal.appeal_reason || "No reason specified"}</p>
+          </div>
+
+          {/* Lead Endorsement card */}
+          {appeal.lead_reviewed_at ? (
+            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
+              <div className="text-foreground flex items-center justify-between font-medium">
+                <span>Lead Endorsement</span>
+                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.lead_reviewed_at)}</span>
+              </div>
+              <div className="text-muted-foreground">
+                Endorsed by{" "}
+                <span className="text-foreground font-medium">{appeal.lead_reviewer_name || "Department Lead"}</span>
+              </div>
+              {appeal.lead_resolution_note && (
+                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                  &ldquo;{appeal.lead_resolution_note}&rdquo;
+                </p>
+              )}
+            </div>
+          ) : appeal.stage === "pending_lead" ? (
+            <div className="text-warning border-warning/20 bg-warning/10 rounded-lg border p-2.5 text-xs">
+              Awaiting {appeal.department_lead_name || `${appeal.department} Department Lead`}
+            </div>
+          ) : null}
+
+          {/* Admin Review card */}
+          {appeal.admin_reviewed_at ? (
+            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
+              <div className="text-foreground flex items-center justify-between font-medium">
+                <span>Admin Review</span>
+                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.admin_reviewed_at)}</span>
+              </div>
+              <div className="text-muted-foreground">
+                Reviewed by{" "}
+                <span className="text-foreground font-medium">
+                  {appeal.admin_reviewer_name || appeal.reviewer_name || "Admin"}
+                </span>
+              </div>
+              {(appeal.admin_resolution_note || appeal.resolution_note) && (
+                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                  &ldquo;{appeal.admin_resolution_note || appeal.resolution_note}&rdquo;
+                </p>
+              )}
+            </div>
+          ) : appeal.status === "approved" || appeal.status === "rejected" ? (
+            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
+              <div className="text-foreground flex items-center justify-between font-medium">
+                <span>Admin Review</span>
+                {appeal.reviewed_at && (
+                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.reviewed_at)}</span>
+                )}
+              </div>
+              {appeal.reviewer_name && (
+                <div className="text-muted-foreground">
+                  Reviewed by <span className="text-foreground font-medium">{appeal.reviewer_name}</span>
+                </div>
+              )}
+              {appeal.resolution_note && (
+                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                  &ldquo;{appeal.resolution_note}&rdquo;
+                </p>
+              )}
+            </div>
+          ) : appeal.stage === "pending_admin" ? (
+            <div className="text-info border-info/20 bg-info/10 rounded-lg border p-2.5 text-xs">
+              Awaiting Admin Review by{" "}
+              <span className="font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
+              {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
+            </div>
+          ) : appeal.stage === "pending_lead" ? (
+            <div className="border-muted bg-muted/30 text-muted-foreground rounded-lg border p-2.5 text-xs">
+              Pending lead then{" "}
+              <span className="text-foreground font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
+              {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
+            </div>
+          ) : null}
+
+          {/* Resolution note input for pending review */}
+          {isPending && (
+            <div className="space-y-2">
+              <Label htmlFor="resolution-note">
+                Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
+              </Label>
+              <Textarea
+                id="resolution-note"
+                placeholder="Add a note explaining your decision…"
+                value={displayNote}
+                onChange={(e) => handleNoteChange(e.target.value)}
+                rows={3}
+                disabled={isLoading}
+                className="resize-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </DetailSheet>
   )
 }

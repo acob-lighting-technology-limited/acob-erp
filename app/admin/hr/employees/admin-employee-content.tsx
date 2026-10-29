@@ -48,12 +48,8 @@ import {
 } from "@/components/employees/EmailChangeMailboxDialog"
 import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { normalizeDepartmentName } from "@/shared/departments"
-import {
-  EmployeeViewModal,
-  type EditForm,
-  SUSPENSION_REASONS,
-  EXIT_REASONS,
-} from "@/components/employees/EmployeeViewModal"
+import { EmployeeProfileSheet } from "@/components/employees/EmployeeProfileSheet"
+import { type EditForm, SUSPENSION_REASONS, EXIT_REASONS } from "@/components/employees/employee-edit-form"
 import { EmployeeDeletionDialog } from "@/components/employees/EmployeeDeletionDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import {
@@ -76,6 +72,7 @@ import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
+import { EmployeeAvatar } from "./_components/employee-avatar"
 const log = logger("hr-employees-admin-employee-content")
 
 type EmployeeGender = "male" | "female" | "prefer_not_to_say" | "unspecified"
@@ -158,29 +155,6 @@ function deriveLeadDepartments(department: string, isDepartmentLead: boolean, se
   if (!isDepartmentLead) return []
   const source = selected?.length ? selected : [department]
   return Array.from(new Set(source.map((name) => normalizeDepartmentName(name)).filter(Boolean)))
-}
-
-const AVATAR_SIZES = {
-  sm: "h-8 w-8 text-[10px]",
-  md: "h-10 w-10 text-xs",
-  lg: "h-12 w-12 text-sm",
-  xl: "h-16 w-16 text-lg",
-} as const
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name.slice(0, 2) || "AC").toUpperCase()
-}
-
-function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: keyof typeof AVATAR_SIZES }) {
-  const fullName = `${employee.first_name || ""} ${employee.last_name || ""}`.trim() || employee.company_email || "User"
-  return (
-    <Avatar className={cn("shrink-0", AVATAR_SIZES[size])}>
-      {employee.avatar_url ? <AvatarImage src={employee.avatar_url} alt={fullName} className="object-cover" /> : null}
-      <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(fullName)}</AvatarFallback>
-    </Avatar>
-  )
 }
 
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
@@ -823,7 +797,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 {ELEVATED_ROLES.includes(r.role) && (
                   <Badge
                     className={cn(
-                      "shrink-0 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap shadow-none",
+                      "shrink-0 px-1.5 py-0 text-xs font-medium whitespace-nowrap shadow-none",
                       getRoleBadgeColor(r.role)
                     )}
                   >
@@ -861,7 +835,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               </TooltipTrigger>
               <TooltipContent side="top">
                 <p>Click to copy: {r.company_email}</p>
-                {r.additional_email && <p className="text-muted-foreground text-[10px]">Alt: {r.additional_email}</p>}
+                {r.additional_email && <p className="text-muted-foreground text-xs">Alt: {r.additional_email}</p>}
               </TooltipContent>
             </Tooltip>
             {r.additional_email && (
@@ -874,7 +848,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   >
                     <Badge
                       variant="outline"
-                      className="text-muted-foreground/80 hover:text-foreground cursor-pointer px-1 py-0 text-[10px] font-normal"
+                      className="text-muted-foreground/80 hover:text-foreground cursor-pointer px-1 py-0 text-xs font-normal"
                     >
                       +1
                     </Badge>
@@ -886,9 +860,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.mailbox_status === "failed" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="shrink-0 bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                    Failed
-                  </Badge>
+                  <Badge className="bg-danger/15 text-danger shrink-0 text-xs font-normal">Failed</Badge>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   {r.mailbox_error || "Matrix could not create this mailbox on cPanel."} Use Send Webmail Credentials to
@@ -914,7 +886,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.is_department_lead && (
               <Badge
                 variant="outline"
-                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
+                className="text-warning border-warning/40 bg-warning/10 shrink-0 gap-1 px-1.5 py-0 text-xs font-medium whitespace-nowrap"
               >
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
@@ -959,14 +931,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   display = r.contract_categories.name
                   const catUpper = display.toUpperCase()
                   if (catUpper.includes("NYSC")) {
-                    badgeColor =
-                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-purple/10 text-purple hover:bg-purple/10 border-transparent shadow-none"
                   } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
-                    badgeColor =
-                      "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-cyan-500/10 text-info hover:bg-cyan-500/10 border-transparent shadow-none"
                   } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
-                    badgeColor =
-                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-success/10 text-success hover:bg-success/10 border-transparent shadow-none"
                   } else {
                     badgeColor =
                       "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
@@ -975,7 +944,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   display = "Contract Staff"
                   badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
                 }
-                return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
+                return <Badge className={cn("px-1.5 py-0 text-xs whitespace-nowrap", badgeColor)}>{display}</Badge>
               },
             },
           ]),
@@ -1147,10 +1116,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   return (
     <DataTablePage
-      title="Employee Management"
+      title="Employees"
       description="View and manage employee profiles, roles, and permissions."
       icon={Users}
-      backLink={{ href: "/admin/hr", label: "Back to HR" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}
@@ -1248,7 +1216,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           render: (r) => (
             <div className="animate-in fade-in slide-in-from-top-2 grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-blue-600 uppercase">
                   <IdCard className="h-4 w-4" /> Identity
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1277,7 +1245,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </div>
               </div>
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-emerald-600 uppercase">
                   <Building2 className="h-4 w-4" /> Work info
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1296,7 +1264,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </div>
               </div>
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-amber-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-amber-600 uppercase">
                   <Calendar className="h-4 w-4" /> Contact
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1446,7 +1414,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          className="hover:text-foreground truncate text-left text-[11px]"
+                          className="hover:text-foreground truncate text-left text-xs"
                           onClick={() => void handleCopyEmail(r.additional_email || "")}
                           aria-label="Copy additional email"
                         >
@@ -1500,7 +1468,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         onConfirm={handleExportExecute}
       />
 
-      <EmployeeViewModal
+      <EmployeeProfileSheet
         isOpen={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         employee={viewEmployeeProfile}

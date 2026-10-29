@@ -12,8 +12,8 @@ const LEVEL_BAR: Record<MailboxLevel, string> = {
 
 const LEVEL_TEXT: Record<MailboxLevel, string> = {
   ok: "text-muted-foreground",
-  warn: "text-amber-600 dark:text-amber-400",
-  alert: "text-red-600 dark:text-red-400",
+  warn: "text-warning",
+  alert: "text-danger",
 }
 
 /**

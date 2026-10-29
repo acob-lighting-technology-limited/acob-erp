@@ -49,17 +49,17 @@ const typeIcons = {
 
 // Type colors
 const typeColors = {
-  info: "bg-blue-50/50 dark:bg-blue-950/10",
-  warning: "bg-yellow-50/50 dark:bg-yellow-950/10",
-  success: "bg-green-50/50 dark:bg-green-950/10",
-  error: "bg-red-50/50 dark:bg-red-950/10",
+  info: "bg-info/50",
+  warning: "bg-warning/50",
+  success: "bg-success/50",
+  error: "bg-danger/50",
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-danger/40 bg-danger/10 text-danger",
+  high: "border-warning/40 bg-warning/10 text-warning",
+  normal: "border-info/40 bg-info/10 text-info",
+  low: "border-success/40 bg-success/10 text-success",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {
@@ -165,12 +165,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full",
                 n.type === "error"
-                  ? "bg-red-100 text-red-600"
+                  ? "bg-danger/15 text-danger"
                   : n.type === "warning"
-                    ? "bg-yellow-100 text-yellow-600"
+                    ? "bg-warning/15 text-warning"
                     : n.type === "success"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-blue-100 text-blue-600"
+                      ? "bg-success/15 text-success"
+                      : "bg-info/15 text-info"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -343,7 +343,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
           title: (n) => n.title,
           subtitle: (n) => `${n.category} · ${n.priority} · ${n.timestamp}`,
           trailing: (n) => (
-            <Badge variant="outline" className={cn("text-[10px] capitalize", getPriorityBadgeClass(n.priority))}>
+            <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
               {n.priority}
             </Badge>
           ),
@@ -366,12 +366,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
                     n.type === "error"
-                      ? "bg-red-100 text-red-600"
+                      ? "bg-danger/15 text-danger"
                       : n.type === "warning"
-                        ? "bg-yellow-100 text-yellow-600"
+                        ? "bg-warning/15 text-warning"
                         : n.type === "success"
-                          ? "bg-green-100 text-green-600"
-                          : "bg-blue-100 text-blue-600"
+                          ? "bg-success/15 text-success"
+                          : "bg-info/15 text-info"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -386,19 +386,16 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="px-1.5 py-0 text-xs">
                     {n.category}
                   </Badge>
                   {n.priority !== "normal" && (
-                    <Badge
-                      variant="outline"
-                      className={cn("px-1.5 py-0 text-[10px]", getPriorityBadgeClass(n.priority))}
-                    >
+                    <Badge variant="outline" className={cn("px-1.5 py-0 text-xs", getPriorityBadgeClass(n.priority))}>
                       {n.priority}
                     </Badge>
                   )}
                 </div>
-                <span className="text-muted-foreground text-[10px]">{n.timestamp}</span>
+                <span className="text-muted-foreground text-xs">{n.timestamp}</span>
               </div>
             </div>
           )

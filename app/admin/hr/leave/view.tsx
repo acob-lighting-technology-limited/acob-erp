@@ -30,15 +30,15 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
-import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
+import { LeaveDetailSheet } from "./_components/leave-detail-sheet"
 import {
   LeaveApprovalStages,
   LeaveAttachments,
   LeaveDetailsList,
   LeaveOverlapNotice,
   LeaveStatusStrip,
-  SectionHeading,
 } from "./_components/leave-detail-sections"
+import { SectionHeading } from "@/components/ui/detail-list"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
@@ -639,7 +639,7 @@ export function LeaveApprovePage({
         }}
       />
 
-      <LeaveDetailDialog
+      <LeaveDetailSheet
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         leave={selectedLeaveDetail}
@@ -660,10 +660,9 @@ export function LeaveApprovePage({
       />
 
       <DataTablePage
-        title="Leave Approvals & Scheduling"
+        title="Leave"
         description="Review leave applications, manage approval workflows, and view organizational leave calendar."
         icon={CalendarCheck2}
-        backLink={backLinkHref ? { href: backLinkHref, label: "Back" } : undefined}
         actions={
           canAddLeave ? (
             <Button size="sm" onClick={() => setAddLeaveOpen(true)} className="gap-1.5">
@@ -846,7 +845,7 @@ export function LeaveApprovePage({
                           ? "destructive"
                           : "secondary"
                     }
-                    className="text-[10px]"
+                    className="text-xs"
                   >
                     {r.status}
                   </Badge>
@@ -949,7 +948,7 @@ export function LeaveApprovePage({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-xs">
                       {STAGE_LABELS[r.current_stage_code || r.approval_stage] || r.current_stage_code}
                     </Badge>
                   </div>

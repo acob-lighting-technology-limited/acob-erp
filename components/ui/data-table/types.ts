@@ -1,4 +1,3 @@
-import type { TableExportOptions } from "@/lib/export/table-export"
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 
@@ -12,6 +11,8 @@ export interface DataTableDetailField {
   icon?: LucideIcon
   label: string
   value: string | null | undefined
+  /** A rendered cell shown in place of `value` (from a column that has a `render` but no `accessor`). */
+  node?: ReactNode
   /**
    * Turns the row into a link opening in a new tab — for an attachment, a signed
    * download, a record elsewhere in the app. Takes precedence over `copyable`:
@@ -67,6 +68,11 @@ export interface DataTableColumn<TData> {
   accessor?: (row: TData) => string | number | null | undefined
   /** Hide on mobile (< md breakpoint) */
   hideOnMobile?: boolean
+  /**
+   * Set false to keep this column out of the phone detail sheet. Columns with an `accessor` or a `render`
+   * are shown there by default; use this for one that only makes sense in the table.
+   */
+  sheet?: false
   /** Visible by default in column toggle (default: true) */
   defaultVisible?: boolean
   /** Allow this column to be dragged to resize (default: false) */
@@ -179,8 +185,6 @@ export interface DataTableProps<TData> {
   data: TData[]
   columns: DataTableColumn<TData>[]
   getRowId: (row: TData) => string
-  /** Opt-in export of visible accessor columns and all filtered, sorted rows. */
-  export?: TableExportOptions | false
 
   // ── Search ───────────────────────────────────────────────────────────────
   searchPlaceholder?: string
@@ -235,6 +239,8 @@ export interface DataTableProps<TData> {
   // ── Row Actions ──────────────────────────────────────────────────────────
   rowActions?: RowAction<TData>[]
   forceRowActionsDropdown?: boolean
+  /** Show every row action as a button instead of a menu. For rows with two or three actions. */
+  inlineRowActions?: boolean
 
   // ── Bulk Actions ─────────────────────────────────────────────────────────
   bulkActions?: BulkAction<TData>[]
@@ -243,8 +249,14 @@ export interface DataTableProps<TData> {
   // ── View Modes ───────────────────────────────────────────────────────────
   /** Show the view-mode toggle */
   viewToggle?: boolean
-  /** Enables the "Cards" mode — renders a card for each row */
+  /** Renders a card for each row. Takes effect only with `cards`. */
   cardRenderer?: (row: TData) => ReactNode
+  /**
+   * Offers the "Cards" mode (needs `cardRenderer`). Off by default: on most tables a card repeats the phone
+   * list row, so the toggle is List · Table. Turn it on where a card shows something a row cannot: a summary,
+   * a chart or a progress bar.
+   */
+  cards?: boolean
   /**
    * Enables a third "Contacts" mode: the `mobileRow` list — grouped section
    * headers, tap-to-open detail sheet and all — rendered at *every* breakpoint

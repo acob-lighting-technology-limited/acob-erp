@@ -136,7 +136,7 @@ export function PortfolioDetail({
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })
     void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
-    void queryClient.invalidateQueries({ queryKey: ["sites"] })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sitesKey() })
     void queryClient.invalidateQueries({ queryKey: portfolioTasksKey(portfolioId) })
   }
 

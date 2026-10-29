@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import type { PostgrestError } from "@supabase/supabase-js"
 
 interface Department {
@@ -127,7 +128,7 @@ export function DepartmentLeadsManager() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["department-leads"],
+    queryKey: QUERY_KEYS.departmentLeads(),
     queryFn: fetchDepartmentsWithLeads,
   })
 
@@ -147,7 +148,7 @@ export function DepartmentLeadsManager() {
       const user = users.find((u) => u.id === selectedUserId)
       toast.success(`${user?.first_name || "User"} assigned as lead for ${selectedDept?.name}`)
       setIsDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ["department-leads"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.departmentLeads() })
     },
     onError: (error: PostgrestError | Error) => {
       toast.error(error.message || "Failed to assign lead")

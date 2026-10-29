@@ -43,13 +43,14 @@ import { logger } from "@/lib/logger"
 
 import { AssetFormDialog } from "@/components/assets/AssetFormDialog"
 import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
-import { AssetHistoryDialog } from "@/components/assets/AssetHistoryDialog"
-import { AssetIssuesDialog } from "@/components/assets/AssetIssuesDialog"
+import { AssetHistorySheet } from "@/components/assets/asset-history-sheet"
+import { AssetIssuesSheet } from "@/components/assets/asset-issues-sheet"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
 import { AssetHandoverDialog } from "@/components/assets/AssetHandoverDialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import {
   buildAssetExportRows,
   exportAssetsToExcel,
@@ -62,6 +63,19 @@ import {
 import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
+import { useShellBase } from "@/hooks/use-shell-base"
+import type {
+  Asset,
+  AssetActivity,
+  AssetAssignment,
+  AssetIssue,
+  AssignableAsset,
+  Employee,
+  ProfileNameRow,
+  UserProfile,
+} from "./_lib/types"
+
+export type { Asset, Employee, UserProfile } from "./_lib/types"
 const log = logger("assets-admin-assets-content")
 
 async function fetchAssetTypes(): Promise<{ label: string; code: string; requiresSerialModel: boolean }[]> {
@@ -91,131 +105,7 @@ async function fetchAssetTypes(): Promise<{ label: string; code: string; require
   return ASSET_TYPES
 }
 
-export interface Asset {
-  id: string
-  unique_code: string
-  asset_type: string
-  acquisition_year: number
-  asset_model?: string
-  serial_number?: string
-  status: string
-  notes?: string
-  created_at: string
-  created_by: string
-  assignment_type?: "individual" | "department" | "office"
-  department?: string
-  office_location?: string
-  current_assignment?: {
-    assigned_to?: string
-    department?: string
-    office_location?: string
-    assignment_type?: "individual" | "department" | "office" | string
-    user?: {
-      first_name: string
-      last_name: string
-    }
-  }
-  issues?: AssetIssue[]
-  unresolved_issues_count?: number
-  deleted_at?: string | null
-  deleted_by?: string | null
-  delete_reason?: string | null
-}
-
-interface AssetIssue {
-  id: string
-  asset_id: string
-  description: string
-  resolved: boolean
-  created_at: string
-  resolved_at?: string
-  resolved_by?: string
-  created_by: string
-}
-
-export interface Employee {
-  id: string
-  first_name: string
-  last_name: string
-  company_email: string
-  department: string
-  employment_status?: string | null
-  designation?: string | null
-  residential_address?: string | null
-}
-
-interface AssetAssignment {
-  id: string
-  assigned_to?: string
-  department?: string
-  office_location?: string
-  assignment_type?: string
-  assigned_at: string
-  is_current: boolean
-  user?: {
-    first_name: string
-    last_name: string
-    designation?: string | null
-    residential_address?: string | null
-  }
-}
-
-type AssignableAsset = {
-  status: string
-  assignment_type?: string
-  department?: string
-  office_location?: string
-  current_assignment?: {
-    assigned_to?: string
-    department?: string
-    office_location?: string
-    assignment_type?: string
-    user?: {
-      first_name: string
-      last_name: string
-      designation?: string | null
-      residential_address?: string | null
-    }
-  }
-}
-
-type ProfileNameRow = {
-  id: string
-  first_name?: string | null
-  last_name?: string | null
-}
-
-interface AssetActivity {
-  id: string
-  timestamp: string
-  type: "assignment" | "unassignment" | "status_change" | "issue_reported" | "issue_resolved"
-  title: string
-  description?: string
-  user_name?: string
-  performed_by_name?: string
-  details?: {
-    assigned_to?: string
-    department?: string
-    office_location?: string
-    assignment_type?: string
-    notes?: string
-    status?: string
-    old_status?: string
-  }
-}
-
 const currentYear = new Date().getFullYear()
-
-export interface UserProfile {
-  first_name?: string | null
-  last_name?: string | null
-  role: string
-  admin_routes?: string[] | null
-  is_department_lead?: boolean
-  lead_departments?: string[]
-  managed_departments?: string[]
-  managed_offices?: string[]
-}
 
 interface AdminAssetsContentProps {
   initialAssets: Asset[]
@@ -234,6 +124,8 @@ export function AdminAssetsContent({
   initialError,
   lockedDepartment,
 }: AdminAssetsContentProps) {
+  const shell = useShellBase()
+  const issuesHref = shell.href("/admin/assets/issues")
   const router = useRouter()
   const normalizedRole = String(userProfile?.role || "")
     .trim()
@@ -1184,17 +1076,17 @@ export function AdminAssetsContent({
   const getStatusColor = (status: string) => {
     switch (status) {
       case "assigned":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+        return "bg-success/15 text-success"
       case "available":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+        return "bg-info/15 text-info"
       case "maintenance":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+        return "bg-warning/15 text-warning"
       case "retired":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+        return "bg-muted text-foreground"
       case "archived":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+        return "bg-danger/15 text-danger"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+        return "bg-muted text-foreground"
     }
   }
 
@@ -1450,16 +1342,12 @@ export function AdminAssetsContent({
 
   return (
     <DataTablePage
-      title="Asset Management"
+      title="Assets"
       description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => router.push("/admin/assets/issues")} className="gap-2" size="sm">
-            <AlertCircle className="h-4 w-4" />
-            Issues
-          </Button>
+          <HeaderMoreMenu items={[{ label: "Asset issues", icon: AlertCircle, href: issuesHref }]} />
           <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="gap-2" size="sm">
             <Download className="h-4 w-4" />
             Export
@@ -1758,8 +1646,8 @@ export function AdminAssetsContent({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* asset History Dialog */}
-      <AssetHistoryDialog
+      {/* Asset history sheet */}
+      <AssetHistorySheet
         isOpen={isHistoryOpen}
         onOpenChange={setIsHistoryOpen}
         selectedAsset={selectedAsset}
@@ -1767,7 +1655,7 @@ export function AdminAssetsContent({
       />
 
       {/* Asset Issues Dialog */}
-      <AssetIssuesDialog
+      <AssetIssuesSheet
         isOpen={isIssuesDialogOpen}
         onOpenChange={setIsIssuesDialogOpen}
         selectedAsset={selectedAsset}

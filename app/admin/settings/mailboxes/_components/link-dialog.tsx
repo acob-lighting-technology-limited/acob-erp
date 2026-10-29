@@ -10,6 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { apiFetch } from "@/lib/api-client"
 import type { MailboxReportRow } from "@/lib/cpanel/mailboxes"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface EmployeeOption {
   id: string
@@ -45,7 +46,7 @@ export function LinkDialog({
   const [saving, setSaving] = useState(false)
 
   const { data: optionsData } = useQuery({
-    queryKey: ["admin-mailbox-options"],
+    queryKey: QUERY_KEYS.adminMailboxOptions(),
     queryFn: async () => {
       const res = await apiFetch("/api/admin/mailboxes/options")
       const json = await res.json().catch(() => null)
@@ -207,7 +208,7 @@ export function LinkDialog({
                 className="w-full min-w-0 text-sm"
               />
               {selectedEmployee?.companyEmail && selectedEmployee.companyEmail !== mailbox.email && (
-                <p className="text-xs break-words text-amber-600 dark:text-amber-400">
+                <p className="text-warning text-xs break-words">
                   Will change {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                   {mailbox.email}.
                 </p>

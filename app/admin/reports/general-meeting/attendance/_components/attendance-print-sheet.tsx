@@ -139,7 +139,7 @@ export function AttendancePrintSheetDialog({
         <div className="space-y-4 py-2">
           {/* Holiday Alert if applicable */}
           {isHoliday && holidayName && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+            <div className="border-warning/30 bg-warning/15 text-warning flex items-center gap-2 rounded-lg border p-2.5 text-xs">
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
               <div>
                 <span className="font-semibold">Public Holiday Notice:</span> {holidayName} (Meeting held on{" "}
@@ -156,7 +156,7 @@ export function AttendancePrintSheetDialog({
             <div className="text-foreground mt-1 text-sm font-medium">{meetingDate}</div>
 
             {/* QR Code Container - Large and High Contrast for instant camera focus */}
-            <div className="relative mt-4 flex h-60 w-60 items-center justify-center rounded-2xl border-2 border-slate-200 bg-white p-3 shadow-md sm:h-64 sm:w-64 dark:border-slate-800">
+            <div className="border-border relative mt-4 flex h-60 w-60 items-center justify-center rounded-2xl border-2 bg-white p-3 shadow-md sm:h-64 sm:w-64">
               {generatingQr ? (
                 <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
               ) : qrDataUrl ? (
@@ -180,17 +180,13 @@ export function AttendancePrintSheetDialog({
             </div>
 
             {/* 6-Digit Code with Dash */}
-            <div className="mt-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-8 py-2.5 font-mono text-2xl font-black tracking-[0.25em] text-emerald-700 shadow-xs sm:text-3xl dark:text-emerald-300">
+            <div className="text-success border-success/30 bg-success/10 mt-2.5 rounded-xl border px-8 py-2.5 font-mono text-2xl font-black tracking-[0.25em] shadow-xs sm:text-3xl">
               {formattedCode}
             </div>
 
             <div className="mt-3 flex items-center gap-1.5">
-              <Badge
-                variant="outline"
-                className="border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-700 dark:text-emerald-300"
-              >
-                <ShieldCheck className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Biometric Entrance
-                Punch Required
+              <Badge variant="outline" className="text-success border-success/30 bg-success/10 text-[11px]">
+                <ShieldCheck className="text-success mr-1 h-3.5 w-3.5" /> Biometric Entrance Punch Required
               </Badge>
             </div>
           </div>

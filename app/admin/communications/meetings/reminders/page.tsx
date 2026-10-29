@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { CommunicationsComposer } from "@/app/admin/communications/_components/communications-composer"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
+export const metadata: Metadata = { title: "Admin Reminders" }
+import type { Metadata } from "next"
+
 export default async function CommunicationsMeetingsRemindersPage() {
   const supabase = await createClient()
 

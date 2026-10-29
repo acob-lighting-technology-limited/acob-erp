@@ -394,7 +394,7 @@ export function AssetIssuesPage({
           title: (issue) => `${issue.asset?.unique_code || "Asset"} · ${issue.description}`,
           subtitle: (issue) => `Assigned: ${assignedTo(issue)} · Reported: ${formatWATDate(issue.created_at)}`,
           trailing: (issue) => (
-            <Badge variant={issue.resolved ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={issue.resolved ? "default" : "secondary"} className="text-xs">
               {issue.resolved ? "Resolved" : "Unresolved"}
             </Badge>
           ),

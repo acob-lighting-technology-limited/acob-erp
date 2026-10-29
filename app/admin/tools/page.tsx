@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Wrench, ArrowRight, FileSignature, Droplet, Video } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
+export const metadata: Metadata = { title: "Admin Tools" }
+import type { Metadata } from "next"
+
 const tools = [
   {
     name: "Email Signature",
@@ -10,7 +13,7 @@ const tools = [
     href: "/admin/tools/signature",
     icon: FileSignature,
     color: "text-blue-500",
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
+    bgColor: "bg-info/15",
   },
   {
     name: "10th Anniversary Signature",
@@ -18,7 +21,7 @@ const tools = [
     href: "/admin/tools/signature-anniversary",
     icon: FileSignature,
     color: "text-amber-600",
-    bgColor: "bg-amber-50 dark:bg-amber-950/30",
+    bgColor: "bg-warning/15",
   },
   {
     name: "Watermark Studio",
@@ -26,7 +29,7 @@ const tools = [
     href: "/admin/tools/watermark",
     icon: Droplet,
     color: "text-teal-500",
-    bgColor: "bg-teal-50 dark:bg-teal-950/30",
+    bgColor: "bg-success/15",
   },
   {
     name: "Media & PDF Suite",
@@ -34,7 +37,7 @@ const tools = [
     href: "/admin/tools/media",
     icon: Video,
     color: "text-indigo-500",
-    bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
+    bgColor: "bg-info/15",
   },
 ]
 

@@ -2,7 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserPmsData } from "../_lib"
 import { TASK_WEIGHT_DEFAULT, computeWeightedTaskScore, isTaskInCycle } from "@/lib/tasks/scoring"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
+import type { Metadata } from "next"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
+
+export const metadata: Metadata = { title: "PMS KPI" }
 
 type TaskRow = {
   id: string

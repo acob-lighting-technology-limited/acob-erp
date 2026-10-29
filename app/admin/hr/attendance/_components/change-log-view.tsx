@@ -19,12 +19,12 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 const log = logger("admin-attendance-change-log-view")
 
 const CATEGORY_CLASSES: Record<ChangeLogCategory, string> = {
-  edits: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  bulk: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
-  appeals: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
-  leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  exemptions: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
-  out_of_station: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300",
+  edits: "bg-info/15 text-info",
+  bulk: "bg-info/15 text-info",
+  appeals: "bg-info/15 text-info",
+  leave: "bg-purple/15 text-purple",
+  exemptions: "bg-purple/15 text-purple",
+  out_of_station: "bg-info/15 text-info",
 }
 
 const APPEAL_OUTCOME_LABELS: Record<string, string> = {
@@ -301,7 +301,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
   return (
     <>
       {truncated && (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-warning border-warning/40 bg-warning/10 mb-3 rounded-md border p-2 text-xs">
           Showing the most recent 5,000 changes this month. Filter by type or person to export the rest in parts.
         </p>
       )}
@@ -379,26 +379,22 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
         emptyIcon={History}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 grid gap-4 border-y p-4 text-sm md:grid-cols-2">
+            <div className="grid gap-4 text-sm md:grid-cols-2">
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                    Comment
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold">Comment</span>
                   <p className="whitespace-pre-wrap">{r.comment || "No comment was typed."}</p>
                 </div>
                 {r.details && (
                   <div className="space-y-1">
-                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                      Recorded by the system
-                    </span>
+                    <span className="text-muted-foreground block text-xs font-semibold">Recorded by the system</span>
                     <p className="text-muted-foreground whitespace-pre-wrap">{r.details}</p>
                   </div>
                 )}
               </div>
               {r.days.length > 1 && (
                 <div className="space-y-1 md:col-span-2">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold">
                     Days changed · {r.days.length}
                   </span>
                   <p className="text-muted-foreground text-xs leading-relaxed">
@@ -410,7 +406,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
               )}
               {r.appeal && (
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold">
                     Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
                   </span>
                   <p>

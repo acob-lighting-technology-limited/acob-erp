@@ -5,6 +5,10 @@ import { AdminReferenceGeneratorContent } from "@/app/admin/correspondence/admin
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Correspondence" }
+
 async function getData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)

@@ -189,7 +189,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
   const selectDay = useCallback(async (date: string) => {
     setLoadingDay(true)
     try {
-      const res = await fetch(`/api/hr/lunch?date=${date}`)
+      const res = await apiFetch(`/api/hr/lunch?date=${date}`)
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load that day's menu")
       setData(payload as LunchPollData)
@@ -235,7 +235,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
       opts.push({
         value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: d.toLocaleString("en-US", { month: "long", year: "numeric" }),
+        label: d.toLocaleString("en-NG", { timeZone: "Africa/Lagos", month: "long", year: "numeric" }),
       })
     }
     return opts
@@ -492,7 +492,6 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
       spacing="tight"
       description="Vote for what you want to eat and see what everyone else picked."
       icon={Utensils}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -679,12 +678,10 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                     {menu.groups.length > 1 && (
                       <div className="flex items-baseline gap-2 pb-1">
                         <span className="text-foreground text-sm font-semibold">{groupHeading(group, index)}</span>
-                        <span className="text-muted-foreground text-[11px] tracking-wider uppercase">
+                        <span className="text-muted-foreground text-xs tracking-wider uppercase">
                           Step {index + 1} of {menu.groups.length} · pick one
                         </span>
-                        {!group.is_required && (
-                          <span className="text-muted-foreground text-[11px] italic">optional</span>
-                        )}
+                        {!group.is_required && <span className="text-muted-foreground text-xs italic">optional</span>}
                       </div>
                     )}
 
@@ -838,7 +835,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                   </div>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1 text-[11px] font-medium">What You Ate:</p>
+                  <p className="text-muted-foreground mb-1 text-xs font-medium">What You Ate:</p>
                   {row.picks.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {row.picks.map((pick) => (
@@ -1092,7 +1089,7 @@ function AvatarStack({ voters, total, currentUserId }: { voters: LunchVoter[]; t
       {extraMobile > 0 && (
         <span
           className={cn(
-            "bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:hidden",
+            "bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-2 sm:hidden",
             chipOverlap
           )}
         >
@@ -1102,7 +1099,7 @@ function AvatarStack({ voters, total, currentUserId }: { voters: LunchVoter[]; t
       {extraDesktop > 0 && (
         <span
           className={cn(
-            "bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:flex",
+            "bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-2 sm:flex",
             chipOverlap
           )}
         >

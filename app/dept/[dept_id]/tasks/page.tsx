@@ -7,6 +7,9 @@ import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { AdminTasksContent, type employee, type UserProfile } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task, TaskPersonSummary } from "@/types/task"
 
+export const metadata: Metadata = { title: "Dept Tasks" }
+import type { Metadata } from "next"
+
 type GoalFilterOption = { id: string; title: string }
 type GoalRow = { id: string; title: string }
 
@@ -88,7 +91,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     projectIds.size > 0
       ? dataClient.from("projects").select("id, project_name").in("id", Array.from(projectIds))
       : { data: [] },
-    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
+    dataClient.from("projects").select("id, project_name, status").order("project_name", { ascending: true }),
   ])
 
   const profileMap = new Map<string, TaskPersonSummary>(
@@ -145,7 +148,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
       initialTasks={filteredTasks}
       initialemployee={(employeeResult.data || []) as employee[]}
       initialDepartments={[deptName]}
-      initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string }>}
+      initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string; status?: string }>}
       userProfile={userProfile}
       initialGoalId={resolvedSearchParams?.goal_id || ""}
     />

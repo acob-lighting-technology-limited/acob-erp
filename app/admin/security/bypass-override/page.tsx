@@ -3,6 +3,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { BypassOverrideContent, type EnrichedBypassLog, type AuditLogRow } from "./_components/bypass-override-content"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Bypass & Override" }
+
 export const dynamic = "force-dynamic"
 
 function isBypassOrOverride(log: AuditLogRow): boolean {

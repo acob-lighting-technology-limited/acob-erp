@@ -3,6 +3,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { RoleEscalationsContent, type AuditLogRow } from "./role-escalations-content"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Role Escalations" }
+
 function isEscalation(log: AuditLogRow): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${JSON.stringify(log.new_values || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.metadata || {})}`.toLowerCase()

@@ -22,9 +22,9 @@ import {
   Wallet,
   AlertCircle,
 } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
-import { LeaveTypesCard } from "@/components/leave/leave-types-card"
 import { LeaveDeleteConfirmDialog } from "@/components/leave/leave-delete-confirm-dialog"
 import { LeaveRequestFormDialog } from "@/components/leave/leave-request-form-dialog"
 import type { LeaveRequestFormData } from "@/components/leave/leave-request-form-dialog"
@@ -40,13 +40,16 @@ import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
+import { LeaveOverviewDialog } from "./_components/leave-overview-dialog"
+import { RecentReviewHistoryDialog } from "./_components/recent-review-history-dialog"
+import { CannotCreateNewRequestDialog } from "./_components/cannot-create-new-request-dialog"
 
 interface LeaveContentProps {
   currentUserId: string
@@ -185,7 +188,7 @@ export function LeaveContent({
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
 
   const { data: leaveRoutePreview } = useQuery<LeaveRoutePreview>({
-    queryKey: ["leave-flow-my-preview", formData.reliever_identifier || ""],
+    queryKey: QUERY_KEYS.leaveFlowMyPreview(formData.reliever_identifier || ""),
     queryFn: async () => {
       const relieverIdParam = formData.reliever_identifier
         ? `?reliever_id=${encodeURIComponent(formData.reliever_identifier)}`
@@ -461,7 +464,7 @@ export function LeaveContent({
             {r.department_overlaps && r.department_overlaps.length > 0 && (
               <Badge
                 variant="outline"
-                className="flex w-fit items-center gap-1 border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                className="border-warning/30 bg-warning/15 text-warning flex w-fit items-center gap-1 px-1.5 py-0 text-xs"
                 title={`Department overlap with ${r.department_overlaps.map((o) => o.full_name).join(", ")}`}
               >
                 <AlertCircle className="h-3 w-3 shrink-0" />
@@ -485,7 +488,7 @@ export function LeaveContent({
                   ? "destructive"
                   : "outline"
             }
-            className="text-[11px] capitalize"
+            className="text-xs capitalize"
           >
             {formatName(r.status)}
           </Badge>
@@ -806,10 +809,9 @@ export function LeaveContent({
 
   return (
     <DataTablePage
-      title="My Leave Center"
+      title="Leave"
       description="Track eligibility, submit requests, and manage approvals in one view."
       icon={CalendarDays}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab === "reviews" ? "reviews" : "my-requests")}
@@ -859,26 +861,18 @@ export function LeaveContent({
       }
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsOverviewOpen(true)}>
-            <CircleHelp className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Overview</span>
-          </Button>
-          {pendingReviewHistory.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setIsReviewHistoryOpen(true)}>
-              <History className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Review History</span>
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={() => {
-              if (hasPendingRequest) {
-                setIsCreateBlockedOpen(true)
-                return
-              }
-              openCreateDialog()
-            }}
-          >
+          <HeaderMoreMenu
+            items={[
+              { label: "Overview", icon: CircleHelp, onSelect: () => setIsOverviewOpen(true) },
+              {
+                label: "Review History",
+                icon: History,
+                onSelect: () => setIsReviewHistoryOpen(true),
+                hidden: pendingReviewHistory.length === 0,
+              },
+            ]}
+          />
+          <Button size="sm" onClick={() => (hasPendingRequest ? setIsCreateBlockedOpen(true) : openCreateDialog())}>
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">New Request</span>
           </Button>
@@ -918,7 +912,7 @@ export function LeaveContent({
                     ? "destructive"
                     : "outline"
               }
-              className="text-[10px] capitalize"
+              className="text-xs capitalize"
             >
               {formatName(r.status)}
             </Badge>
@@ -930,7 +924,7 @@ export function LeaveContent({
                 : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-[10px] font-medium">
+                <Badge variant="outline" className="text-xs font-medium">
                   {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
@@ -950,7 +944,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(r.status)}
               </Badge>
@@ -1067,11 +1061,11 @@ export function LeaveContent({
         }}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+            <div className="space-y-4 text-xs">
               {r.department_overlaps && r.department_overlaps.length > 0 && (
-                <div className="space-y-1 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                  <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="border-warning/80 bg-warning/70 text-warning space-y-1 rounded-md border p-3 text-xs">
+                  <div className="text-warning flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="text-warning h-4 w-4 shrink-0" />
                     <span>Concurrent Department Leave Notice</span>
                   </div>
                   <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
@@ -1080,7 +1074,7 @@ export function LeaveContent({
                   </p>
                   <ul className="list-inside list-disc space-y-0.5 font-medium">
                     {r.department_overlaps.map((overlap, idx) => (
-                      <li key={idx}>
+                      <li key={`row-${idx}`}>
                         {overlap.full_name} ({overlap.status}) — {overlap.start_date} to {overlap.end_date}
                       </li>
                     ))}
@@ -1089,45 +1083,41 @@ export function LeaveContent({
               )}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Leave Type</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Leave Type</span>
                   <span className="font-medium">{leaveTypeMap.get(r.leave_type_id)?.name || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Duration</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Duration</span>
                   <span className="font-medium">
                     {r.start_date} to {r.end_date} ({r.days_count} day{Number(r.days_count) > 1 ? "s" : ""})
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Reliever</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reliever</span>
                   <span className="font-medium">{resolvePersonName(r.reliever) || "Not assigned"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Current Stage</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Current Stage</span>
                   <span className="font-medium">{approvalStageLabel(r.current_stage_code || r.approval_stage)}</span>
                 </div>
               </div>
 
               {r.reason && (
                 <div className="space-y-1 border-t pt-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Reason for Leave
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reason for Leave</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.reason}</p>
                 </div>
               )}
 
               {r.handover_note && !r.handover_note.startsWith("Attached:") && (
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Handover Note</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Handover Note</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.handover_note}</p>
                 </div>
               )}
 
               <div className="space-y-1 border-t pt-3">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                  Approval Timeline
-                </span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Approval Timeline</span>
                 <p className="text-muted-foreground font-mono text-xs">{getApprovalTimeline(r)}</p>
               </div>
             </div>
@@ -1169,7 +1159,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(row.status)}
               </Badge>
@@ -1182,7 +1172,7 @@ export function LeaveContent({
                 </div>
               )}
               {row.department_overlaps && row.department_overlaps.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                <div className="text-warning flex items-center gap-1.5 text-xs font-medium">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>
                     Overlap ({row.department_overlaps.length}):{" "}
@@ -1282,65 +1272,27 @@ export function LeaveContent({
         onSubmit={handleSubmitRequest}
       />
 
-      <Dialog open={isOverviewOpen} onOpenChange={setIsOverviewOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Leave Overview</DialogTitle>
-            <DialogDescription>
-              Quick guide for leave balances, request flow, and what each leave type allows.
-            </DialogDescription>
-          </DialogHeader>
-          <LeaveTypesCard leaveTypes={leaveTypes} balanceMap={balanceMap} />
-        </DialogContent>
-      </Dialog>
+      <LeaveOverviewDialog
+        isOverviewOpen={isOverviewOpen}
+        setIsOverviewOpen={setIsOverviewOpen}
+        leaveTypes={leaveTypes}
+        balanceMap={balanceMap}
+      />
 
       {/* An approver's own decision trail. It lives in a dialog rather than a panel
           under the table so the record list stays the whole page — but it is not
           optional: without it there is no way to see what you already decided. */}
-      <Dialog open={isReviewHistoryOpen} onOpenChange={setIsReviewHistoryOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Recent Review History</DialogTitle>
-            <DialogDescription>Your latest acceptance and rejection decisions are recorded here.</DialogDescription>
-          </DialogHeader>
-          {pendingReviewHistory.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No review activity yet.</p>
-          ) : (
-            <ul className="max-h-[60vh] space-y-2 overflow-y-auto">
-              {pendingReviewHistory.slice(0, 25).map((item) => (
-                <li key={item.id} className="rounded-md border p-2.5 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={item.status === "rejected" ? "destructive" : "outline"} className="capitalize">
-                      {item.status || "recorded"}
-                    </Badge>
-                    <span className="font-medium">{approvalStageLabel(item.stage_code || "approval_stage")}</span>
-                    <span className="text-muted-foreground">{item.request?.user?.full_name || "Employee"}</span>
-                    <span className="text-muted-foreground ml-auto">
-                      {item.approved_at ? formatWATDateTime(item.approved_at) : ""}
-                    </span>
-                  </div>
-                  {item.comments ? <p className="mt-1">{item.comments}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </DialogContent>
-      </Dialog>
+      <RecentReviewHistoryDialog
+        isReviewHistoryOpen={isReviewHistoryOpen}
+        setIsReviewHistoryOpen={setIsReviewHistoryOpen}
+        pendingReviewHistory={pendingReviewHistory}
+        approvalStageLabel={approvalStageLabel}
+      />
 
-      <Dialog open={isCreateBlockedOpen} onOpenChange={setIsCreateBlockedOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cannot Create New Request</DialogTitle>
-            <DialogDescription>
-              You already have an ongoing leave request. Submit a new one only after the current request is approved,
-              rejected, or cancelled.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setIsCreateBlockedOpen(false)}>Okay</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CannotCreateNewRequestDialog
+        isCreateBlockedOpen={isCreateBlockedOpen}
+        setIsCreateBlockedOpen={setIsCreateBlockedOpen}
+      />
     </DataTablePage>
   )
 }

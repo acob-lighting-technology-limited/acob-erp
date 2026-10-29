@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface ArchivedDay {
   date: string
   files: number
@@ -42,14 +43,14 @@ function formatDay(date: string): string {
 }
 
 async function fetchArchive(): Promise<ArchiveResponse> {
-  const res = await fetch("/api/admin/security/network-activity", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/security/network-activity", { cache: "no-store" })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new Error(body?.error ?? "Failed to load the network log archive")
   return body.data as ArchiveResponse
 }
 
 async function downloadDay(date: string) {
-  const res = await fetch(`/api/admin/security/network-activity/download?date=${date}`, { cache: "no-store" })
+  const res = await apiFetch(`/api/admin/security/network-activity/download?date=${date}`, { cache: "no-store" })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new Error(body?.error ?? "Download failed")
@@ -136,7 +137,6 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       title="Network Activity"
       description={`Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`}
       icon={ShieldCheck}
-      backLink={{ href: backLinkHref ?? "/admin/security", label: "Back to Security" }}
       statBadgeStyle="line"
       statBadges={[
         { label: `${days.length} days archived`, icon: CalendarDays },

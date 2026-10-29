@@ -130,7 +130,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
               <div className="space-y-2">
                 <Label className="text-xs">Send times</Label>
                 {sendTimes.map((time, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={`row-${index}`} className="flex items-center gap-2">
                     <Input
                       type="time"
                       value={time}

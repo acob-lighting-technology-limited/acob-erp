@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 /**
  * The tool itself lives on the staff route; this re-export gives it a real
  * /admin URL so using it from the admin console does not throw the viewer out
@@ -7,3 +8,5 @@ export {
   /* @next-codemod-ignore `default` export is re-exported. Check if this component uses `params` or `searchParams` */
   default,
 } from "@/app/(app)/tools/signature-anniversary/page"
+
+export const metadata: Metadata = { title: "Admin Signature Anniversary" }

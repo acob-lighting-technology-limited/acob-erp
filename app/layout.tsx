@@ -21,7 +21,9 @@ import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Matrix",
+  // Every page title gets " | Matrix" appended, so a page only sets its own name. A tab shows about 20
+  // characters, which is why the brand is short.
+  title: { default: "Matrix", template: "%s | Matrix" },
   description: "Matrix — the internal workspace platform for ACOB Lighting Technology Limited",
   applicationName: "Matrix",
   manifest: "/manifest.webmanifest",

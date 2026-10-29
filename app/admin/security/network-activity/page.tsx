@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { AdminSecurityNetworkActivityPage } from "./view"
+export { default } from "./page-client"
 
-export default function AdminSecurityNetworkActivityPageRoute() {
-  return <AdminSecurityNetworkActivityPage />
-}
+export const metadata: Metadata = { title: "Admin Network Activity" }

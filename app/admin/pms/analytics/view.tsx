@@ -309,7 +309,6 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
       title="PMS Analytics"
       description="Performance distribution, review outcomes, and department benchmarking in one unified analytics table."
       icon={BarChart3}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       actions={
         <Button
           variant="outline"
@@ -434,12 +433,13 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
           trailing: (row) => {
             const tier = scoreToTier(row.final)
             return (
-              <Badge variant={tier.variant} className="text-[10px]">
+              <Badge variant={tier.variant} className="text-xs">
                 {tier.label}
               </Badge>
             )
           },
         }}
+        cards
         cardRenderer={(row) => <AnalyticsCard row={row} />}
         emptyTitle="No analytics rows found"
         emptyDescription="Performance analytics will appear here once reviews have been created and scored."

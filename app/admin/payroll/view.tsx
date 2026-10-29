@@ -10,21 +10,12 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Dialog } from "@/components/ui/dialog"
 import { ManageGrossSalaryDialog } from "@/components/hr/manage-gross-salary-dialog"
-import { FileText, Plus, DollarSign, Calendar, ClipboardList, Calculator } from "lucide-react"
+import { FileText, DollarSign, Calendar, ClipboardList, Calculator } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { CreatePayrollPeriodDialog } from "./_components/create-payroll-period-dialog"
 
 export interface PayrollPeriod {
   id: string
@@ -179,7 +170,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       render: (row: DbPayrollEntry) => (
         <div>
           <p className="text-foreground font-medium">{row.payroll_periods?.name || "N/A"}</p>
-          <p className="text-muted-foreground text-[11px]">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
+          <p className="text-muted-foreground text-xs">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
         </div>
       ),
     },
@@ -199,7 +190,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "gross_salary",
       label: "Gross Pay",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+        <span className="text-info font-mono text-xs font-semibold">
           ₦
           {Number(row.gross_salary || row.breakdown?.monthlyGross || 0).toLocaleString("en-US", {
             minimumFractionDigits: 2,
@@ -211,7 +202,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "tax_amount",
       label: "PAYE Tax",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-amber-600 dark:text-amber-400">
+        <span className="text-warning font-mono text-xs">
           ₦{Number(row.tax_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -220,7 +211,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "total_deductions",
       label: "Deductions",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-red-600 dark:text-red-400">
+        <span className="text-danger font-mono text-xs">
           ₦{Number(row.total_deductions || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -229,7 +220,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "net_salary",
       label: "Net Take-Home",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+        <span className="text-success font-mono text-xs font-bold">
           ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -242,7 +233,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           variant={row.payroll_periods?.status === "completed" ? "default" : "outline"}
           className={
             row.payroll_periods?.status === "completed"
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              ? "text-success bg-success/10"
               : "border-amber-500/30 text-amber-600"
           }
         >
@@ -342,82 +333,22 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           <Calculator className="mr-1.5 h-4 w-4" /> Payroll Calculator
         </Link>
       </Button>
-      <Dialog open={openPeriod} onOpenChange={setOpenPeriod}>
-        <DialogTrigger asChild>
-          <Button size="sm">
-            <Plus className="mr-1.5 h-4 w-4" /> Create Period
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <form onSubmit={handleCreatePeriod}>
-            <DialogHeader>
-              <DialogTitle>Create Payroll Period</DialogTitle>
-              <DialogDescription>Set up a monthly cycle dates configuration.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Period Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. June 2026"
-                  value={periodForm.name}
-                  onChange={(e) => setPeriodForm({ ...periodForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
-                  <Input
-                    id="start_date"
-                    type="date"
-                    value={periodForm.start_date}
-                    onChange={(e) => setPeriodForm({ ...periodForm, start_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date</Label>
-                  <Input
-                    id="end_date"
-                    type="date"
-                    value={periodForm.end_date}
-                    onChange={(e) => setPeriodForm({ ...periodForm, end_date: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pay_date">Target Pay Date</Label>
-                <Input
-                  id="pay_date"
-                  type="date"
-                  value={periodForm.pay_date}
-                  onChange={(e) => setPeriodForm({ ...periodForm, pay_date: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpenPeriod(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                Create
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreatePayrollPeriodDialog
+        openPeriod={openPeriod}
+        setOpenPeriod={setOpenPeriod}
+        handleCreatePeriod={handleCreatePeriod}
+        periodForm={periodForm}
+        setPeriodForm={setPeriodForm}
+        loading={loading}
+      />
     </div>
   ) : null
 
   return (
     <DataTablePage
-      title="Payroll Management"
+      title="Payroll"
       description="Create monthly payroll periods, then open a period's worksheet to run the bulk calculation and publish payslips."
       icon={FileText}
-      backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -441,7 +372,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
             trailing: (row) => (
-              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-xs">
                 {row.status === "completed" ? "Completed" : "Draft"}
               </Badge>
             ),
@@ -461,7 +392,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   {row.status === "completed" ? "Completed" : "Draft"}
                 </Badge>
               </div>
-              <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
+              <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
                 <span>Start: {row.start_date}</span>
                 <span>End: {row.end_date}</span>
               </div>
@@ -491,7 +422,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             subtitle: (row) =>
               `${row.user?.department || "General"} · ${row.payroll_periods?.name || "N/A"} · Net: ₦${Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
             trailing: (row) => (
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-success font-mono text-xs font-bold">
                 ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </span>
             ),
@@ -503,11 +434,11 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   <p className="text-sm font-semibold">{row.user?.full_name || "Unknown"}</p>
                   <p className="text-muted-foreground text-xs">{row.user?.department || "General"}</p>
                 </div>
-                <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-success font-mono text-xs font-bold">
                   ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>Gross: ₦{Number(row.gross_salary || 0).toLocaleString("en-US")}</div>
                 <div>Tax: ₦{Number(row.tax_amount || 0).toLocaleString("en-US")}</div>
               </div>

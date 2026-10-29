@@ -8,6 +8,7 @@ import { staffInitials } from "@/components/ui/staff-avatar"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
 
+import { apiFetch } from "@/lib/api-client"
 interface StaffCard {
   id: string
   name: string | null
@@ -18,7 +19,7 @@ interface StaffCard {
 }
 
 async function fetchStaffCard(id: string): Promise<StaffCard> {
-  const response = await fetch(`/api/staff/${id}`, { credentials: "same-origin" })
+  const response = await apiFetch(`/api/staff/${id}`, { credentials: "same-origin" })
   if (!response.ok) throw new Error("Failed to load staff member")
   const payload = (await response.json()) as { data: StaffCard }
   return payload.data
@@ -104,7 +105,7 @@ function ContactRow({
     <>
       <Icon className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="text-muted-foreground block text-[11px] font-medium tracking-wide uppercase">{label}</span>
+        <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">{label}</span>
         <span className={cn("block text-sm", value ? "truncate" : "text-muted-foreground")}>
           {value || "Not provided"}
         </span>

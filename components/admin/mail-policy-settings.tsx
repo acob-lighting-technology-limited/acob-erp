@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { depsChanged } from "@/lib/utils/deps-changed"
 
 type PolicyRow = {
@@ -58,7 +59,7 @@ export function MailPolicySettings() {
   const [policies, setPolicies] = useState<PolicyRow[]>([])
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["mail-policies"],
+    queryKey: QUERY_KEYS.mailPolicies(),
     queryFn: fetchMailPolicies,
   })
 
@@ -82,7 +83,7 @@ export function MailPolicySettings() {
     },
     onSuccess: () => {
       toast.success("Mail policies updated")
-      queryClient.invalidateQueries({ queryKey: ["mail-policies"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailPolicies() })
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Failed to save mail policies")

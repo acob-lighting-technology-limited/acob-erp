@@ -41,9 +41,11 @@ function generateRandomPassword(): string {
 export function PasswordDialog({
   mailbox,
   onOpenChange,
+  onReset,
 }: {
   mailbox: MailboxReportRow | null
   onOpenChange: (open: boolean) => void
+  onReset?: () => void
 }) {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -93,6 +95,7 @@ export function PasswordDialog({
 
       toast.success(`Password for ${mailbox.email} reset successfully`)
       setResetSuccess(true)
+      onReset?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reset password")
     } finally {

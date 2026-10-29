@@ -17,10 +17,10 @@ import { MdQueuePreviewSheet } from "./md-queue-preview-sheet"
 import { useMdDeskOverview } from "./use-md-desk"
 
 const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
-  leave: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  requisition: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  correspondence: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  task_rating: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  leave: "bg-success/10 text-success",
+  requisition: "bg-warning/10 text-warning",
+  correspondence: "bg-info/10 text-info",
+  task_rating: "bg-purple/10 text-purple",
 }
 
 const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 })
@@ -248,11 +248,11 @@ export function WaitingOnMd() {
           trailing: (i) => (
             <div className="flex items-center gap-1.5">
               {i.urgent && (
-                <Badge variant="destructive" className="text-[10px]">
+                <Badge variant="destructive" className="text-xs">
                   Emergency
                 </Badge>
               )}
-              <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+              <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                 {MD_DESK_QUEUE_LABELS[i.kind]}
               </Badge>
             </div>
@@ -266,11 +266,11 @@ export function WaitingOnMd() {
             badges: (i) => (
               <div className="flex flex-wrap items-center gap-1.5">
                 {i.urgent && (
-                  <Badge variant="destructive" className="text-[10px]">
+                  <Badge variant="destructive" className="text-xs">
                     Emergency
                   </Badge>
                 )}
-                <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+                <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                   {MD_DESK_QUEUE_LABELS[i.kind]}
                 </Badge>
               </div>

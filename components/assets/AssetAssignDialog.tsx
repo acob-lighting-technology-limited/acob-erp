@@ -151,16 +151,16 @@ export function AssetAssignDialog({
         </DialogHeader>
         <div className="space-y-4 py-4">
           {!currentAssignment && selectedAsset?.status !== "assigned" && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-200">New Assignment</p>
-              <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+            <div className="border-info/30 bg-info/15 rounded-lg border p-3">
+              <p className="text-info text-sm font-medium">New Assignment</p>
+              <p className="text-info mt-1 text-xs">
                 When you assign this asset, its status will automatically be changed to &quot;assigned&quot;
               </p>
             </div>
           )}
           {currentAssignment && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
-              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
+            <div className="border-warning/30 bg-warning/15 rounded-lg border p-3">
+              <p className="text-warning text-sm font-medium">
                 Currently assigned to:{" "}
                 {selectedAsset?.assignment_type === "office" ? (
                   <span>{selectedAsset.office_location || "Office"}</span>
@@ -174,9 +174,7 @@ export function AssetAssignDialog({
                   "Unknown"
                 )}
               </p>
-              <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
-                This assignment will be marked as handed over
-              </p>
+              <p className="text-warning mt-1 text-xs">This assignment will be marked as handed over</p>
             </div>
           )}
 

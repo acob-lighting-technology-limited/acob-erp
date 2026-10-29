@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, ShieldAlert, Package } from "lucide-react"
 import type { AssetMailRoutingResult } from "./shared-types"
 
+import { apiFetch } from "@/lib/api-client"
 export function AssetMailRoutingPanel() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AssetMailRoutingResult | null>(null)
@@ -14,7 +15,7 @@ export function AssetMailRoutingPanel() {
   const run = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/dev/asset-mail-routing")
+      const res = await apiFetch("/api/dev/asset-mail-routing")
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load asset mail routing")
       setResult(data as AssetMailRoutingResult)

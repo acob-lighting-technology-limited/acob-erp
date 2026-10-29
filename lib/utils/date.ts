@@ -82,6 +82,21 @@ export function formatWATDate(date: string | Date, options: Omit<Intl.DateTimeFo
 }
 
 /**
+ * A clock reading such as "09:30" printed as "9:30 AM".
+ *
+ * A clock reading is not a moment in time, so it is read and printed as UTC: the browser's own zone (or the
+ * server's) can then never shift it. The en-US wording is what reminder emails already use.
+ */
+export function formatClockTime(clock: string): string {
+  return new Date(`2000-01-01T${clock}Z`).toLocaleTimeString("en-US", {
+    timeZone: "UTC",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+}
+
+/**
  * Format a stored birthday string (MM-DD, or DD-MM) as "16 June" — day and
  * month only, no year. Returns null when the value is empty or malformed.
  */

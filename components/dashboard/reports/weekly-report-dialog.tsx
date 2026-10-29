@@ -126,7 +126,7 @@ function WeeklyReportForm({ onClose, onSuccess, initialData }: Omit<WeeklyReport
         // The three report fields, in their final positions, while the week loads.
         <div className="grid gap-6 py-4" aria-busy>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="space-y-2">
+            <div key={`row-${i}`} className="space-y-2">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-24 w-full" />
             </div>

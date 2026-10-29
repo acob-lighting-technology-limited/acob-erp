@@ -3,7 +3,7 @@ import { WaitingOnMd } from "@/components/md-desk/waiting-on-md"
 import { requireMdDeskMember } from "@/lib/md-desk/gate"
 
 export const metadata: Metadata = {
-  title: "MD's Desk | ACOB Lighting Technology Limited",
+  title: "MD's Desk",
 }
 
 export const dynamic = "force-dynamic"

@@ -27,9 +27,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -38,11 +36,9 @@ import {
   Calendar,
   Settings,
   Utensils,
-  Loader2,
   Download,
   ChevronLeft,
   ChevronRight,
-  BarChart3,
   Users,
   Award,
   CalendarDays,
@@ -62,7 +58,7 @@ import { cn } from "@/lib/utils"
 import { LunchMenuBuilderDialog } from "./_components/lunch-menu-builder-dialog"
 import { LunchDeadlineDialog } from "./_components/lunch-deadline-dialog"
 import { LunchVoteOverrideDialog } from "./_components/lunch-vote-override-dialog"
-import { LunchMenuViewersDialog } from "./_components/lunch-menu-viewers-dialog"
+import { LunchMenuViewersSheet } from "./_components/lunch-menu-viewers-sheet"
 import { LunchShareDialog } from "./_components/lunch-share-dialog"
 import { LunchExportDialog } from "./_components/lunch-export-dialog"
 import { getAttendanceMonthOptions } from "@/lib/hr/attendance-utils"
@@ -78,6 +74,8 @@ import {
 } from "@/lib/hr/lunch-voting"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
 import { CalendarGridSkeleton, RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
+import { LunchPriceScheduleSettingsDialog } from "./_components/lunch-price-schedule-settings-dialog"
 
 export interface LunchEmployee {
   id: string
@@ -151,7 +149,7 @@ export function getMenuStatusInfo(menu: { status: string; archived_at?: string |
   return {
     key: "deadline_passed",
     label: "Deadline passed",
-    tone: "border-0 bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 shadow-none",
+    tone: "border-0 bg-warning/10 text-warning hover:bg-amber-500/20 shadow-none",
     accentClass: "bg-amber-500",
   }
 }
@@ -199,7 +197,7 @@ type LunchReviewSummary = {
 }
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 function monBasedDay(jsDay: number) {
   return jsDay === 0 ? 6 : jsDay - 1
@@ -315,7 +313,7 @@ export function LunchRegisterPage({
   const loadDateLogs = useCallback(async (date: string) => {
     setFetchingLogs(true)
     try {
-      const res = await fetch(`/api/admin/hr/lunch?date=${date}`)
+      const res = await apiFetch(`/api/admin/hr/lunch?date=${date}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load logs")
 
@@ -350,7 +348,7 @@ export function LunchRegisterPage({
     async function loadMonthlyData() {
       setFetchingSummary(true)
       try {
-        const res = await fetch(`/api/admin/hr/lunch?month=${selectedMonth}`)
+        const res = await apiFetch(`/api/admin/hr/lunch?month=${selectedMonth}`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to load monthly summary")
 
@@ -391,7 +389,7 @@ export function LunchRegisterPage({
           url += "?all_time=true"
         }
 
-        const res = await fetch(url)
+        const res = await apiFetch(url)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to load leaderboard data")
 
@@ -411,7 +409,7 @@ export function LunchRegisterPage({
     setFetchingMenus(true)
     setMenusError(null)
     try {
-      const res = await fetch("/api/admin/hr/lunch/menus")
+      const res = await apiFetch("/api/admin/hr/lunch/menus")
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load menus")
       const loaded = (data.menus || []) as AdminLunchMenu[]
@@ -770,7 +768,7 @@ export function LunchRegisterPage({
           {/* A stored value means this day was deliberately overridden; the
               rest simply follow the lunch settings deadline. */}
           {row.voting_deadline && (
-            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+            <Badge variant="outline" className="px-1.5 py-0 text-xs">
               custom
             </Badge>
           )}
@@ -1241,7 +1239,6 @@ export function LunchRegisterPage({
               : "Individual employee lunch calendar view."
       }
       icon={Utensils}
-      backLink={{ href: "/admin/hr", label: "Back to HR" }}
       tabs={LUNCH_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as LunchTab)}
@@ -1299,118 +1296,15 @@ export function LunchRegisterPage({
           )}
 
           {/* Settings Dialog */}
-          <Dialog open={openSettings} onOpenChange={setOpenSettings}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Settings</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <form onSubmit={handleSaveSettings}>
-                <DialogHeader>
-                  <DialogTitle>Lunch Price & Schedule Settings</DialogTitle>
-                  <DialogDescription>
-                    Adjust the daily price of food, subsidy, and lunch schedule days of the week. Changes apply to logs
-                    starting today.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4 text-sm">
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Food Cost per Meal (₦)</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      value={settingsForm.cost || ""}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, cost: parseFloat(e.target.value) || 0 })}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subsidy">Company Subsidy Percentage (%)</Label>
-                    <Input
-                      id="subsidy"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={settingsForm.subsidy_percent}
-                      onChange={(e) =>
-                        setSettingsForm({ ...settingsForm, subsidy_percent: parseFloat(e.target.value) || 0 })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="voting-deadline">Voting Deadline</Label>
-                    <Input
-                      id="voting-deadline"
-                      type="time"
-                      value={settingsForm.voting_deadline}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, voting_deadline: e.target.value })}
-                      required
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      Default cut-off for staff to vote on each day&apos;s menu. Individual menus can override it.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Lunch Schedule Days</Label>
-                    <div className="bg-muted/20 mt-1 grid grid-cols-2 gap-2 rounded-lg border p-3">
-                      {WEEKDAYS.map((day) => {
-                        const isChecked = settingsForm.eating_days.includes(day)
-                        return (
-                          <div key={day} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`day-${day}`}
-                              checked={isChecked}
-                              onCheckedChange={(checked) => toggleFormWeekday(day, !!checked)}
-                            />
-                            <Label htmlFor={`day-${day}`} className="cursor-pointer text-xs font-medium">
-                              {day}
-                            </Label>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-                    <div className="flex justify-between">
-                      <span>Calculated Employee Pay:</span>
-                      <span className="font-bold text-red-600">
-                        ₦
-                        {(settingsForm.cost * (1 - settingsForm.subsidy_percent / 100)).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Calculated Company Subsidy:</span>
-                      <span className="font-bold text-emerald-600">
-                        ₦
-                        {(settingsForm.cost * (settingsForm.subsidy_percent / 100)).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setOpenSettings(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    Save Settings
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <LunchPriceScheduleSettingsDialog
+            openSettings={openSettings}
+            setOpenSettings={setOpenSettings}
+            handleSaveSettings={handleSaveSettings}
+            settingsForm={settingsForm}
+            setSettingsForm={setSettingsForm}
+            toggleFormWeekday={toggleFormWeekday}
+            loading={loading}
+          />
 
           {/* Export Report */}
           <Button variant="outline" onClick={handleExportClick} size="sm">
@@ -1485,7 +1379,7 @@ export function LunchRegisterPage({
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
               trailing: (row) => {
                 const status = getMenuStatusInfo(row)
-                return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                return <Badge className={cn("text-xs", status.tone)}>{status.label}</Badge>
               },
               detail: {
                 title: (row) =>
@@ -1496,7 +1390,7 @@ export function LunchRegisterPage({
                 },
                 badges: (row) => {
                   const status = getMenuStatusInfo(row)
-                  return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                  return <Badge className={cn("text-xs", status.tone)}>{status.label}</Badge>
                 },
                 fields: (row) => [
                   {
@@ -1545,26 +1439,21 @@ export function LunchRegisterPage({
                   <div className="text-muted-foreground line-clamp-2 text-xs">
                     {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
                   </div>
-                  <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                  <div className="flex items-center justify-between border-t pt-2 text-xs">
                     <span className="text-muted-foreground">{row.votes.length} votes cast</span>
                     <div className="flex items-center gap-1.5">
                       {canShareMenu(row) && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 gap-1 text-[10px] text-emerald-600"
+                          className="h-7 gap-1 text-xs text-emerald-600"
                           onClick={() => setShareMenu(row)}
                         >
                           <MessageCircle className="h-3 w-3" />
                           Share
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px]"
-                        onClick={() => setEditingMenu(row)}
-                      >
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingMenu(row)}>
                         Edit
                       </Button>
                     </div>
@@ -1969,13 +1858,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -1985,9 +1874,7 @@ export function LunchRegisterPage({
                           </span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2013,13 +1900,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -2029,9 +1916,7 @@ export function LunchRegisterPage({
                           </span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2057,13 +1942,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -2071,9 +1956,7 @@ export function LunchRegisterPage({
                           <span className="shrink-0 text-xs font-semibold text-amber-600">{row.lunch_count} meals</span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2118,7 +2001,7 @@ export function LunchRegisterPage({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="min-w-36 text-center text-sm font-medium">
-                  {new Date(selectedMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  {formatWATDate(selectedMonth + "-01", { day: undefined, month: "long", year: "numeric" })}
                 </span>
                 <Button
                   variant="outline"
@@ -2288,7 +2171,7 @@ export function LunchRegisterPage({
         }}
       />
 
-      <LunchMenuViewersDialog
+      <LunchMenuViewersSheet
         open={viewersMenu !== null}
         onOpenChange={(open) => !open && setViewersMenu(null)}
         menu={viewersMenu}
@@ -2350,7 +2233,7 @@ export function LunchRegisterPage({
               subtitle: (row) =>
                 `${row.review_count} reviews · Avg Rating: ${row.average_rating ? row.average_rating.toFixed(1) : "N/A"} ★`,
               trailing: (row) => (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                 </Badge>
               ),
@@ -2365,7 +2248,7 @@ export function LunchRegisterPage({
                     {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                <div className="flex items-center justify-between border-t pt-2 text-xs">
                   <span className="text-muted-foreground">{row.review_count} reviews</span>
                   <span className="text-muted-foreground">{row.comments.length} comments</span>
                 </div>
@@ -2396,14 +2279,12 @@ function FeedbackExpandPanel({ entry }: { entry: LunchReviewSummary }) {
         <p className="text-muted-foreground text-xs font-semibold uppercase">
           Anonymous Staff Comments ({entry.comments.length})
         </p>
-        <span className="text-muted-foreground text-[11px]">
-          Feedback is submitted anonymously without employee names.
-        </span>
+        <span className="text-muted-foreground text-xs">Feedback is submitted anonymously without employee names.</span>
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
         {entry.comments.map((comment) => (
           <div key={comment.id} className="bg-card space-y-1.5 rounded-lg border p-3 text-xs shadow-sm">
-            <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+            <div className="text-muted-foreground flex items-center justify-between text-xs">
               <div className="flex items-center gap-1 font-semibold text-amber-500">
                 <Star className="h-3 w-3 fill-amber-500" />
                 {comment.rating} / 5
@@ -2601,7 +2482,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
         <p className="text-muted-foreground px-2 text-xs font-semibold uppercase">Menu</p>
         <div
           className={cn(
-            "text-muted-foreground grid items-center gap-3 px-2 text-[11px] font-semibold uppercase",
+            "text-muted-foreground grid items-center gap-3 px-2 text-xs font-semibold uppercase",
             menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
           )}
         >
@@ -2666,7 +2547,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
           <p className="text-muted-foreground px-2 text-xs">Nobody has chosen a meal yet.</p>
         ) : (
           <>
-            <div className="text-muted-foreground grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-[11px] font-semibold uppercase">
+            <div className="text-muted-foreground grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-xs font-semibold uppercase">
               <span>S/N</span>
               <SortHeader
                 label="Employee"
@@ -2754,12 +2635,12 @@ function EmployeeLunchExpandPanel({
   // Format day short: e.g. "Mon, Jul 13"
   function formatDayShort(dateString: string) {
     const d = new Date(dateString)
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    return d.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", weekday: "short", month: "short", day: "numeric" })
   }
 
   return (
     <div className="bg-muted/20 space-y-1 border-b px-6 py-4">
-      <div className="text-muted-foreground grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 border-b px-2 pb-2 text-[10px] font-bold tracking-wider uppercase">
+      <div className="text-muted-foreground grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 border-b px-2 pb-2 text-xs font-bold tracking-wider uppercase">
         <span>Day</span>
         <span>Status</span>
         <span>Meal Price</span>

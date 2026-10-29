@@ -10,6 +10,10 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { loadWorkLinkNames } from "@/lib/tasks/work-links"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Tasks" }
+
 interface GoalFilterOption {
   id: string
   title: string
@@ -113,7 +117,7 @@ async function getAdminTasksData() {
           .in("id", Array.from(kpiIds))
       : { data: [] },
     loadWorkLinkNames(dataClient, rawTasks),
-    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
+    dataClient.from("projects").select("id, project_name, status").order("project_name", { ascending: true }),
   ])
 
   const profileMap = new Map<string, TaskPersonSummary>(
@@ -191,7 +195,7 @@ async function getAdminTasksData() {
     tasks: filteredTasks as Task[],
     employee: (employeeResult.data || []) as employee[],
     departments,
-    projects: (allProjectsRes.data || []) as Array<{ id: string; project_name: string }>,
+    projects: (allProjectsRes.data || []) as Array<{ id: string; project_name: string; status?: string }>,
     cycles: (cyclesRaw || []) as Array<{
       id: string
       name: string

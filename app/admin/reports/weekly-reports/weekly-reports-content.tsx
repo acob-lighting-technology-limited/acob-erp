@@ -37,6 +37,7 @@ import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
   trackingData: TrackerStatus[]
@@ -83,6 +84,21 @@ export function WeeklyReportsContent({
   const currentOfficeWeek = getCurrentOfficeWeek()
   // Opens on the week being reported on — from Friday that is the next one, so
   // reports arriving ahead of Monday's meeting land in the week on screen.
+  const shell = useShellBase()
+  const trackerHrefFor = (report: { week_number: number; year: number; department: string }) =>
+    shell.href(
+      `/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`
+    )
+  const renderTrackerLink = (report: { week_number: number; year: number; department: string }) => {
+    const href = trackerHrefFor(report)
+    return href ? (
+      <Link href={href} className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline">
+        View action tracker
+      </Link>
+    ) : (
+      <span />
+    )
+  }
   const reportingWeek = useMemo(() => getReportingOfficeWeek(), [])
   const [weekFilter, setWeekFilter] = useState(reportingWeek.week)
   const [yearFilter, setYearFilter] = useState(reportingWeek.year)
@@ -293,7 +309,7 @@ export function WeeklyReportsContent({
           return (
             <div className="flex flex-col">
               <span>{created}</span>
-              {wasEdited ? <span className="text-muted-foreground text-[11px]">(edited)</span> : null}
+              {wasEdited ? <span className="text-muted-foreground text-xs">(edited)</span> : null}
             </div>
           )
         },
@@ -359,7 +375,7 @@ export function WeeklyReportsContent({
       title="Weekly Reports"
       description="Review and export departmental reports."
       icon={FileBarChart}
-      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
+      backLink={{ href: shell.backHref("/admin/reports/general-meeting"), label: "Back to General Meeting" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -504,44 +520,37 @@ export function WeeklyReportsContent({
           render: (report) => (
             <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
-                <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
+                <h4 className="text-xs font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
+                <div className="border-info/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.work_done)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
-                  Tasks for New Week
-                </h4>
-                <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
+                <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">Tasks for New Week</h4>
+                <div className="border-success/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
-                <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
+                <h4 className="text-xs font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
+                <div className="border-danger/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.challenges)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 md:col-span-3">
-                <Link
-                  href={`/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
-                  className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  View action tracker
-                </Link>
+                {renderTrackerLink(report)}
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -594,11 +603,11 @@ export function WeeklyReportsContent({
             return (
               <>
                 {formattedMeeting && (
-                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium">
                     📅 {formattedMeeting}
                   </span>
                 )}
-                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs">
                   🕒 {formatWATTimeDate(report.created_at)}
                 </span>
               </>
@@ -630,7 +639,7 @@ export function WeeklyReportsContent({
                 {
                   label: "Action Tracker",
                   value: trackerStatus.label,
-                  href: `/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`,
+                  href: trackerHrefFor(report) ?? undefined,
                 },
                 { label: "Submitted", value: formatWATTimeDate(report.created_at) },
                 {
@@ -680,6 +689,7 @@ export function WeeklyReportsContent({
             },
           },
         }}
+        cards
         cardRenderer={(report) => {
           const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"

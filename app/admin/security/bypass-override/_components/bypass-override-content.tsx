@@ -435,10 +435,9 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
 
   return (
     <DataTablePage
-      title="Bypass & Override Audit Logs"
+      title="Bypass & Override"
       description="Centralized audit trail of manual policy alterations, emergency bypasses, and validation overrides."
       icon={ShieldAlert}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => router.refresh()}>
@@ -517,7 +516,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
             const details = getDetailedChanges(row)
 
             return (
-              <div className="bg-muted/40 space-y-4 rounded-lg border-2 p-4">
+              <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <span className="text-muted-foreground block text-xs font-medium uppercase">Target / Entity</span>
@@ -551,8 +550,8 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
                     </span>
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                       {details.map((d, i) => (
-                        <div key={i} className="bg-background rounded border p-2">
-                          <span className="text-muted-foreground block text-[10px]">{d.label}</span>
+                        <div key={`row-${i}`} className="bg-background rounded border p-2">
+                          <span className="text-muted-foreground block text-xs">{d.label}</span>
                           <span className="font-semibold">{d.value}</span>
                         </div>
                       ))}
@@ -572,7 +571,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
           subtitle: (row) =>
             `${formatWATDateTime(row.created_at)} · By: ${row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : "System"}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {getBypassType(row)}
             </Badge>
           ),

@@ -485,10 +485,10 @@ export function AdminPmsReviewsPage({
   const goDeptCycle = useCallback(
     (cycleId: string, department: string) => {
       router.push(
-        `/admin/pms/reviews/${encodeURIComponent(cycleId)}?mode=department&department=${encodeURIComponent(department)}`
+        `${reviewCycleBasePath ?? "/admin/pms/reviews"}/${encodeURIComponent(cycleId)}?mode=department&department=${encodeURIComponent(department)}`
       )
     },
-    [router]
+    [router, reviewCycleBasePath]
   )
 
   // ─── Column definitions ───────────────────────────────────────────────────
@@ -773,7 +773,6 @@ export function AdminPmsReviewsPage({
       title="PMS Reviews"
       description="Manage quarterly performance reviews by individual, department, or cycle."
       icon={FileText}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(t) => setTab(t as TabMode)}

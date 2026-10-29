@@ -189,7 +189,7 @@ export function RiskRegisterView({
         <div className="space-y-0.5">
           <span className="text-sm whitespace-nowrap">{r.department}</span>
           {r.supporting_departments.length > 0 && (
-            <p className="text-muted-foreground text-[11px]">with {r.supporting_departments.join(", ")}</p>
+            <p className="text-muted-foreground text-xs">with {r.supporting_departments.join(", ")}</p>
           )}
         </div>
       ),
@@ -218,7 +218,7 @@ export function RiskRegisterView({
       render: (r) => (
         <div className="space-y-0.5">
           <RatingBadge rating={r.rating} score={r.score} className="text-xs" />
-          <p className="text-muted-foreground text-[11px] whitespace-nowrap">
+          <p className="text-muted-foreground text-xs whitespace-nowrap">
             I{r.impact} × L{r.likelihood}
           </p>
         </div>
@@ -232,10 +232,8 @@ export function RiskRegisterView({
       render: (r) => (
         <div className="space-y-0.5">
           <span className="text-xs">{r.control_owner_departments.join(", ")}</span>
-          {ownerName(r) && <p className="text-muted-foreground text-[11px]">{ownerName(r)}</p>}
-          {r.control_owner_note && (
-            <p className="text-muted-foreground line-clamp-1 text-[11px]">{r.control_owner_note}</p>
-          )}
+          {ownerName(r) && <p className="text-muted-foreground text-xs">{ownerName(r)}</p>}
+          {r.control_owner_note && <p className="text-muted-foreground line-clamp-1 text-xs">{r.control_owner_note}</p>}
         </div>
       ),
       hideOnMobile: true,
@@ -314,7 +312,6 @@ export function RiskRegisterView({
           : "Departmental risks, their inherent rating, control owners and mitigation plans."
       }
       icon={ShieldAlert}
-      backLink={backLink || { href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
@@ -430,16 +427,16 @@ export function RiskRegisterView({
           mobileRow={{
             title: (r) => r.risk_name,
             subtitle: (r) => `${reference(r)} · ${describeTimeline(r)}`,
-            trailing: (r) => <RatingBadge rating={r.rating} score={r.score} className="text-[10px]" />,
+            trailing: (r) => <RatingBadge rating={r.rating} score={r.score} className="text-xs" />,
             detail: {
               title: (r) => r.risk_name,
               subtitle: (r) => reference(r),
               badges: (r) => (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <RatingBadge rating={r.rating} score={r.score} className="text-[10px]" />
-                  <StatusBadge status={r.status} className="text-[10px]" />
+                  <RatingBadge rating={r.rating} score={r.score} className="text-xs" />
+                  <StatusBadge status={r.status} className="text-xs" />
                   {isRiskOverdue(r, today) && (
-                    <Badge variant="outline" className="border-rose-300 text-[10px] text-rose-700 dark:text-rose-300">
+                    <Badge variant="outline" className="text-danger border-rose-300 text-xs">
                       Overdue
                     </Badge>
                   )}

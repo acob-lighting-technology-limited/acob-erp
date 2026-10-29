@@ -97,7 +97,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
               </ul>
             )}
 
-            <p className="text-muted-foreground/70 font-mono text-[11px]">ACOB Lighting Technology Limited</p>
+            <p className="text-muted-foreground/70 font-mono text-xs">ACOB Lighting Technology Limited</p>
           </div>
         </section>
 

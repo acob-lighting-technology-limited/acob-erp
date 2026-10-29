@@ -5,6 +5,10 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileSignature } from "lucide-react"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Signature" }
+
 export default async function SignaturePage(props: { searchParams: Promise<{ userId?: string }> }) {
   const searchParams = await props.searchParams
   const supabase = await createClient()
@@ -24,7 +28,13 @@ export default async function SignaturePage(props: { searchParams: Promise<{ use
   }
 
   // Fetch user profile for auto-population
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", targetUserId).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, other_names, last_name, designation, phone_number, additional_phone, company_email, additional_email"
+    )
+    .eq("id", targetUserId)
+    .single()
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

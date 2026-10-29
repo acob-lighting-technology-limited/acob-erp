@@ -5,6 +5,10 @@ import { logger } from "@/lib/logger"
 import { getDefaultDepartmentDescription } from "@/shared/departments"
 import { DepartmentsPage, type Department, type DepartmentEmployee, type DepartmentsData } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Departments" }
+
 const log = logger("departments-page")
 
 export const dynamic = "force-dynamic"

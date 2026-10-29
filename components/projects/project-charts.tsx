@@ -161,7 +161,7 @@ function ChartCard({
                   <tr key={rowIndex}>
                     {row.map((cell, index) => (
                       <td
-                        key={index}
+                        key={`row-${index}`}
                         className={`px-3 py-1.5 ${index === 0 ? "text-left" : "text-right tabular-nums"}`}
                       >
                         {cell}
@@ -179,7 +179,7 @@ function ChartCard({
           </>
         )}
         {notes.map((note) => (
-          <p key={note} className="text-muted-foreground text-[11px]">
+          <p key={note} className="text-muted-foreground text-xs">
             {note}
           </p>
         ))}

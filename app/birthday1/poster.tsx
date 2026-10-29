@@ -63,7 +63,7 @@ export function BirthdayPoster() {
         </span>
         <span className="bd1-birthday" aria-hidden="true">
           {HEADLINE.split("").map((letter, i) => (
-            <span key={i} className="bd1-letter" style={{ "--l": i } as CSSProperties}>
+            <span key={`row-${i}`} className="bd1-letter" style={{ "--l": i } as CSSProperties}>
               {letter}
             </span>
           ))}
@@ -72,7 +72,7 @@ export function BirthdayPoster() {
         <span className="bd1-burst" aria-hidden="true">
           {BURST.map((piece, i) => (
             <span
-              key={i}
+              key={`row-${i}`}
               className={cn("bd1-burst-piece", piece.long && "bd1-burst-piece--long")}
               style={
                 {
@@ -88,7 +88,7 @@ export function BirthdayPoster() {
 
         {SPARKLES.map((sparkle, i) => (
           <span
-            key={i}
+            key={`row-${i}`}
             className="bd1-sparkle"
             style={{ left: sparkle.left, top: sparkle.top, animationDelay: sparkle.delay }}
             aria-hidden="true"

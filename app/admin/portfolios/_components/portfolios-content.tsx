@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Layers,
   Plus,
-  RefreshCw,
   Trash2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -186,7 +185,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   // The charts need each task's dates, which the portfolio rollup leaves out, so
   // they read the projects list — only once the Charts tab is opened.
   const { data: chartProjects = [], isLoading: chartsLoading } = useQuery({
-    queryKey: ["projects", "charts"],
+    queryKey: QUERY_KEYS.projects("charts"),
     enabled: activeTab === "charts",
     queryFn: async (): Promise<ChartsProject[]> => {
       const res = await apiFetch("/api/projects", { cache: "no-store" })
@@ -285,9 +284,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.rollup.overdueCount,
         render: (r) =>
           r.rollup.overdueCount > 0 ? (
-            <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
-              {r.rollup.overdueCount}
-            </Badge>
+            <Badge className="text-danger border-danger/20 bg-danger/10">{r.rollup.overdueCount}</Badge>
           ) : (
             <span className="text-muted-foreground text-xs">None</span>
           ),
@@ -335,24 +332,14 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
 
   return (
     <DataTablePage
-      title="Project Portfolios"
+      title="Portfolios"
       description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
-      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {isAdmin && (
             <Button size="sm" onClick={() => setIsAddOpen(true)}>
               <Plus className="h-4 w-4 sm:mr-2" />

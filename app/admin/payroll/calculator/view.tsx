@@ -10,14 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import {
   calculatePayroll,
   calculatePAYETax,
@@ -30,7 +23,6 @@ import {
   DollarSign,
   TrendingDown,
   CheckCircle2,
-  RefreshCw,
   User,
   Sliders,
   Sparkles,
@@ -44,6 +36,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatCurrency, formatNumber } from "@/lib/format"
+import { SimulateGrossSalaryApprovalDialog } from "./_components/simulate-gross-salary-approval-dialog"
 
 interface CalculatorPageProps {
   initialData: {
@@ -408,9 +401,9 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
       <div className="space-y-6">
         {/* Status Alert Banner */}
         {approvedStatus === "approved" && (
-          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-700 dark:text-emerald-300">
+          <div className="text-success border-success/30 bg-success/10 flex items-center justify-between rounded-lg border p-4">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="text-success h-5 w-5" />
               <div>
                 <p className="text-sm font-semibold">Calculation Approved for Simulation</p>
                 <p className="text-xs opacity-90">
@@ -421,10 +414,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 </p>
               </div>
             </div>
-            <Badge
-              variant="outline"
-              className="border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-            >
+            <Badge variant="outline" className="text-success border-success/40 bg-success/20">
               Approved
             </Badge>
           </div>
@@ -539,7 +529,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(-10)}
-                    className="h-7 text-xs text-red-600 dark:text-red-400"
+                    className="text-danger h-7 text-xs"
                   >
                     <Minus className="mr-1 h-3 w-3" /> 10%
                   </Button>
@@ -548,7 +538,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(-5)}
-                    className="h-7 text-xs text-red-600 dark:text-red-400"
+                    className="text-danger h-7 text-xs"
                   >
                     <Minus className="mr-1 h-3 w-3" /> 5%
                   </Button>
@@ -557,7 +547,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(5)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 5%
                   </Button>
@@ -566,7 +556,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(10)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 10%
                   </Button>
@@ -575,7 +565,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(15)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 15%
                   </Button>
@@ -755,9 +745,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <TableHeader>
                 <TableRow className="bg-muted/80">
                   <TableHead className="font-semibold">Payroll Element</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-700 dark:text-amber-300">
-                    Current PITA System
-                  </TableHead>
+                  <TableHead className="text-warning text-right font-semibold">Current PITA System</TableHead>
                   <TableHead className="text-primary text-right font-semibold">Proposed New Tax Reform</TableHead>
                   <TableHead className="text-right font-semibold">Reform Impact (Delta)</TableHead>
                 </TableRow>
@@ -837,7 +825,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Deductions */}
                 <TableRow>
-                  <TableCell className="text-xs font-medium text-red-600 sm:text-sm dark:text-red-400">
+                  <TableCell className="text-danger text-xs font-medium sm:text-sm">
                     Employee Pension (8% Basic)
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs">
@@ -851,10 +839,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* PAYE Tax Comparison */}
                 <TableRow className="bg-amber-500/10">
-                  <TableCell className="text-xs font-semibold text-amber-700 sm:text-sm dark:text-amber-300">
-                    PAYE Income Tax
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  <TableCell className="text-warning text-xs font-semibold sm:text-sm">PAYE Income Tax</TableCell>
+                  <TableCell className="text-warning text-right font-mono text-xs font-semibold">
                     {money(currentBreakdown.monthlyTax)}
                   </TableCell>
                   <TableCell className="text-primary text-right font-mono text-xs font-bold">
@@ -866,9 +852,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     ) : (
                       <span
                         className={
-                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "text-success" : "text-danger"
                         }
                       >
                         {reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "-" : "+"}
@@ -891,13 +875,13 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Total Deductions */}
                 <TableRow className="bg-red-500/5">
-                  <TableCell className="text-xs font-semibold text-red-600 sm:text-sm dark:text-red-400">
+                  <TableCell className="text-danger text-xs font-semibold sm:text-sm">
                     Total Monthly Deductions
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-red-600 dark:text-red-400">
+                  <TableCell className="text-danger text-right font-mono text-xs font-semibold">
                     {money(currentBreakdown.totalDeductions)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">
+                  <TableCell className="text-danger text-right font-mono text-xs font-bold">
                     {money(currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs font-bold">
@@ -906,9 +890,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     ) : (
                       <span
                         className={
-                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "text-success" : "text-danger"
                         }
                       >
                         {reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "-" : "+"}
@@ -920,13 +902,11 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Net Take-Home Pay */}
                 <TableRow className="border-t-2 border-emerald-500/30 bg-emerald-500/10">
-                  <TableCell className="text-sm font-bold text-emerald-700 sm:text-base dark:text-emerald-300">
-                    Net Take-Home Pay
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                  <TableCell className="text-success text-sm font-bold sm:text-base">Net Take-Home Pay</TableCell>
+                  <TableCell className="text-success text-right font-mono text-sm font-bold">
                     {money(currentBreakdown.netPay)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                  <TableCell className="text-success text-right font-mono text-base font-extrabold">
                     {money(
                       currentBreakdown.monthlyGross -
                         (currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)
@@ -939,8 +919,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       <span
                         className={
                           currentBreakdown.monthlyTax - reformTaxDetail.monthlyTax > 0
-                            ? "font-bold text-emerald-600 dark:text-emerald-400"
-                            : "font-bold text-red-600 dark:text-red-400"
+                            ? "text-success font-bold"
+                            : "text-danger font-bold"
                         }
                       >
                         {currentBreakdown.monthlyTax - reformTaxDetail.monthlyTax > 0 ? "+" : "-"}
@@ -971,10 +951,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
             {/* COLUMN 1: Current PITA Reliefs */}
             <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
               <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  Current PITA Relief Structure
-                </span>
-                <Badge variant="outline" className="font-mono text-[9px]">
+                <span className="text-warning text-xs font-semibold">Current PITA Relief Structure</span>
+                <Badge variant="outline" className="font-mono text-xs">
                   PITA Act
                 </Badge>
               </div>
@@ -989,7 +967,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       : "border-border/60 bg-background/80 hover:border-amber-500/50"
                   }`}
                 >
-                  <div className="text-muted-foreground flex items-center justify-between text-[11px] font-medium">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
                     <span>1. Pension (8%)</span>
                     {isReliefExpanded("pension") ? (
                       <ChevronUp className="h-3.5 w-3.5 text-amber-600" />
@@ -998,7 +976,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     )}
                   </div>
                   <p className="font-mono text-xs font-bold">{money(taxDetail.totalReliefs)}</p>
-                  <span className="text-primary text-[10px] underline">
+                  <span className="text-primary text-xs underline">
                     {isReliefExpanded("pension") ? "Hide ▲" : "Math ▼"}
                   </span>
                 </div>
@@ -1012,7 +990,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       : "border-border/60 bg-background/80 hover:border-amber-500/50"
                   }`}
                 >
-                  <div className="text-muted-foreground flex items-center justify-between text-[11px] font-medium">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
                     <span>2. CRA (Comp 1 & 2)</span>
                     {isReliefExpanded("cra") ? (
                       <ChevronUp className="h-3.5 w-3.5 text-amber-600" />
@@ -1021,7 +999,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     )}
                   </div>
                   <p className="font-mono text-xs font-bold">{money(taxDetail.cra)}</p>
-                  <span className="text-primary text-[10px] underline">
+                  <span className="text-primary text-xs underline">
                     {isReliefExpanded("cra") ? "Hide ▲" : "Math ▼"}
                   </span>
                 </div>
@@ -1036,7 +1014,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     : "border-amber-500/40 bg-amber-500/10 hover:border-amber-500"
                 }`}
               >
-                <div className="flex items-center justify-between text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                <div className="text-warning flex items-center justify-between text-xs font-semibold">
                   <span>PITA Chargeable Income (Annual)</span>
                   {isReliefExpanded("chargeable") ? (
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -1044,22 +1022,20 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     <ChevronDown className="h-3.5 w-3.5" />
                   )}
                 </div>
-                <p className="font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
-                  {money(taxDetail.chargeableIncome)}
-                </p>
+                <p className="text-warning font-mono text-sm font-bold">{money(taxDetail.chargeableIncome)}</p>
               </div>
 
               {/* PITA Dropdown Accordion Content */}
               {isReliefExpanded("pension") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 border-b pb-1 font-sans text-xs font-semibold">
                     PITA Pension Relief Math:
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Annual Basic Salary (50%):</span>
                     <span>{money(currentBreakdown.basic)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] font-bold text-amber-600">
+                  <div className="flex justify-between text-xs font-bold text-amber-600">
                     <span>Annual Pension (8% × Basic):</span>
                     <span>{money(currentBreakdown.pensionEmployeeAnnual)}</span>
                   </div>
@@ -1068,30 +1044,30 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               {isReliefExpanded("cra") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 border-b pb-1 font-sans text-xs font-semibold">
                     PITA CRA Math (Comp 1 + Comp 2):
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Gross Income:</span>
                     <span>{money(currentBreakdown.annualGross)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-red-600">
+                  <div className="flex justify-between text-xs text-red-600">
                     <span>Less Pension:</span>
                     <span>-{money(taxDetail.totalReliefs)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Net Income:</span>
                     <span>{money(taxDetail.netForCRA)}</span>
                   </div>
-                  <div className="text-muted-foreground flex justify-between text-[10px]">
+                  <div className="text-muted-foreground flex justify-between text-xs">
                     <span>Comp 1 [Max(1% Net, ₦200k)]:</span>
                     <span>{money(Math.max(0.01 * taxDetail.netForCRA, 200000))}</span>
                   </div>
-                  <div className="text-muted-foreground flex justify-between text-[10px]">
+                  <div className="text-muted-foreground flex justify-between text-xs">
                     <span>Comp 2 [20% of Net Income]:</span>
                     <span>{money(0.2 * taxDetail.netForCRA)}</span>
                   </div>
-                  <div className="border-border/40 flex justify-between border-t pt-1 text-[10px] font-bold text-amber-600">
+                  <div className="border-border/40 flex justify-between border-t pt-1 text-xs font-bold text-amber-600">
                     <span>Total CRA Relief:</span>
                     <span>{money(taxDetail.cra)}</span>
                   </div>
@@ -1100,18 +1076,18 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               {isReliefExpanded("chargeable") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 border-b pb-1 font-sans text-xs font-semibold">
                     PITA Chargeable Income Math:
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Net Income (Gross - Pension):</span>
                     <span>{money(taxDetail.netForCRA)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-amber-600">
+                  <div className="flex justify-between text-xs text-amber-600">
                     <span>Less CRA Relief:</span>
                     <span>-{money(taxDetail.cra)}</span>
                   </div>
-                  <div className="border-border/40 flex justify-between border-t pt-1 text-[10px] font-bold text-amber-600">
+                  <div className="border-border/40 flex justify-between border-t pt-1 text-xs font-bold text-amber-600">
                     <span>PITA Chargeable Income:</span>
                     <span>{money(taxDetail.chargeableIncome)}</span>
                   </div>
@@ -1123,7 +1099,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
             <div className="border-primary/30 bg-primary/5 space-y-3 rounded-lg border p-3">
               <div className="border-primary/20 flex items-center justify-between border-b pb-2">
                 <span className="text-primary text-xs font-semibold">New Tax Reform Relief Structure</span>
-                <Badge variant="default" className="bg-primary font-mono text-[9px]">
+                <Badge variant="default" className="bg-primary font-mono text-xs">
                   2025/2026 Reform
                 </Badge>
               </div>
@@ -1138,7 +1114,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       : "border-border/60 bg-background/80 hover:border-primary/50"
                   }`}
                 >
-                  <div className="text-muted-foreground flex items-center justify-between text-[11px] font-medium">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
                     <span>1. Pension (8%)</span>
                     {isReliefExpanded("reform-pension") ? (
                       <ChevronUp className="text-primary h-3.5 w-3.5" />
@@ -1147,7 +1123,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     )}
                   </div>
                   <p className="font-mono text-xs font-bold">{money(currentBreakdown.pensionEmployeeAnnual)}</p>
-                  <span className="text-primary text-[10px] underline">
+                  <span className="text-primary text-xs underline">
                     {isReliefExpanded("reform-pension") ? "Hide ▲" : "Math ▼"}
                   </span>
                 </div>
@@ -1161,7 +1137,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       : "border-border/60 bg-background/80 hover:border-primary/50"
                   }`}
                 >
-                  <div className="text-muted-foreground flex items-center justify-between text-[11px] font-medium">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
                     <span>2. Static Relief (No CRA)</span>
                     {isReliefExpanded("reform-static") ? (
                       <ChevronUp className="text-primary h-3.5 w-3.5" />
@@ -1169,8 +1145,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </div>
-                  <p className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">₦500,000.00</p>
-                  <span className="text-primary text-[10px] underline">
+                  <p className="text-success font-mono text-xs font-bold">₦500,000.00</p>
+                  <span className="text-primary text-xs underline">
                     {isReliefExpanded("reform-static") ? "Hide ▲" : "Rule info ▼"}
                   </span>
                 </div>
@@ -1185,7 +1161,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     : "border-primary/40 bg-primary/10 hover:border-primary"
                 }`}
               >
-                <div className="text-primary flex items-center justify-between text-[11px] font-semibold">
+                <div className="text-primary flex items-center justify-between text-xs font-semibold">
                   <span>New Reform Chargeable Income (Annual)</span>
                   {isReliefExpanded("reform-chargeable") ? (
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -1199,14 +1175,14 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               {/* Reform Dropdown Accordion Content */}
               {isReliefExpanded("reform-pension") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 border-b pb-1 font-sans text-xs font-semibold">
                     New Reform Pension Math:
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Annual Basic Salary (50%):</span>
                     <span>{money(currentBreakdown.basic)}</span>
                   </div>
-                  <div className="text-primary flex justify-between text-[10px] font-bold">
+                  <div className="text-primary flex justify-between text-xs font-bold">
                     <span>Annual Pension Relief (8%):</span>
                     <span>{money(currentBreakdown.pensionEmployeeAnnual)}</span>
                   </div>
@@ -1215,15 +1191,15 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               {isReliefExpanded("reform-static") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 text-primary border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 text-primary border-b pb-1 font-sans text-xs font-semibold">
                     New Tax Reform Exemption Rule:
                   </div>
-                  <p className="text-muted-foreground font-sans text-[10px]">
+                  <p className="text-muted-foreground font-sans text-xs">
                     Under the new Tax Reform Act, CRA Components 1 & 2 (1% Net & 20% Net) are <strong>removed</strong>.
                     Instead, employees receive a <strong>static ₦500,000 statutory relief</strong> plus the 0% tax
                     threshold on the first ₦800,000!
                   </p>
-                  <div className="border-border/40 flex justify-between border-t pt-1 text-[10px] font-bold text-emerald-600">
+                  <div className="border-border/40 flex justify-between border-t pt-1 text-xs font-bold text-emerald-600">
                     <span>Fixed Statutory Relief:</span>
                     <span>₦500,000.00</span>
                   </div>
@@ -1232,22 +1208,22 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               {isReliefExpanded("reform-chargeable") && (
                 <div className="border-border bg-background space-y-1 rounded border p-2.5 font-mono text-xs">
-                  <div className="border-border/40 border-b pb-1 font-sans text-[11px] font-semibold">
+                  <div className="border-border/40 border-b pb-1 font-sans text-xs font-semibold">
                     New Reform Chargeable Income Math:
                   </div>
-                  <div className="flex justify-between text-[10px]">
+                  <div className="flex justify-between text-xs">
                     <span>Annual Gross Income:</span>
                     <span>{money(currentBreakdown.annualGross)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-red-600">
+                  <div className="flex justify-between text-xs text-red-600">
                     <span>Less Pension (8%):</span>
                     <span>-{money(currentBreakdown.pensionEmployeeAnnual)}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-emerald-600">
+                  <div className="flex justify-between text-xs text-emerald-600">
                     <span>Less Static Relief:</span>
                     <span>-₦500,000.00</span>
                   </div>
-                  <div className="text-primary border-border/40 flex justify-between border-t pt-1 text-[10px] font-bold">
+                  <div className="text-primary border-border/40 flex justify-between border-t pt-1 text-xs font-bold">
                     <span>New Chargeable Income:</span>
                     <span>{money(reformTaxDetail.chargeableIncome)}</span>
                   </div>
@@ -1261,10 +1237,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <h4 className="text-foreground text-xs font-bold tracking-wider uppercase">
                 Tax Bracket Computation (2-Column Schedule Comparison):
               </h4>
-              <Badge
-                variant="outline"
-                className="w-fit border-amber-500/30 bg-amber-500/10 font-mono text-[11px] text-amber-700 dark:text-amber-300"
-              >
+              <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 w-fit font-mono text-xs">
                 PITA vs New Tax Reform Act
               </Badge>
             </div>
@@ -1273,10 +1246,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               {/* Column 1: Current Tax Schedule (PITA) */}
               <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                 <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                    Column 1: Current PITA Tax Schedule
-                  </span>
-                  <Badge variant="secondary" className="font-mono text-[10px]">
+                  <span className="text-warning text-xs font-semibold">Column 1: Current PITA Tax Schedule</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
                     7% – 24%
                   </Badge>
                 </div>
@@ -1284,24 +1255,24 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 <div className="space-y-1.5">
                   {taxDetail.brackets.map((b, idx) => (
                     <div
-                      key={idx}
+                      key={`row-${idx}`}
                       className="border-border/40 bg-background/60 flex items-center justify-between rounded border p-2 text-xs"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="px-1 py-0 font-mono text-[9px]">
+                        <Badge variant="outline" className="px-1 py-0 font-mono text-xs">
                           B{idx + 1}
                         </Badge>
-                        <span className="text-[11px] font-medium">{b.label}</span>
+                        <span className="text-xs font-medium">{b.label}</span>
                       </div>
-                      <div className="flex items-center gap-2 font-mono text-[11px]">
+                      <div className="flex items-center gap-2 font-mono text-xs">
                         <span className="text-muted-foreground">{money(b.amount)}</span>
-                        <span className="font-bold text-amber-600 dark:text-amber-400">{money(b.tax)}</span>
+                        <span className="text-warning font-bold">{money(b.tax)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-2 flex items-center justify-between rounded border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                <div className="text-warning border-warning/40 bg-warning/10 mt-2 flex items-center justify-between rounded border p-2.5 text-xs font-bold">
                   <span>Current Monthly Tax:</span>
                   <span className="font-mono text-sm">{money(currentBreakdown.monthlyTax)}</span>
                 </div>
@@ -1311,7 +1282,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <div className="border-primary/30 bg-primary/5 space-y-2 rounded-lg border p-3">
                 <div className="border-primary/20 flex items-center justify-between border-b pb-2">
                   <span className="text-primary text-xs font-semibold">Column 2: New Tax Reform Schedule</span>
-                  <Badge variant="default" className="bg-primary font-mono text-[10px]">
+                  <Badge variant="default" className="bg-primary font-mono text-xs">
                     0% – 25% (2025/2026 Reform)
                   </Badge>
                 </div>
@@ -1319,16 +1290,16 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 <div className="space-y-1.5">
                   {reformTaxDetail.brackets.map((b, idx) => (
                     <div
-                      key={idx}
+                      key={`row-${idx}`}
                       className="border-border/40 bg-background/60 flex items-center justify-between rounded border p-2 text-xs"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="px-1 py-0 font-mono text-[9px]">
+                        <Badge variant="outline" className="px-1 py-0 font-mono text-xs">
                           B{idx + 1}
                         </Badge>
-                        <span className="text-[11px] font-medium">{b.label}</span>
+                        <span className="text-xs font-medium">{b.label}</span>
                       </div>
-                      <div className="flex items-center gap-2 font-mono text-[11px]">
+                      <div className="flex items-center gap-2 font-mono text-xs">
                         <span className="text-muted-foreground">{money(b.amount)}</span>
                         <span className="text-primary font-bold">{money(b.tax)}</span>
                       </div>
@@ -1363,7 +1334,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               <div className="font-mono text-xs font-bold">
                 Take-Home Net (New Reform):{" "}
-                <span className="text-emerald-600 dark:text-emerald-400">
+                <span className="text-success">
                   {money(
                     currentBreakdown.monthlyGross -
                       (currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)
@@ -1375,66 +1346,17 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
         </div>
 
         {/* SECTION 4: Approval Simulation Modal */}
-        <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
-          <DialogContent className="sm:max-w-[540px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                Simulate Gross Salary Approval
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Review and approve the altered gross salary for {selectedEmp ? selectedEmp.full_name : "this employee"}.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-3">
-              <div className="border-border bg-muted/40 space-y-2 rounded-lg border p-4">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Target Employee:</span>
-                  <span className="font-semibold">{selectedEmp ? selectedEmp.full_name : "General Sandbox"}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Original Baseline Gross:</span>
-                  <span className="font-mono">{money(baselineBreakdown.monthlyGross)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Approved Monthly Gross:</span>
-                  <span className="text-primary font-mono font-bold">{money(currentBreakdown.monthlyGross)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Approved Net Take-Home:</span>
-                  <span className="font-mono font-bold text-emerald-600">{money(currentBreakdown.netPay)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Approved PAYE Tax:</span>
-                  <span className="font-mono">{money(currentBreakdown.monthlyTax)}</span>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="approval-note" className="text-xs font-medium">
-                  Approval Notes / Comments (Optional)
-                </Label>
-                <Input
-                  id="approval-note"
-                  placeholder="e.g. Approved gross salary increase following Q3 promotion..."
-                  value={approvalNote}
-                  onChange={(e) => setApprovalNote(e.target.value)}
-                  className="mt-1 text-xs"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setApprovalDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleApprove}>
-                Confirm & Approve
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <SimulateGrossSalaryApprovalDialog
+          approvalDialogOpen={approvalDialogOpen}
+          setApprovalDialogOpen={setApprovalDialogOpen}
+          selectedEmp={selectedEmp}
+          money={money}
+          baselineBreakdown={baselineBreakdown}
+          currentBreakdown={currentBreakdown}
+          approvalNote={approvalNote}
+          setApprovalNote={setApprovalNote}
+          handleApprove={handleApprove}
+        />
       </div>
     </DataTablePage>
   )

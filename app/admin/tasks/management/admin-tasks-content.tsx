@@ -15,7 +15,6 @@ import {
   Trash2,
   Calendar,
   User,
-  Target,
   CheckCircle2,
   Clock,
   ShieldCheck,
@@ -26,6 +25,7 @@ import {
   Layers,
   Download,
 } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog"
@@ -33,7 +33,7 @@ import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog"
 import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionDialog"
 import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -55,6 +55,7 @@ import {
   exportUserPlanToPdf,
   type TaskExportMeta,
 } from "@/lib/tasks/export"
+import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -97,7 +98,7 @@ interface AdminTasksContentProps {
   initialemployee: employee[]
   initialDepartments: string[]
   initialReviewCycles?: ReviewCycleOption[]
-  initialProjects?: Array<{ id: string; project_name: string }>
+  initialProjects?: Array<{ id: string; project_name: string; status?: string }>
   userProfile: UserProfile
   initialGoalId?: string
 }
@@ -105,7 +106,7 @@ interface AdminTasksContentProps {
 export function AdminTaskStatusBadge({ status, className }: { status: string; className?: string }) {
   const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
   return (
-    <Badge variant={cfg.badgeVariant} className={cn("text-[11px] whitespace-nowrap capitalize", cfg.color, className)}>
+    <Badge variant={cfg.badgeVariant} className={cn("text-xs whitespace-nowrap capitalize", cfg.color, className)}>
       {cfg.label}
     </Badge>
   )
@@ -447,7 +448,7 @@ export function AdminTasksContent({
             )}
             <div className="flex min-w-0 flex-col">
               <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>
-              <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+              <span className="text-muted-foreground text-xs uppercase">{r.department || "General"}</span>
             </div>
           </div>
         ),
@@ -481,7 +482,7 @@ export function AdminTasksContent({
           r.goal_title ? (
             <div className="flex flex-col">
               <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
-              {r.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.kpi_measure}</span>}
+              {r.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-xs">{r.kpi_measure}</span>}
             </div>
           ) : r.kpi_measure ? (
             <span className="line-clamp-1 text-xs font-medium">{r.kpi_measure}</span>
@@ -604,16 +605,14 @@ export function AdminTasksContent({
           : "Operational task tracking, multi-user assignment, and PMS review governance."
       }
       icon={activeTab === "user_plan" ? Users : ClipboardList}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={TASK_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsWorkflowOpen(true)} className="h-8 gap-2">
-            <ArrowRight className="h-4 w-4" />
-            <span className="hidden sm:inline">Workflow Guide</span>
-          </Button>
+          <HeaderMoreMenu
+            items={[{ label: "Workflow guide", icon: ArrowRight, onSelect: () => setIsWorkflowOpen(true) }]}
+          />
           <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
@@ -738,9 +737,9 @@ export function AdminTasksContent({
           ]}
           expandable={{
             render: (r) => (
-              <div className="grid grid-cols-1 gap-6 p-5 text-xs md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 text-xs md:grid-cols-2">
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
                     Description & Scope
                   </h4>
                   <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
@@ -748,21 +747,21 @@ export function AdminTasksContent({
                   </div>
 
                   {r.unable_to_complete_reason && (
-                    <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
+                    <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
                       {r.unable_to_complete_reason}
                     </div>
                   )}
 
                   {r.failure_reason && (
-                    <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
+                    <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Failure Note:</span>
                       {r.failure_reason}
                     </div>
                   )}
 
                   {r.extension_reason && (
-                    <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
+                    <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Extension Reason:</span>
                       {r.extension_reason}
                     </div>
@@ -770,12 +769,12 @@ export function AdminTasksContent({
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
                     Attribution & Lifecycle
                   </h4>
                   <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Assigned To:</span>
+                      <span className="text-muted-foreground block text-xs">Assigned To:</span>
                       <span className="flex items-center gap-1.5 font-medium">
                         {r.assigned_to_user && (
                           <StaffAvatar
@@ -789,7 +788,7 @@ export function AdminTasksContent({
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
+                      <span className="text-muted-foreground block text-xs">Assigned By:</span>
                       <span className="flex items-center gap-1.5 font-medium">
                         {r.assigned_by_user && (
                           <StaffAvatar
@@ -805,16 +804,16 @@ export function AdminTasksContent({
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Created At:</span>
+                      <span className="text-muted-foreground block text-xs">Created At:</span>
                       <span>{formatWATDateTime(r.created_at)}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Due Date:</span>
+                      <span className="text-muted-foreground block text-xs">Due Date:</span>
                       <span className="font-medium">{r.due_date ? formatWATDate(r.due_date) : "No deadline"}</span>
                     </div>
                     {r.reviewed_by_user && (
                       <div className="col-span-2 border-t pt-1">
-                        <span className="text-muted-foreground block text-[10px]">Reviewed By:</span>
+                        <span className="text-muted-foreground block text-xs">Reviewed By:</span>
                         <span className="font-medium">
                           {formatFullName(r.reviewed_by_user.first_name, r.reviewed_by_user.last_name)}
                           {r.reviewed_at && ` on ${formatWATDateTime(r.reviewed_at)}`}
@@ -854,16 +853,16 @@ export function AdminTasksContent({
               ].filter(Boolean)
               return parts.join(" · ")
             },
-            trailing: (r) => <AdminTaskStatusBadge status={r.status} className="text-[10px]" />,
+            trailing: (r) => <AdminTaskStatusBadge status={r.status} className="text-xs" />,
             detail: {
               title: (r) => r.title,
               subtitle: (r) => r.work_item_number || undefined,
               badges: (r) => (
                 <>
-                  <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
+                  <AdminTaskStatusBadge status={r.status} className="text-xs" />
                   <Badge
                     variant="outline"
-                    className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
+                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(r.weight))}
                   >
                     Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
                   </Badge>
@@ -897,10 +896,10 @@ export function AdminTasksContent({
           cardRenderer={(r) => (
             <div className="bg-card group relative space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
               <div className="flex items-start justify-between">
-                <span className="text-muted-foreground font-mono text-[10px]">{r.work_item_number}</span>
+                <span className="text-muted-foreground font-mono text-xs">{r.work_item_number}</span>
                 <Badge
                   variant="outline"
-                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
+                  className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(r.weight))}
                 >
                   Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
                 </Badge>
@@ -909,14 +908,12 @@ export function AdminTasksContent({
                 <h4 className="line-clamp-1 text-sm font-semibold">{r.title}</h4>
                 <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
               </div>
-              {r.kpi_measure && (
-                <div className="text-muted-foreground line-clamp-1 text-[11px]">🎯 {r.kpi_measure}</div>
-              )}
+              {r.kpi_measure && <div className="text-muted-foreground line-clamp-1 text-xs">🎯 {r.kpi_measure}</div>}
               <div className="flex items-center justify-between border-t pt-2">
                 <div className="flex items-center gap-1.5">
                   <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
                 </div>
-                <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
+                <AdminTaskStatusBadge status={r.status} className="text-xs" />
               </div>
             </div>
           )}
@@ -962,40 +959,7 @@ export function AdminTasksContent({
         taskToDelete={taskToDelete}
       />
 
-      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tasks & PMS Governance Guide</DialogTitle>
-            <DialogDescription>
-              Understanding task lifecycles, review governance, and KPI scoring impact.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2 text-xs">
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">1. Multi-Assignment & Individual Tasks</p>
-              <p className="text-muted-foreground">
-                When assigning a task to multiple team members, individual task instances are generated. Each employee
-                has direct, separate accountability.
-              </p>
-            </div>
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">2. Corporate KPI Alignment</p>
-              <p className="text-muted-foreground">
-                Every task is linked to an approved departmental Corporate KPI. The associated Strategic Goal and Pillar
-                are automatically aligned and feed directly into performance reviews and scorecard progress.
-              </p>
-            </div>
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">3. Lead Review & Weight Scoring</p>
-              <p className="text-muted-foreground">
-                Submitted tasks require lead/admin approval to reach Completed status and award KPI points based on task
-                weight (1–5) and review rating. Blocked tasks can be reassigned (neutral for KPI), granted extensions,
-                or marked failed.
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <WorkflowGuideDialog isWorkflowOpen={isWorkflowOpen} setIsWorkflowOpen={setIsWorkflowOpen} />
     </DataTablePage>
   )
 }

@@ -101,26 +101,17 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   if (stage === "pending_lead") {
     if (appeal.initiated_by_role === "admin_manual") {
       return (
-        <Badge
-          variant="outline"
-          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-        >
+        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
           Pending Lead
         </Badge>
       )
     }
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge
-          variant="outline"
-          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-        >
+        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
           Pending Lead
         </Badge>
-        <Badge
-          variant="outline"
-          className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400"
-        >
+        <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
           Pending Admin
         </Badge>
       </div>
@@ -128,26 +119,20 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   }
   if (stage === "pending_admin") {
     return (
-      <Badge variant="outline" className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400">
+      <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
         Pending Admin
       </Badge>
     )
   }
   if (stage === "pending_hr_lead") {
     return (
-      <Badge
-        variant="outline"
-        className="border-purple-500 bg-purple-500/10 font-medium text-purple-600 dark:text-purple-400"
-      >
+      <Badge variant="outline" className="bg-purple/10 text-purple border-purple-500 font-medium">
         Pending HR Lead
       </Badge>
     )
   }
   return (
-    <Badge
-      variant="outline"
-      className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-    >
+    <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
       Pending
     </Badge>
   )
@@ -343,7 +328,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         // Use noon UTC so timezone conversion (WAT +1) never shifts the calendar date
         const dateObj = new Date(`${workday}T12:00:00Z`)
         // Month label: "June 2026" — use en-US without day to avoid "1 June 2026" from en-GB defaults
-        const monthLabel = dateObj.toLocaleDateString("en-US", {
+        const monthLabel = dateObj.toLocaleDateString("en-NG", {
           month: "long",
           year: "numeric",
           timeZone: "Africa/Lagos",
@@ -359,7 +344,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
             clock_out: null,
             total_hours: null,
             status: "no_record",
-            dayLabel: dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" }),
+            dayLabel: dateObj.toLocaleDateString("en-NG", { weekday: "long", timeZone: "Africa/Lagos" }),
             dateLabel: formatWATDate(dateObj, { day: "2-digit", month: "long", year: "numeric" }),
             periodLabel: "-",
             monthLabel,
@@ -387,7 +372,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         return {
           ...existing,
           total_hours: breakdown.total ?? existing.total_hours,
-          dayLabel: dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" }),
+          dayLabel: dateObj.toLocaleDateString("en-NG", { weekday: "long", timeZone: "Africa/Lagos" }),
           dateLabel: formatWATDate(dateObj, { day: "2-digit", month: "long", year: "numeric" }),
           periodLabel: `${existing.clock_in || "-"} - ${getClockOutLabel({ ...existing, date: workday })}`,
           monthLabel,
@@ -418,7 +403,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         render: (row) => (
           <div className="whitespace-nowrap">
             <span className="text-foreground block text-xs font-semibold sm:text-sm">{row.dayLabel}</span>
-            <span className="text-muted-foreground block text-[11px]">
+            <span className="text-muted-foreground block text-xs">
               {formatWATDate(row.date, { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
@@ -455,7 +440,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                 <span>{getClockOutLabel(row)}</span>
               </>
             ) : row.clock_in && row.date === toLocalISODate() ? (
-              <span className="font-medium text-blue-600 dark:text-blue-400">{getClockOutLabel(row)}</span>
+              <span className="text-info font-medium">{getClockOutLabel(row)}</span>
             ) : (
               <span className="text-muted-foreground">—</span>
             )}
@@ -527,7 +512,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1 border-red-200 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/20"
+                className="border-danger/30 text-danger hover:bg-danger/25 h-7 gap-1 px-2 text-xs hover:text-red-700"
                 onClick={() => {
                   setEditAppeal(null)
                   setAppealDialogRow(row)
@@ -652,7 +637,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         title="Attendance"
         description="Track your work hours and attendance records."
         icon={Clock}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
         tabs={ATTENDANCE_TABS}
         activeTab={activeTab}
         onTabChange={(t) => setActiveTab(t as "log" | "calendar")}
@@ -919,30 +903,24 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                 const latestAppeal = rowAppeals[0]
 
                 return (
-                  <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+                  <div className="space-y-3 text-xs">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock In
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock In</span>
                         <span className="font-mono font-medium">{formatClockTime(row.clock_in)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock Out
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock Out</span>
                         <span className="font-mono font-medium">{getClockOutLabel(row)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Work Hours
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Work Hours</span>
                         <span className="font-medium">
                           {row.workHours != null ? `${row.workHours.toFixed(2)} hrs` : "-"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">
                           Missed Hours
                         </span>
                         <span className="font-medium">
@@ -954,7 +932,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                     {latestAppeal ? (
                       <div className="space-y-3.5 border-t pt-3.5 text-sm">
                         <div>
-                          <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
+                          <span className="text-muted-foreground mb-1 block text-xs font-semibold">
                             {latestAppeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
                           </span>
                           <p className="text-foreground text-sm font-medium whitespace-pre-wrap">
@@ -963,9 +941,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                         </div>
 
                         <div>
-                          <span className="text-muted-foreground mb-2 block text-xs font-semibold tracking-wide uppercase">
-                            Audit History
-                          </span>
+                          <span className="text-muted-foreground mb-2 block text-xs font-semibold">Audit History</span>
                           <div className="bg-background/80 divide-y rounded-lg border text-xs">
                             {/* 1. Origin */}
                             <div className="flex flex-col justify-between gap-1 p-3 sm:flex-row sm:items-center">
@@ -1001,9 +977,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                     Lead Endorsement
                                   </span>
                                   {latestAppeal.lead_reviewed_at ? (
-                                    <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
+                                    <span className="text-success font-medium">Endorsed</span>
                                   ) : latestAppeal.stage === "pending_lead" ? (
-                                    <span className="font-medium text-amber-600 dark:text-amber-400">
+                                    <span className="text-warning font-medium">
                                       Awaiting {latestAppeal.department_lead_name || "Department Lead"}
                                     </span>
                                   ) : (
@@ -1044,16 +1020,14 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                     <span
                                       className={
                                         latestAppeal.status === "rejected"
-                                          ? "font-medium text-red-600 dark:text-red-400"
-                                          : "font-medium text-emerald-600 dark:text-emerald-400"
+                                          ? "text-danger font-medium"
+                                          : "text-success font-medium"
                                       }
                                     >
                                       {latestAppeal.status === "rejected" ? "Rejected" : "Approved"}
                                     </span>
                                   ) : latestAppeal.stage === "pending_admin" ? (
-                                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                                      Awaiting Admin Review
-                                    </span>
+                                    <span className="text-info font-medium">Awaiting Admin Review</span>
                                   ) : (
                                     <span className="text-muted-foreground">
                                       Pending lead then {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
@@ -1272,10 +1246,7 @@ function StatusBadge({ status }: { status: AttendanceRow["normalizedStatus"] }) 
   const norm = normalizeStoredAttendanceStatus(status) || status
   return (
     <Badge
-      className={
-        ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-      }
+      className={ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-foreground"}
     >
       {ATTENDANCE_STATUS_LABELS[norm as keyof typeof ATTENDANCE_STATUS_LABELS] ?? norm}
     </Badge>

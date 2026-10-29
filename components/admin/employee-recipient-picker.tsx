@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchDirectoryRows } from "@/lib/directory/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 export interface DirectoryEmployee {
   id: string
@@ -109,13 +110,13 @@ export function EmployeeRecipientPicker({
         {loading ? (
           <RowsSkeleton rows={4} className="py-2" />
         ) : filtered.length === 0 ? (
-          <div className="text-muted-foreground py-6 text-center text-sm">No employees found</div>
+          <EmptyState compact title="No employees found" />
         ) : (
           filtered.map((emp) => (
             <label
               key={emp.id}
               className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                selectedIds.includes(emp.id) ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
+                selectedIds.includes(emp.id) ? "bg-success/15" : "hover:bg-muted/50"
               }`}
             >
               <Checkbox checked={selectedIds.includes(emp.id)} onCheckedChange={() => toggle(emp.id)} />

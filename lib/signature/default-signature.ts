@@ -9,6 +9,7 @@ import {
   PHONE_ICON,
   X_ICON,
 } from "@/lib/signature-assets"
+import { escapeHtml } from "@/lib/email-templates/utils"
 
 /**
  * The standard ACOB email signature — the single source for its HTML, used by
@@ -68,9 +69,13 @@ export function buildContactSequence(sections: string[]): string {
     .join("")}`
 }
 
+// Everything below is interpolated into HTML that is rendered with
+// dangerouslySetInnerHTML and pasted into mail clients, and names and phone
+// numbers are typed by staff, so each value is escaped (or, for the tel: href,
+// reduced to digits) at the point it enters the markup.
 export function buildPhoneContactHtml(phoneNumber: string, formattedPhone: string): string {
-  const primaryPhoneHref = phoneNumber.replace(/\s+/g, "")
-  return `<a href="tel:${primaryPhoneHref}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>`
+  const primaryPhoneHref = phoneNumber.replace(/[^\d+]/g, "")
+  return `<a href="tel:${primaryPhoneHref}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${escapeHtml(formattedPhone)}</a>`
 }
 
 export function buildEmailContactHtml(
@@ -78,9 +83,11 @@ export function buildEmailContactHtml(
   alternativeEmail: string,
   emailContactOrder: EmailContactOrder
 ): string {
-  const primaryEmailSection = `<a href="mailto:${companyEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${companyEmail}</a>`
-  const alternativeEmailSection = alternativeEmail
-    ? `<a href="mailto:${alternativeEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${alternativeEmail}</a>`
+  const primaryEmail = escapeHtml(companyEmail)
+  const alternativeEmailEscaped = escapeHtml(alternativeEmail)
+  const primaryEmailSection = `<a href="mailto:${primaryEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${primaryEmail}</a>`
+  const alternativeEmailSection = alternativeEmailEscaped
+    ? `<a href="mailto:${alternativeEmailEscaped}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${alternativeEmailEscaped}</a>`
     : ""
 
   if (!alternativeEmailSection) return primaryEmailSection
@@ -101,7 +108,8 @@ export function buildDefaultSignatureHtml(input: DefaultSignatureInput): string 
   const phoneContactHtml = buildPhoneContactHtml(input.phoneNumber, input.formattedPhone)
   const emailContactHtml = buildEmailContactHtml(input.companyEmail, input.alternativeEmail, input.emailContactOrder)
   const officeRowHtml = buildOfficeRowHtml()
-  const fullName = input.fullName
+  const fullName = escapeHtml(input.fullName)
+  const companyRole = escapeHtml(input.companyRole)
 
   return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5;">
   <!-- Thin green line -->
@@ -113,7 +121,7 @@ export function buildDefaultSignatureHtml(input: DefaultSignatureInput): string 
   <!-- Name & Role -->
   <div style="border-bottom: 1.5px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 6px;">
     <p style="margin: 0 0 0 0; line-height: 1; font-size: 20px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${input.companyRole}</p>
+    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${companyRole}</p>
 
     <!-- Contact details -->
     <div style="font-size: 14px; color: #374151; line-height: 1.3;">
@@ -162,7 +170,8 @@ export function buildAnniversarySignatureHtml(
   input: DefaultSignatureInput,
   options: { font?: string; template?: string } = {}
 ): string {
-  const fullName = input.fullName
+  const fullName = escapeHtml(input.fullName)
+  const companyRole = escapeHtml(input.companyRole)
   const font = options.font ?? ANNIVERSARY_SIGNATURE_FONT
   const template = options.template ?? "minimal"
   const phoneContactHtml = buildPhoneContactHtml(input.phoneNumber, input.formattedPhone)
@@ -272,7 +281,7 @@ export function buildAnniversarySignatureHtml(
       <td style="width: 4px; background: linear-gradient(180deg, #c5a028, #d4af37, #e8c947); border-radius: 4px;" width="4"></td>
       <td style="padding-left: 14px;">
         <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.025em;">${fullName}</p>
-        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
       </td>
     </tr>
   </table>
@@ -287,7 +296,7 @@ export function buildAnniversarySignatureHtml(
     timeline: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 8px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -314,7 +323,7 @@ export function buildAnniversarySignatureHtml(
   <div style="margin-bottom: 10px;">
     <div style="padding-left: 12px; border-left: 3px solid #d4af37;">
       <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-      <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+      <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
     </div>
     ${contactBlock}
   </div>
@@ -328,7 +337,7 @@ export function buildAnniversarySignatureHtml(
     renewal: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -343,7 +352,7 @@ export function buildAnniversarySignatureHtml(
       <td style="width: 1px; background: #e7dec2;" width="1"></td>
       <td style="padding-left: 12px;">
         <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
       </td>
     </tr>
   </table>
@@ -361,7 +370,7 @@ export function buildAnniversarySignatureHtml(
       <td style="width: 1px; background: #e7dec2;" width="1"></td>
       <td style="padding-left: 12px;">
         <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
       </td>
     </tr>
   </table>
@@ -375,7 +384,7 @@ export function buildAnniversarySignatureHtml(
     minimal: renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -386,7 +395,7 @@ export function buildAnniversarySignatureHtml(
     "minimal-clean": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -397,7 +406,7 @@ export function buildAnniversarySignatureHtml(
     "minimal-confidential": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -408,7 +417,7 @@ export function buildAnniversarySignatureHtml(
     "diagnostic-logo-only": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
     ${compactNarrative}
@@ -417,7 +426,7 @@ export function buildAnniversarySignatureHtml(
     "diagnostic-contact-text": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactTextBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>
@@ -427,7 +436,7 @@ export function buildAnniversarySignatureHtml(
     "diagnostic-social-text": renderAnniversaryLayout(`<div style="color: #d4af37;">&mdash;&mdash;</div>
   <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563; font-style: italic;">Best Regards,</p>
   <p style="margin: 0; line-height: 1; font-size: 20px; font-weight: 700; color: #0f172a;">${fullName}</p>
-  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${input.companyRole}</p>
+  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0f5c4d;">${companyRole}</p>
   <div style="margin-bottom: 10px;">${contactTextBlock}</div>
   <div style="padding: 8px 0 14px 0; border-top: 2px solid #e7dec2; border-bottom: 2px solid #e7dec2;">
     <div style="margin-bottom: 8px;">${anniversaryLogo}</div>

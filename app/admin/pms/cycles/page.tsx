@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { ReviewCyclesPage } from "./view"
+export { default } from "./page-client"
 
-export default function ReviewCyclesPageRoute() {
-  return <ReviewCyclesPage />
-}
+export const metadata: Metadata = { title: "Admin Review Cycles" }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,8 +9,10 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { Bot, Database, Download, Globe, MessageSquare, RefreshCw, Users } from "lucide-react"
+import { Bot, Database, Download, Globe, MessageSquare, Users } from "lucide-react"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { apiFetch } from "@/lib/api-client"
 type AcobotSource = "erp" | "website"
 
 type AcobotLogRow = {
@@ -59,7 +61,7 @@ function toCsv(rows: AcobotLogRow[]) {
 }
 
 async function fetchAcobotLogs(source: AcobotSource): Promise<AcobotLogRow[]> {
-  const response = await fetch(`/api/admin/dev/acobot?source=${source}`, {
+  const response = await apiFetch(`/api/admin/dev/acobot?source=${source}`, {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -72,7 +74,6 @@ async function fetchAcobotLogs(source: AcobotSource): Promise<AcobotLogRow[]> {
 }
 
 export function DevAcobotLogsContent() {
-  const queryClient = useQueryClient()
   const [tab, setTab] = useState<AcobotSource>("erp")
   const isWebsite = tab === "website"
 
@@ -81,7 +82,7 @@ export function DevAcobotLogsContent() {
     isLoading,
     error,
     refetch,
-  } = useQuery({ queryKey: ["acobot-logs", tab], queryFn: () => fetchAcobotLogs(tab) })
+  } = useQuery({ queryKey: QUERY_KEYS.acobotLogsKey(tab), queryFn: () => fetchAcobotLogs(tab) })
 
   const departmentOptions = useMemo(
     () =>
@@ -231,15 +232,6 @@ export function DevAcobotLogsContent() {
 
   const headerActions = (
     <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => queryClient.invalidateQueries({ queryKey: ["acobot-logs", tab] })}
-        disabled={isLoading}
-      >
-        <RefreshCw className="mr-2 h-4 w-4" />
-        Refresh
-      </Button>
       <Button size="sm" onClick={exportCsv} disabled={rows.length === 0}>
         <Download className="mr-2 h-4 w-4" />
         Export
@@ -286,9 +278,8 @@ export function DevAcobotLogsContent() {
 
   return (
     <DataTablePage
-      title="ACOBot Conversations"
+      title="ACOBot"
       description="Every question staff and website visitors asked ACOBot, its answer, and who asked it."
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(t) => setTab(t as AcobotSource)}
@@ -359,7 +350,7 @@ export function DevAcobotLogsContent() {
           subtitle: (row) => `${isWebsite ? "Visitor" : row.full_name || "Unknown"} · ${formatWATDate(row.created_at)}`,
           trailing: (row) =>
             row.had_context ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Live data
               </Badge>
             ) : null,

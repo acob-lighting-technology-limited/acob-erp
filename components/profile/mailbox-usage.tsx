@@ -10,6 +10,7 @@ import { MailboxUsageBar } from "@/components/mailbox/mailbox-usage-bar"
 import { EmailSetupDialog } from "@/components/profile/email-setup-dialog"
 import { apiFetch } from "@/lib/api-client"
 import { MAILBOX_ALERT_PERCENT, formatBytes, formatQuota } from "@/lib/cpanel/quota"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface MailboxUsage {
   email: string
@@ -28,7 +29,7 @@ async function fetchMailboxUsage(): Promise<MailboxUsage | null> {
 /** Both pieces read the same cached query, so the mailbox is fetched once. */
 function useMailboxUsage() {
   return useQuery({
-    queryKey: ["profile-mailbox-usage"],
+    queryKey: QUERY_KEYS.profileMailboxUsage(),
     queryFn: fetchMailboxUsage,
     staleTime: 5 * 60 * 1000,
     retry: false,

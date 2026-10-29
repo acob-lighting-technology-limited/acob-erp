@@ -4,7 +4,10 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminFeedbackContent } from "@/app/admin/feedback/admin-feedback-content"
+import type { Metadata } from "next"
 import type { FeedbackRecord } from "@/components/feedback/types"
+
+export const metadata: Metadata = { title: "Dept Feedback" }
 
 interface Props {
   params: Promise<{ dept_id: string }>

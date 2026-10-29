@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import {
   FileText,
   Star,
@@ -13,19 +12,11 @@ import {
   BarChart2,
   MessageSquare,
   User,
-  CalendarDays,
   CheckCircle2,
 } from "lucide-react"
 import type { Review } from "./page"
 import { toast } from "sonner"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -34,6 +25,8 @@ import { formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
+import { AcknowledgePerformanceReviewDialog } from "./_components/acknowledge-performance-review-dialog"
+import { ReviewDetailsDialog } from "./_components/review-details-dialog"
 
 interface ReviewsContentProps {
   initialReviews: Review[]
@@ -226,19 +219,19 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
         <h4 className="text-muted-foreground text-sm font-bold tracking-widest uppercase">Detailed Scores</h4>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">Attendance</p>
+            <p className="text-muted-foreground text-xs">Attendance</p>
             <p className="font-bold">{formatMetric(r.attendance_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">Behaviour</p>
+            <p className="text-muted-foreground text-xs">Behaviour</p>
             <p className="font-bold">{formatMetric(r.behaviour_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">KPI Achievement</p>
+            <p className="text-muted-foreground text-xs">KPI Achievement</p>
             <p className="font-bold">{formatMetric(r.kpi_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">CBT Score</p>
+            <p className="text-muted-foreground text-xs">CBT Score</p>
             <p className="font-bold">{formatMetric(r.cbt_score)}/100</p>
           </div>
         </div>
@@ -353,7 +346,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
           trailing: (r) => (
             <Badge
               variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
-              className="text-[10px] capitalize"
+              className="text-xs capitalize"
             >
               {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
             </Badge>
@@ -373,7 +366,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             badges: (r) => (
               <Badge
                 variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
               </Badge>
@@ -430,9 +423,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             </div>
             <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">Final Score</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                {formatMetric(r.final_score)}%
-              </span>
+              <span className="text-success font-mono font-bold">{formatMetric(r.final_score)}%</span>
             </div>
           </div>
         )}
@@ -449,43 +440,21 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
         urlSync
       />
 
-      <Dialog open={Boolean(selectedReview)} onOpenChange={(open) => !open && setSelectedReview(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Acknowledge Performance Review</DialogTitle>
-            <DialogDescription>Confirm that you have read and understood this evaluation.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Any comments regarding this review?</p>
-              <Textarea
-                value={employeeComments}
-                onChange={(e) => setEmployeeComments(e.target.value)}
-                placeholder="Enter your feedback or comments here..."
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedReview(null)}>
-              Cancel
-            </Button>
-            <Button onClick={acknowledgeReview} disabled={isSubmitting}>
-              {isSubmitting ? "Processing..." : "I Acknowledge this Review"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AcknowledgePerformanceReviewDialog
+        selectedReview={selectedReview}
+        setSelectedReview={setSelectedReview}
+        employeeComments={employeeComments}
+        setEmployeeComments={setEmployeeComments}
+        acknowledgeReview={acknowledgeReview}
+        isSubmitting={isSubmitting}
+      />
 
-      <Dialog open={Boolean(detailsReview)} onOpenChange={(open) => !open && setDetailsReview(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Review Details</DialogTitle>
-            <DialogDescription>{detailsReview ? getQuarterLabel(detailsReview) : "Review details"}</DialogDescription>
-          </DialogHeader>
-          {detailsReview ? renderReviewDetails(detailsReview) : null}
-        </DialogContent>
-      </Dialog>
+      <ReviewDetailsDialog
+        detailsReview={detailsReview}
+        setDetailsReview={setDetailsReview}
+        getQuarterLabel={getQuarterLabel}
+        renderReviewDetails={renderReviewDetails}
+      />
     </DataTablePage>
   )
 }

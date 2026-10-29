@@ -11,11 +11,12 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
-import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-dialog"
+import { AdminDocViewSheet } from "@/components/documentation/admin-doc-view-sheet"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
 import { formatDate } from "@/lib/format"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
 export type Documentation = AdminDocumentation
@@ -38,10 +39,7 @@ interface AdminDocumentationContentProps {
   backLinkLabel?: string
 }
 
-const getStatusColor = (isDraft: boolean) =>
-  isDraft
-    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+const getStatusColor = (isDraft: boolean) => (isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success")
 
 export function AdminDocumentationContent({
   initialDocumentation,
@@ -52,6 +50,7 @@ export function AdminDocumentationContent({
   backLinkHref = "/admin",
   backLinkLabel = "Back to Admin",
 }: AdminDocumentationContentProps) {
+  const shell = useShellBase()
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
@@ -208,17 +207,16 @@ export function AdminDocumentationContent({
         lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
         accessMode={departmentDocs.accessMode ?? "admin"}
         lockedDepartment={departmentDocs.lockedDepartment}
-        backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+        backLink={{ href: shell.backHref("/admin/documentation"), label: "Back to Documentation" }}
       />
     )
   }
 
   return (
     <DataTablePage
-      title="Employee Documentation"
+      title="Documentation"
       description="Manage and view staff personal work docs and departmental files."
       icon={FileText}
-      backLink={{ href: backLinkHref, label: backLinkLabel }}
       tabs={hideTabList ? undefined : TABS}
       activeTab={activeTab}
       onTabChange={handleTabChange}
@@ -305,7 +303,7 @@ export function AdminDocumentationContent({
               subtitle: (doc) =>
                 `${doc.user ? `${doc.user.first_name} ${doc.user.last_name}` : "Unknown"} · ${doc.category || "General"} · ${formatDate(doc.updated_at)}`,
               trailing: (doc) => (
-                <Badge className={`text-[10px] ${getStatusColor(doc.is_draft)}`}>
+                <Badge className={`text-xs ${getStatusColor(doc.is_draft)}`}>
                   {doc.is_draft ? "Draft" : "Published"}
                 </Badge>
               ),
@@ -363,7 +361,7 @@ export function AdminDocumentationContent({
             urlSync
           />
 
-          <AdminDocViewDialog
+          <AdminDocViewSheet
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
             doc={selectedDoc}
@@ -380,7 +378,7 @@ export function AdminDocumentationContent({
               lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
               accessMode={departmentDocs.accessMode ?? "admin"}
               lockedDepartment={departmentDocs.lockedDepartment}
-              backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+              backLink={{ href: shell.backHref("/admin/documentation"), label: "Back to Documentation" }}
             />
           ) : (
             <Card className="border-2">

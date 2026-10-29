@@ -8,6 +8,10 @@ import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { logger } from "@/lib/logger"
 import type { Database, UserRole } from "@/types/database"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Employees" }
+
 const log = logger("admin-employees")
 
 async function getAdminEmployeeData() {

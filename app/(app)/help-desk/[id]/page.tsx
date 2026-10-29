@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import type { Metadata } from "next"
 import { TicketDetailContent } from "./ticket-detail-content"
+
+export const metadata: Metadata = { title: "Help Desk details" }
 
 export default async function HelpDeskTicketPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params

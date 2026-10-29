@@ -27,9 +27,9 @@ export function SendResultPanel({ results }: SendResultPanelProps) {
         <div className="max-h-[300px] space-y-1 overflow-y-auto">
           {results.map((r, i) => (
             <div
-              key={i}
+              key={`row-${i}`}
               className={`flex items-center justify-between rounded px-2 py-1.5 text-sm ${
-                r.success ? "bg-green-50 dark:bg-green-950/20" : "bg-red-50 dark:bg-red-950/20"
+                r.success ? "bg-success/15" : "bg-danger/15"
               }`}
             >
               <span className="truncate">{r.to}</span>

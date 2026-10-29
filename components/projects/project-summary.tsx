@@ -26,24 +26,24 @@ export function formatCapacity(watts: number | null | undefined) {
 /** One colour per progress status, shared by badges, dots and bars. */
 export const HEALTH_TONE: Record<ProjectHealthStatus, { badge: string; dot: string; text: string }> = {
   on_track: {
-    badge: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    badge: "border-success/20 bg-success/10 text-success",
     dot: "bg-emerald-500",
-    text: "text-emerald-700 dark:text-emerald-400",
+    text: "text-success",
   },
   at_risk: {
-    badge: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    badge: "border-warning/20 bg-warning/10 text-warning",
     dot: "bg-amber-500",
-    text: "text-amber-700 dark:text-amber-400",
+    text: "text-warning",
   },
   behind_schedule: {
-    badge: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400",
+    badge: "border-danger/20 bg-danger/10 text-danger",
     dot: "bg-red-500",
-    text: "text-red-700 dark:text-red-400",
+    text: "text-danger",
   },
   completed: {
-    badge: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    badge: "border-info/20 bg-info/10 text-info",
     dot: "bg-blue-500",
-    text: "text-blue-700 dark:text-blue-400",
+    text: "text-info",
   },
 }
 
@@ -54,13 +54,11 @@ export function HealthBadge({ status }: { status: ProjectHealthStatus }) {
 export function PortfolioStatusBadge({ status }: { status: string }) {
   switch (status) {
     case "active":
-      return (
-        <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Active</Badge>
-      )
+      return <Badge className="text-success border-success/20 bg-success/10">Active</Badge>
     case "on_hold":
-      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">On hold</Badge>
+      return <Badge className="text-warning border-warning/20 bg-warning/10">On hold</Badge>
     case "closed":
-      return <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-400">Closed</Badge>
+      return <Badge className="text-muted-foreground border-slate-500/20 bg-slate-500/10">Closed</Badge>
     default:
       return (
         <Badge variant="outline" className="capitalize">
@@ -71,8 +69,8 @@ export function PortfolioStatusBadge({ status }: { status: string }) {
 }
 
 const PRIORITY_BADGE: Record<ProjectPriority, string> = {
-  critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
-  high: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  critical: "border-danger/30 bg-danger/10 text-danger",
+  high: "border-warning/30 bg-warning/10 text-warning",
   medium: "border-border text-muted-foreground",
   low: "border-border text-muted-foreground/80",
 }
@@ -122,7 +120,7 @@ export function LabelledBar({
         <span className="text-foreground font-semibold tabular-nums">{value === null ? "—" : `${value}%`}</span>
       </div>
       <Progress value={value ?? 0} indicatorClassName={indicatorClassName} />
-      {note && <p className="text-muted-foreground truncate text-[11px]">{note}</p>}
+      {note && <p className="text-muted-foreground truncate text-xs">{note}</p>}
     </div>
   )
 }
@@ -150,7 +148,7 @@ export function WorkDoneCell({ health }: { health: Pick<ProjectHealth, "doneCoun
   return (
     <div className="w-36 space-y-1">
       <Progress value={health.workDonePct ?? 0} />
-      <p className="text-muted-foreground text-[11px]">
+      <p className="text-muted-foreground text-xs">
         <WorkDoneText health={health} />
       </p>
     </div>
@@ -245,9 +243,7 @@ export function ProjectSummary({
           <div className="flex flex-wrap items-center gap-2">
             <HealthBadge status={health.status} />
             {health.overdueCount > 0 && (
-              <span className="text-xs font-medium text-red-700 dark:text-red-400">
-                {plural(health.overdueCount, "task")} past due
-              </span>
+              <span className="text-danger text-xs font-medium">{plural(health.overdueCount, "task")} past due</span>
             )}
             {health.averageRating !== null && (
               <Tooltip>
@@ -269,7 +265,7 @@ export function ProjectSummary({
       <dl className="grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-3">
         {facts.map((fact) => (
           <div key={fact.label} className="min-w-0 space-y-0.5">
-            <dt className="text-muted-foreground text-[11px] font-medium">{fact.label}</dt>
+            <dt className="text-muted-foreground text-xs font-medium">{fact.label}</dt>
             <dd className="truncate text-sm font-medium">{fact.value}</dd>
           </div>
         ))}

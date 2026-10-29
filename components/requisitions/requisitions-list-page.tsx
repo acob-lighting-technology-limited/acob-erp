@@ -45,7 +45,9 @@ import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
 type View = "mine" | "action" | "payment" | "all" | "department"
@@ -133,7 +135,7 @@ export function RequisitionsListPage({
     try {
       const params = new URLSearchParams({ view })
       if (view === "department" && deptName) params.set("department", deptName)
-      const res = await fetch(`/api/requisitions?${params}`)
+      const res = await apiFetch(`/api/requisitions?${params}`)
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || "Could not load requisitions")
       setRows(json.data || [])
@@ -191,7 +193,7 @@ export function RequisitionsListPage({
       render: (r) => (
         <div className="flex flex-col">
           <span className="text-xs font-medium">{r.requester?.full_name || "—"}</span>
-          <span className="text-muted-foreground text-[11px]">{r.department}</span>
+          <span className="text-muted-foreground text-xs">{r.department}</span>
         </div>
       ),
       initialWidth: 170,
@@ -219,11 +221,11 @@ export function RequisitionsListPage({
       accessor: (r) => r.status,
       render: (r) => (
         <div className="flex flex-col gap-1">
-          <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-[11px]">
+          <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-xs">
             {STATUS_LABELS[r.status]}
           </Badge>
           {r.status === "pending" || r.status === "partly_paid" ? (
-            <span className="text-muted-foreground text-[11px]">{progressLabel(r)}</span>
+            <span className="text-muted-foreground text-xs">{progressLabel(r)}</span>
           ) : null}
         </div>
       ),
@@ -271,7 +273,7 @@ export function RequisitionsListPage({
   // rows for one view, so the count is the length of that view's list.
   const countQueries = useQueries({
     queries: views.map((v) => ({
-      queryKey: ["requisition-tab-count", v, v === "department" ? deptName : null],
+      queryKey: QUERY_KEYS.requisitionTabCount(v, v === "department" ? deptName : null),
       queryFn: async () => {
         const params = new URLSearchParams({ view: v })
         if (v === "department" && deptName) params.set("department", deptName)
@@ -295,13 +297,6 @@ export function RequisitionsListPage({
       title={title}
       description={description}
       icon={FileCheck2}
-      backLink={
-        surface === "admin"
-          ? { href: "/admin/accounts", label: "Back to Accounts" }
-          : surface === "dept"
-            ? undefined
-            : { href: "/profile", label: "Back to Home" }
-      }
       tabs={tabs}
       activeTab={tab}
       onTabChange={setTab}

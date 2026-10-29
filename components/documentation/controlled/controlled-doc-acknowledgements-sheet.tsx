@@ -1,0 +1,134 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { CheckCircle2, CircleAlert, Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { DetailSheet } from "@/components/ui/detail-sheet"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { apiFetch } from "@/lib/api-client"
+import { formatDocDate, type AcknowledgementStaffRow, type ControlledDocRow } from "@/lib/documentation/controlled"
+
+type Filter = "pending" | "acknowledged" | "all"
+
+interface ControlledDocAcknowledgementsSheetProps {
+  doc: ControlledDocRow | null
+  onOpenChange: (open: boolean) => void
+}
+
+export function ControlledDocAcknowledgementsSheet({ doc, onOpenChange }: ControlledDocAcknowledgementsSheetProps) {
+  const open = doc !== null
+  const [filter, setFilter] = useState<Filter>("pending")
+  const [search, setSearch] = useState("")
+
+  const { data, isLoading, error } = useQuery<{ data: AcknowledgementStaffRow[] }>({
+    queryKey: QUERY_KEYS.controlledDocAcknowledgements(doc?.id, doc?.current_version?.id),
+    queryFn: async () => {
+      const res = await apiFetch(`/api/documentation/controlled/${doc?.id}/acknowledgements`, { cache: "no-store" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to load acknowledgements")
+      return payload
+    },
+    enabled: open,
+  })
+
+  const rows = useMemo(() => data?.data ?? [], [data])
+  const acknowledgedCount = rows.filter((row) => row.acknowledged_at).length
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (filter === "pending" && row.acknowledged_at) return false
+      if (filter === "acknowledged" && !row.acknowledged_at) return false
+      if (!query) return true
+      return `${row.name} ${row.department ?? ""}`.toLowerCase().includes(query)
+    })
+  }, [rows, filter, search])
+
+  function close() {
+    setFilter("pending")
+    setSearch("")
+    onOpenChange(false)
+  }
+
+  return (
+    <DetailSheet
+      open={open}
+      onOpenChange={(next) => !next && close()}
+      title="Acknowledgements"
+      description={`${doc?.reference_code} · ${doc?.title} · version ${doc?.current_version?.version_number}`}
+      footer={
+        <Button variant="outline" className="ml-auto" onClick={close}>
+          Close
+        </Button>
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-2">
+          {["a", "b", "c", "d", "e", "f"].map((id) => (
+            <Skeleton key={id} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : error ? (
+        <p className="text-destructive text-sm">{error instanceof Error ? error.message : "Failed to load"}</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm">
+            <span className="font-semibold">{acknowledgedCount}</span> of{" "}
+            <span className="font-semibold">{rows.length}</span> active staff have acknowledged this version.
+          </p>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)}>
+              <TabsList>
+                <TabsTrigger value="pending">Pending ({rows.length - acknowledgedCount})</TabsTrigger>
+                <TabsTrigger value="acknowledged">Done ({acknowledgedCount})</TabsTrigger>
+                <TabsTrigger value="all">All</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search staff..."
+                className="pl-8"
+              />
+            </div>
+          </div>
+
+          <ul className="divide-y rounded-lg border">
+            {visible.length === 0 ? (
+              <li className="text-muted-foreground px-3 py-6 text-center text-sm">
+                {filter === "pending" && !search ? "Everyone has acknowledged this version." : "No staff match."}
+              </li>
+            ) : (
+              visible.map((row) => (
+                <li key={row.user_id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{row.name}</p>
+                    <p className="text-muted-foreground truncate text-xs">{row.department || "No department"}</p>
+                  </div>
+                  {row.acknowledged_at ? (
+                    <span className="text-success flex shrink-0 items-center gap-1 text-xs">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {formatDocDate(row.acknowledged_at)}
+                    </span>
+                  ) : (
+                    <span className="text-warning flex shrink-0 items-center gap-1 text-xs">
+                      <CircleAlert className="h-3.5 w-3.5" />
+                      Pending
+                    </span>
+                  )}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </DetailSheet>
+  )
+}

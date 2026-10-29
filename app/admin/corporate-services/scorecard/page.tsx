@@ -5,7 +5,7 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { UnifiedScorecardHub } from "@/app/admin/corporate-scorecard/_components/unified-scorecard-hub"
 
 export const metadata: Metadata = {
-  title: "Corporate Scorecard | Corporate Services | Matrix",
+  title: "Corporate Scorecard | Corporate Services",
   description: "The 2026 strategic plan's corporate KPIs, department execution, and executive summary.",
 }
 

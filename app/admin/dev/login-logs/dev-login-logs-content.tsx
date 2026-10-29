@@ -27,11 +27,12 @@ import {
 } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Input } from "@/components/ui/input"
 import { apiJson } from "@/lib/api-client"
 import { formatNumber } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 type DevLoginLogRow = {
   id: string
   user_id: string | null
@@ -75,7 +76,7 @@ type DevLoginLogsPayload = {
 }
 
 async function fetchDevLoginLogs(days: string): Promise<DevLoginLogsPayload> {
-  const response = await fetch(`/api/admin/dev/login-logs?days=${days}`, {
+  const response = await apiFetch(`/api/admin/dev/login-logs?days=${days}`, {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -92,7 +93,7 @@ async function fetchDevLoginLogs(days: string): Promise<DevLoginLogsPayload> {
 
 async function fetchDashboardAuditLogs(department: string, userId: string | null): Promise<any[]> {
   const url = `/api/admin/dev/login-logs?type=dashboard-audit&department=${department}&user_id=${userId || "all"}`
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -197,19 +198,19 @@ function UserStatsView({
     <div className="space-y-6 py-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Total Logins</p>
+          <p className="text-muted-foreground text-xs font-medium">Total Logins</p>
           <p className="mt-1 text-xl font-bold">{userStats.total}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Active Days</p>
+          <p className="text-muted-foreground text-xs font-medium">Active Days</p>
           <p className="mt-1 text-xl font-bold">{userStats.uniqueDays}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Primary Method</p>
+          <p className="text-muted-foreground text-xs font-medium">Primary Method</p>
           <p className="mt-1 text-sm font-semibold capitalize">{userStats.preferredMethod.replace(/_/g, " ")}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">First Login</p>
+          <p className="text-muted-foreground text-xs font-medium">First Login</p>
           <p className="text-muted-foreground mt-1 truncate text-xs font-semibold">
             {userStats.firstLogin
               ? formatWATDate(userStats.firstLogin, { day: "2-digit", month: "short", year: "2-digit" })
@@ -224,8 +225,8 @@ function UserStatsView({
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={userStats.hourlyChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-[10px]" />
-                <YAxis tickLine={false} axisLine={false} className="text-[10px]" />
+                <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-xs" />
+                <YAxis tickLine={false} axisLine={false} className="text-xs" />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
@@ -282,16 +283,16 @@ function UserStatsView({
                   <div key={log.id} className="flex items-start justify-between border-b pb-2 last:border-0 last:pb-0">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="px-1.5 py-0 text-[10px] capitalize">
+                        <Badge variant="outline" className="px-1.5 py-0 text-xs capitalize">
                           {log.action}
                         </Badge>
                         <span className="text-foreground font-medium capitalize">
                           {log.entity_type.replace(/_/g, " ")}
                         </span>
                       </div>
-                      <p className="text-muted-foreground font-mono text-[10px]">{route}</p>
+                      <p className="text-muted-foreground font-mono text-xs">{route}</p>
                     </div>
-                    <span className="text-muted-foreground text-[10px]">{formatWATRelative(log.created_at)}</span>
+                    <span className="text-muted-foreground text-xs">{formatWATRelative(log.created_at)}</span>
                   </div>
                 )
               })}
@@ -352,7 +353,7 @@ export function DevLoginLogsContent() {
   }, [selectedUser, rows])
 
   const { data: auditLogsData, isLoading: isLoadingAudit } = useQuery({
-    queryKey: ["dev-login-logs-audit", selectedDept, selectedUserId],
+    queryKey: QUERY_KEYS.devLoginLogsAudit(selectedDept, selectedUserId),
     queryFn: () => fetchDashboardAuditLogs(selectedDept, selectedUserId),
     enabled: rows.length > 0,
   })
@@ -398,7 +399,7 @@ export function DevLoginLogsContent() {
       .map((m) => {
         const [year, monthStr] = m.split("-")
         const date = new Date(Number(year), Number(monthStr) - 1, 1)
-        const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+        const label = date.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", month: "long", year: "numeric" })
         return { value: m, label }
       })
   }, [rows])
@@ -729,9 +730,8 @@ export function DevLoginLogsContent() {
 
   return (
     <DataTablePage
-      title="Developer Login Logs"
+      title="Login Logs"
       description="Monitor successful sign-ins with network and actor context."
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -1011,12 +1011,12 @@ export function DevLoginLogsContent() {
                       >
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-foreground flex max-w-[80%] items-center gap-1.5 truncate font-semibold">
-                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] capitalize">
+                            <Badge variant="outline" className="px-1.5 py-0 text-xs capitalize">
                               {item.action}
                             </Badge>
                             <span className="text-muted-foreground truncate font-mono">{item.route}</span>
                           </span>
-                          <span className="text-muted-foreground font-mono text-[10px]">{item.count} ops</span>
+                          <span className="text-muted-foreground font-mono text-xs">{item.count} ops</span>
                         </div>
                         <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
                           <div
@@ -1207,7 +1207,7 @@ export function DevLoginLogsContent() {
             subtitle: (row) =>
               `${row.department || "General"} · ${row.auth_method || "auth"} · ${formatWATDate(row.login_at)}`,
             trailing: (row) => (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 {row.role}
               </Badge>
             ),
@@ -1245,20 +1245,17 @@ export function DevLoginLogsContent() {
           urlSync
         />
 
-        <Dialog open={selectedRowForStats !== null} onOpenChange={(open) => !open && setSelectedRowForStats(null)}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Access Profile: {selectedRowForStats?.full_name || "Unknown User"}</DialogTitle>
-              <DialogDescription>
-                Detailed sign-in history and network access analytics for {selectedRowForStats?.email}.
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedRowForStats && (
-              <UserStatsView email={selectedRowForStats.email} userId={selectedRowForStats.user_id} allLogs={rows} />
-            )}
-          </DialogContent>
-        </Dialog>
+        <DetailSheet
+          wide
+          open={selectedRowForStats !== null}
+          onOpenChange={(open) => !open && setSelectedRowForStats(null)}
+          title={`Access profile: ${selectedRowForStats?.full_name || "Unknown User"}`}
+          description={`Sign-in history and network access for ${selectedRowForStats?.email ?? ""}`}
+        >
+          {selectedRowForStats && (
+            <UserStatsView email={selectedRowForStats.email} userId={selectedRowForStats.user_id} allLogs={rows} />
+          )}
+        </DetailSheet>
       </div>
     </DataTablePage>
   )

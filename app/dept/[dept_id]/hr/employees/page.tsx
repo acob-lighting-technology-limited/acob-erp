@@ -4,7 +4,10 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
+import type { Metadata } from "next"
 import type { UserRole } from "@/types/database"
+
+export const metadata: Metadata = { title: "Dept Employees" }
 
 interface Props {
   params: Promise<{ dept_id: string }>

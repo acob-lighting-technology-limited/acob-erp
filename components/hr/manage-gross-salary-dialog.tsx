@@ -158,7 +158,7 @@ export function ManageGrossSalaryDialog() {
                 placeholder="Search staff..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-7 pl-7 text-[11px]"
+                className="h-7 pl-7 text-xs"
               />
             </div>
           </div>
@@ -166,7 +166,7 @@ export function ManageGrossSalaryDialog() {
           <div className="border-border/60 max-h-[360px] overflow-x-auto overflow-y-auto rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50 text-[11px]">
+                <TableRow className="bg-muted/50 text-xs">
                   <TableHead>Staff Member</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead className="font-mono">Gross Salary</TableHead>
@@ -192,7 +192,7 @@ export function ManageGrossSalaryDialog() {
                       <TableRow key={emp.user_id} className={isDirty ? "bg-emerald-500/5" : ""}>
                         <TableCell className="py-2">
                           <div className="text-foreground font-medium">{emp.full_name}</div>
-                          <div className="text-muted-foreground font-mono text-[10px]">
+                          <div className="text-muted-foreground font-mono text-xs">
                             {emp.employee_number}
                             {emp.is_department_lead ? " • Dept Lead" : ""}
                           </div>
@@ -208,7 +208,7 @@ export function ManageGrossSalaryDialog() {
                               setEdits((prev) => ({ ...prev, [emp.user_id]: formatWithCommas(e.target.value) }))
                             }
                             className={`h-8 w-32 font-mono text-xs font-bold ${
-                              isDirty ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400" : ""
+                              isDirty ? "text-success border-success/50" : ""
                             }`}
                           />
                         </TableCell>

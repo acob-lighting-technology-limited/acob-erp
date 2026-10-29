@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/server"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { formatScore } from "@/lib/format"
 
+export const metadata: Metadata = { title: "PMS attendance" }
+import type { Metadata } from "next"
+
 function formatClockTime(value: string | null | undefined): string {
   if (!value || value === "-") return "-"
   const parts = value.split(":")
