@@ -142,6 +142,10 @@ export const RELEASES: Release[] = [
         ],
       },
       {
+        area: "Staff",
+        items: ["Employee profiles now open as a focused view, with editing and signature work in separate workspaces"],
+      },
+      {
         area: "Tools",
         items: [
           "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",

@@ -24,6 +24,7 @@ import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-conten
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "./types"
 import { EmployeeEditForm, type EditForm } from "./employee-edit-form"
 import type { EmployeeMailboxActions } from "@/lib/employees/mailbox-state"
+import { EmployeeProfileSheetView } from "./employee-profile-sheet-view"
 
 export interface EmployeeProfileSheetProps {
   isOpen: boolean
@@ -110,7 +111,7 @@ function StaffTypeBadge({
   )
 }
 
-export function EmployeeProfileSheet({
+function LegacyEmployeeProfileSheet({
   isOpen,
   onOpenChange,
   employee,
@@ -624,4 +625,8 @@ export function EmployeeProfileSheet({
       </SheetContent>
     </Sheet>
   )
+}
+
+export function EmployeeProfileSheet(props: EmployeeProfileSheetProps) {
+  return <EmployeeProfileSheetView {...props} />
 }
