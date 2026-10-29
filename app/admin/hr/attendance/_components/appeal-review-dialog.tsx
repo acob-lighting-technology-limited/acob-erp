@@ -1,16 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Label } from "@/components/ui/label"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { AppealAuditTrail } from "@/components/hr/appeal-audit-trail"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { apiFetch } from "@/lib/api-client"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 
 export interface AppealRow {
   id: string
@@ -42,7 +44,28 @@ export interface AppealRow {
   reviewed_by?: string | null
   reviewer_name?: string | null
   reviewed_at?: string | null
+  batch_id?: string | null
+  overridden_by_name?: string | null
+  overridden_at?: string | null
+  override_reason?: string | null
+  overridden_stage?: string | null
+  /** Why the viewer may not approve or reject this pending appeal; null when they may. */
+  review_block?: string | null
+  /** Whether the viewer may override this pending appeal. */
+  can_override?: boolean
+  /** Every day of a range staged as one batch, oldest first. Absent for a single day. */
+  days?: AppealRow[]
+  /** Last day of a batched range. */
+  appeal_date_end?: string
   created_at: string
+}
+
+/** "29 Oct 2026", or "26 Oct – 29 Oct 2026 · 4 days" for a batched range. */
+export function appealDateLabel(appeal: AppealRow): string {
+  const format = (date: string) => formatWATDate(date, { day: "2-digit", month: "short", year: "numeric" })
+  if (!appeal.days || appeal.days.length < 2 || !appeal.appeal_date_end) return format(appeal.appeal_date)
+  const start = formatWATDate(appeal.appeal_date, { day: "2-digit", month: "short" })
+  return `${start} – ${format(appeal.appeal_date_end)} · ${appeal.days.length} days`
 }
 
 interface AppealReviewDialogProps {
@@ -54,8 +77,8 @@ interface AppealReviewDialogProps {
 
 export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealReviewDialogProps) {
   const [note, setNote] = useState("")
-  const [approvingLoad, setApprovingLoad] = useState(false)
-  const [rejectingLoad, setRejectingLoad] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | "override" | null>(null)
+  const [overrideOpen, setOverrideOpen] = useState(false)
 
   // Clear the note when a different appeal is shown — adjusted during render, not in an effect.
   const [notedAppeal, setNotedAppeal] = useState(appeal)
@@ -65,112 +88,116 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   }
 
   const currentNote = appeal ? note : ""
-  const isLoading = approvingLoad || rejectingLoad
+  const isLoading = loadingAction !== null
+  const pendingIds = appeal ? (appeal.days ?? [appeal]).filter((d) => d.status === "pending").map((d) => d.id) : []
 
-  async function handleAction(action: "approve" | "reject") {
+  async function decide(action: "approve" | "reject" | "override", noteValue: string) {
     if (!appeal) return
-    const noteValue = currentNote.trim()
-    if (action === "reject" && !noteValue) {
-      toast.error("A resolution note is required when rejecting an appeal")
-      return
-    }
-
-    const setter = action === "approve" ? setApprovingLoad : setRejectingLoad
-    setter(true)
+    setLoadingAction(action)
     try {
       const res = await apiFetch("/api/admin/hr/attendance/appeals", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: appeal.id,
-          action,
-          resolution_note: noteValue || null,
-        }),
+        body: JSON.stringify({ ids: pendingIds, action, resolution_note: noteValue || null }),
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok) throw new Error(payload?.error ?? `Failed to ${action} appeal`)
 
-      const successMsg =
+      toast.success(
         action === "reject"
           ? "Appeal rejected"
-          : payload?.isFinalApproval
-            ? "Appeal approved"
-            : "Appeal endorsed and advanced to next stage"
-      toast.success(successMsg)
+          : action === "override"
+            ? "Approved by override"
+            : payload?.isFinalApproval
+              ? "Appeal approved"
+              : "Endorsed and sent to an admin"
+      )
+      setOverrideOpen(false)
       onSuccess()
       onClose()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to ${action} appeal`)
     } finally {
-      setter(false)
+      setLoadingAction(null)
     }
   }
 
-  function handleOpenChange(isOpen: boolean) {
-    if (!isOpen) onClose()
+  function handleAction(action: "approve" | "reject") {
+    const noteValue = currentNote.trim()
+    if (action === "reject" && !noteValue) {
+      toast.error("A resolution note is required when rejecting an appeal")
+      return
+    }
+    void decide(action, noteValue)
   }
-
-  function handleNoteChange(value: string) {
-    setNote(value)
-  }
-
-  const displayNote = appeal ? note : ""
 
   const approveButtonText = () => {
-    if (approvingLoad) return "Processing…"
+    if (loadingAction === "approve") return "Processing…"
     if (appeal?.stage === "pending_lead") {
-      return appeal.initiated_by_role === "admin_manual" ? "Confirm Alteration" : "Endorse (Advance to HR)"
-    }
-    if (appeal?.stage === "pending_hr_lead") {
-      return "Final Approve (HR Lead)"
+      return appeal.initiated_by_role === "admin_manual" ? "Confirm Change" : "Endorse (Send to Admin)"
     }
     return "Approve"
   }
 
   const isPending = appeal?.status === "pending"
+  const canDecide = isPending && !appeal?.review_block
+  const dayCount = pendingIds.length
 
   return (
     <DetailSheet
       open={open}
-      onOpenChange={handleOpenChange}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
       title={isPending ? "Review Appeal" : "Appeal Details"}
-      description={appeal ? `${appeal.user_name} — ${appeal.appeal_date}` : "No appeal selected"}
+      description={appeal ? `${appeal.user_name} — ${appealDateLabel(appeal)}` : "No appeal selected"}
       badges={
         appeal && appeal.status !== "pending" ? (
           <Badge
             className={
-              appeal.status === "approved"
-                ? "bg-success/15 text-success"
-                : appeal.status === "rejected"
-                  ? "bg-danger/15 text-danger"
-                  : "bg-info/15 text-info"
+              appeal.overridden_at
+                ? "bg-warning/15 text-warning"
+                : appeal.status === "approved"
+                  ? "bg-success/15 text-success"
+                  : appeal.status === "rejected"
+                    ? "bg-danger/15 text-danger"
+                    : "bg-info/15 text-info"
             }
           >
-            {appeal.status.toUpperCase()}
+            {appeal.overridden_at ? "OVERRIDDEN" : appeal.status.toUpperCase()}
           </Badge>
         ) : null
       }
       footer={
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
           {isPending ? (
             <>
               <Button variant="outline" onClick={onClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => void handleAction("reject")}
-                disabled={isLoading || !appeal || !currentNote.trim()}
-              >
-                {rejectingLoad ? "Rejecting…" : "Reject"}
-              </Button>
-              <Button
-                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => void handleAction("approve")}
-                disabled={isLoading || !appeal}
-              >
-                {approveButtonText()}
-              </Button>
+              {appeal?.can_override && (
+                <Button variant="outline" onClick={() => setOverrideOpen(true)} disabled={isLoading}>
+                  Override
+                </Button>
+              )}
+              {canDecide && (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleAction("reject")}
+                    disabled={isLoading || !currentNote.trim()}
+                  >
+                    {loadingAction === "reject" ? "Rejecting…" : "Reject"}
+                  </Button>
+                  <Button
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={() => handleAction("approve")}
+                    disabled={isLoading}
+                  >
+                    {approveButtonText()}
+                  </Button>
+                </>
+              )}
             </>
           ) : (
             <Button variant="outline" onClick={onClose}>
@@ -192,38 +219,12 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Appeal Date</span>
-              <span className="font-medium">{appeal.appeal_date}</span>
+              <span className="text-muted-foreground">{appeal.days && appeal.days.length > 1 ? "Days" : "Day"}</span>
+              <span className="font-medium">{appealDateLabel(appeal)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Submitted</span>
               <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.created_at)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t pt-2">
-              <span className="text-muted-foreground">Origin</span>
-              <div className="text-right">
-                {appeal.initiated_by_role === "admin_manual" ? (
-                  <div>
-                    <Badge variant="outline" className="border-blue-200 text-blue-600">
-                      Admin Manual Alteration
-                    </Badge>
-                    <div className="text-muted-foreground mt-0.5 text-xs">By {appeal.created_by_name || "Admin"}</div>
-                  </div>
-                ) : appeal.initiated_by_role === "lead_on_behalf" ? (
-                  <div>
-                    <Badge variant="outline" className="border-purple-200 text-purple-600">
-                      Lead on Behalf
-                    </Badge>
-                    <div className="text-muted-foreground mt-0.5 text-xs">
-                      By {appeal.created_by_name || "Department Lead"}
-                    </div>
-                  </div>
-                ) : (
-                  <Badge variant="outline" className="text-success border-emerald-200">
-                    Employee Appeal
-                  </Badge>
-                )}
-              </div>
             </div>
           </div>
 
@@ -259,83 +260,18 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
             <p className="text-sm leading-relaxed">{appeal.appeal_reason || "No reason specified"}</p>
           </div>
 
-          {/* Lead Endorsement card */}
-          {appeal.lead_reviewed_at ? (
-            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-              <div className="text-foreground flex items-center justify-between font-medium">
-                <span>Lead Endorsement</span>
-                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.lead_reviewed_at)}</span>
-              </div>
-              <div className="text-muted-foreground">
-                Endorsed by{" "}
-                <span className="text-foreground font-medium">{appeal.lead_reviewer_name || "Department Lead"}</span>
-              </div>
-              {appeal.lead_resolution_note && (
-                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                  &ldquo;{appeal.lead_resolution_note}&rdquo;
-                </p>
-              )}
-            </div>
-          ) : appeal.stage === "pending_lead" ? (
-            <div className="text-warning border-warning/20 bg-warning/10 rounded-lg border p-2.5 text-xs">
-              Awaiting {appeal.department_lead_name || `${appeal.department} Department Lead`}
-            </div>
-          ) : null}
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Audit History</p>
+            <AppealAuditTrail appeal={appeal} />
+          </div>
 
-          {/* Admin Review card */}
-          {appeal.admin_reviewed_at ? (
-            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-              <div className="text-foreground flex items-center justify-between font-medium">
-                <span>Admin Review</span>
-                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.admin_reviewed_at)}</span>
-              </div>
-              <div className="text-muted-foreground">
-                Reviewed by{" "}
-                <span className="text-foreground font-medium">
-                  {appeal.admin_reviewer_name || appeal.reviewer_name || "Admin"}
-                </span>
-              </div>
-              {(appeal.admin_resolution_note || appeal.resolution_note) && (
-                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                  &ldquo;{appeal.admin_resolution_note || appeal.resolution_note}&rdquo;
-                </p>
-              )}
+          {isPending && appeal.review_block && (
+            <div className="text-muted-foreground bg-muted/40 rounded-lg border p-2.5 text-xs">
+              {appeal.review_block}
             </div>
-          ) : appeal.status === "approved" || appeal.status === "rejected" ? (
-            <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
-              <div className="text-foreground flex items-center justify-between font-medium">
-                <span>Admin Review</span>
-                {appeal.reviewed_at && (
-                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.reviewed_at)}</span>
-                )}
-              </div>
-              {appeal.reviewer_name && (
-                <div className="text-muted-foreground">
-                  Reviewed by <span className="text-foreground font-medium">{appeal.reviewer_name}</span>
-                </div>
-              )}
-              {appeal.resolution_note && (
-                <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
-                  &ldquo;{appeal.resolution_note}&rdquo;
-                </p>
-              )}
-            </div>
-          ) : appeal.stage === "pending_admin" ? (
-            <div className="text-info border-info/20 bg-info/10 rounded-lg border p-2.5 text-xs">
-              Awaiting Admin Review by{" "}
-              <span className="font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
-              {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-            </div>
-          ) : appeal.stage === "pending_lead" ? (
-            <div className="border-muted bg-muted/30 text-muted-foreground rounded-lg border p-2.5 text-xs">
-              Pending lead then{" "}
-              <span className="text-foreground font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
-              {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-            </div>
-          ) : null}
+          )}
 
-          {/* Resolution note input for pending review */}
-          {isPending && (
+          {canDecide && (
             <div className="space-y-2">
               <Label htmlFor="resolution-note">
                 Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
@@ -343,8 +279,8 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               <Textarea
                 id="resolution-note"
                 placeholder="Add a note explaining your decision…"
-                value={displayNote}
-                onChange={(e) => handleNoteChange(e.target.value)}
+                value={currentNote}
+                onChange={(e) => setNote(e.target.value)}
                 rows={3}
                 disabled={isLoading}
                 className="resize-none"
@@ -353,6 +289,20 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
           )}
         </div>
       )}
+
+      <PromptDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        title="Override this approval?"
+        description={`Only override if the person who should approve this (usually the Department Lead) is not available. This approves ${dayCount > 1 ? `all ${dayCount} days` : "it"} now, skips the remaining steps, and is recorded against your name. The employee, the skipped approver and the Admin & HR Lead are told.`}
+        label="Reason for overriding"
+        placeholder="e.g. Department Lead on leave, payroll closes today"
+        inputType="textarea"
+        required
+        confirmLabel="Override and approve"
+        confirmLoadingLabel="Overriding…"
+        onConfirm={(reason) => decide("override", reason.trim())}
+      />
     </DetailSheet>
   )
 }

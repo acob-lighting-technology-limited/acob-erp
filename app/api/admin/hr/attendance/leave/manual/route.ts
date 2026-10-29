@@ -9,7 +9,12 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
 import { formatLeaveReference, getHolidaySet, notifyUsers } from "@/lib/hr/leave-workflow"
 import { addIsoDays, countLeaveDays, nextWorkingDayAfter, trimRangeToWorkingDays } from "@/lib/hr/leave-days"
-import { leaveStageForAppealStage, notifyAppealReviewers } from "@/lib/hr/attendance-appeals"
+import {
+  departmentHasLead,
+  leaveStageForAppealStage,
+  notifyAppealReviewers,
+  stagingRoute,
+} from "@/lib/hr/attendance-appeals"
 
 const log = logger("admin-hr-attendance-leave-manual")
 export const dynamic = "force-dynamic"
@@ -132,13 +137,17 @@ export async function POST(request: NextRequest) {
         full_name: string | null
       }>()
 
-    const isTargetLead = Boolean(targetProfile?.is_department_lead)
-    const targetStage = isTargetLead ? "pending_hr_lead" : "pending_lead"
-    const approverLabel = isTargetLead ? "Admin & HR Lead" : "Department Lead"
+    const route = stagingRoute(
+      scope,
+      targetProfile ?? null,
+      await departmentHasLead(dataClient, targetProfile?.department ?? null)
+    )
+    const targetStage = route.stage
+    const approverLabel = route.awaiting
     const leaveTypeName = ltRow?.name || "Sick Leave"
 
-    // Two-stage rule: recording the grant here is the Admin & HR stage; it applies only
-    // once the Department Lead (or, for a lead, the Admin & HR Lead) confirms it. The
+    // Two-sides rule: recording the grant here is the admin side; it applies only once
+    // the lead side confirms it (see stagingRoute). The
     // pending leave_requests row holds the whole range (and reserves the balance); the
     // single appeal below carries it to that confirmation. admin_manual rows are skipped
     // by the stale-leave and SLA crons, so a back-dated grant is not auto-cancelled.
