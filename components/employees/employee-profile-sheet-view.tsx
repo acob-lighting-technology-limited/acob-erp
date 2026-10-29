@@ -9,6 +9,7 @@ import { DetailSheet } from "@/components/ui/detail-sheet"
 import { DetailList, SectionHeading } from "@/components/ui/detail-list"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { SignatureCreator } from "@/components/signature-creator"
 import { formatDDMMYYYY } from "@/lib/utils/date"
@@ -87,7 +88,12 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
         onOpenChange={(open) => !open && close()}
         title={name}
         leading={<StaffAvatar name={name} profileId={employee.id} size="md" className="border" />}
-        description={employee.designation || "Employee"}
+        description={
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span>{employee.designation || "Employee"}</span>
+            {employee.department && <span className="text-muted-foreground">· {employee.department}</span>}
+          </span>
+        }
         badges={<EmployeeStatusBadge status={employee.employment_status || "active"} />}
         footer={
           <>
@@ -112,39 +118,54 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
         }
       >
         {modalViewMode === "profile" ? (
-          <section className="space-y-3">
-            <SectionHeading title="Profile" />
-            <DetailList
-              items={[
-                { label: "Department", value: employee.department },
-                { label: "Designation", value: employee.designation },
-                { label: "Office", value: employee.office_location },
-                { label: "Role", value: employee.role },
-                {
-                  label: "Email",
-                  value: (
-                    <span className="inline-flex items-center gap-1.5">
-                      {employee.company_email || "—"}
-                      {employee.company_email && (
-                        <Button
-                          aria-label="Copy company email"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={copyEmail}
-                        >
-                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        </Button>
-                      )}
-                    </span>
-                  ),
-                  wide: true,
-                },
-                { label: "Phone", value: employee.phone_number },
-                { label: "Address", value: employee.residential_address, wide: true },
-              ]}
-            />
-          </section>
+          <>
+            <section className="space-y-3">
+              <SectionHeading title="Work" />
+              <DetailList
+                items={[
+                  { label: "Department", value: employee.department },
+                  { label: "Designation", value: employee.designation },
+                  { label: "Office", value: employee.office_location },
+                  { label: "Role", value: employee.role },
+                ]}
+              />
+            </section>
+            <section className="space-y-3">
+              <SectionHeading title="Contact" />
+              <DetailList
+                items={[
+                  {
+                    label: "Company email",
+                    value: (
+                      <span className="inline-flex items-center gap-1.5">
+                        {employee.company_email || "—"}
+                        {employee.company_email && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                aria-label="Copy company email"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={copyEmail}
+                              >
+                                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy email</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                    ),
+                    wide: true,
+                  },
+                  { label: "Personal email", value: employee.personal_email },
+                  { label: "Phone", value: employee.phone_number },
+                  { label: "Address", value: employee.residential_address, wide: true },
+                ]}
+              />
+            </section>
+          </>
         ) : (
           <section className="space-y-3">
             <SectionHeading title="Employment" />
@@ -166,7 +187,7 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
         )}
       </DetailSheet>
 
-      <Dialog open={isOpen && modalViewMode === "edit"} onOpenChange={(open) => !open && setModalViewMode("profile")}>
+      <Dialog open={isOpen && modalViewMode === "edit"} onOpenChange={(open) => !open && close()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit {name}</DialogTitle>
@@ -185,7 +206,7 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
             canManageUsers={canManageUsers}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalViewMode("profile")}>
+            <Button variant="outline" onClick={close}>
               Cancel
             </Button>
             <Button onClick={props.onSave} loading={props.isSaving}>
@@ -194,10 +215,7 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={isOpen && modalViewMode === "signature"}
-        onOpenChange={(open) => !open && setModalViewMode("profile")}
-      >
+      <Dialog open={isOpen && modalViewMode === "signature"} onOpenChange={(open) => !open && close()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Email signature</DialogTitle>
