@@ -98,7 +98,7 @@ interface AdminTasksContentProps {
   initialemployee: employee[]
   initialDepartments: string[]
   initialReviewCycles?: ReviewCycleOption[]
-  initialProjects?: Array<{ id: string; project_name: string }>
+  initialProjects?: Array<{ id: string; project_name: string; status?: string }>
   userProfile: UserProfile
   initialGoalId?: string
 }

@@ -133,6 +133,7 @@ export const RELEASES: Release[] = [
         items: [
           "Completed task sheets are quieter, with activity kept read-only after closure",
           "Task sheets now show assignment, status changes, notes and review decisions in one timeline",
+          "Task creation excludes closed and cancelled projects from new task assignments",
         ],
       },
       {

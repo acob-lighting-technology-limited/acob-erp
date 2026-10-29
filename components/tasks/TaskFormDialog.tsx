@@ -39,6 +39,7 @@ import { portfolioLabel } from "@/lib/tasks/work-links"
 interface ProjectOption {
   id: string
   project_name: string
+  status?: string
 }
 
 interface KpiOption {
@@ -317,16 +318,23 @@ export function TaskFormDialog({
   const projectOptions = useMemo(() => {
     const map = new Map<string, ProjectOption>()
     for (const p of initialProjects) map.set(p.id, p)
-    for (const p of fetchedProjects ?? []) map.set(p.id, { id: p.id, project_name: p.project_name })
+    for (const p of fetchedProjects ?? []) map.set(p.id, { id: p.id, project_name: p.project_name, status: p.status })
     if (selectedTask?.project_id) {
       const existing = map.get(selectedTask.project_id)
       map.set(selectedTask.project_id, {
         id: selectedTask.project_id,
         project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
+        status: existing?.status,
       })
     }
-    return Array.from(map.values())
-  }, [initialProjects, fetchedProjects, selectedTask?.project_id, selectedTask?.project_name])
+    const all = Array.from(map.values())
+    // Exclude completed and cancelled projects from new task assignments.
+    // If editing an existing task, preserve its currently-linked project.
+    if (!selectedTask) {
+      return all.filter((p) => p.status !== "completed" && p.status !== "cancelled")
+    }
+    return all.filter((p) => p.id === selectedTask.project_id || (p.status !== "completed" && p.status !== "cancelled"))
+  }, [initialProjects, fetchedProjects, selectedTask])
 
   // Portfolio-wide work (e.g. a group of sites in development) that no single
   // project owns. Optional like projects, so a failed load never blocks saving.
