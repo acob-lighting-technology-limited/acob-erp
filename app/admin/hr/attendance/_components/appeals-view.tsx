@@ -9,11 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
-import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
-import { AppealReviewDialog } from "./appeal-review-dialog"
+import { formatWATDate } from "@/lib/utils/date"
+import { AppealReviewDialog, appealDateLabel } from "./appeal-review-dialog"
 import type { AppealRow } from "./appeal-review-dialog"
-import { apiFetch, apiJson } from "@/lib/api-client"
-import { toast } from "sonner"
+import { AppealAuditTrail, appealAuditLines } from "@/components/hr/appeal-audit-trail"
+import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
@@ -23,7 +23,33 @@ interface AppealsViewProps {
   lockedDepartment?: string
 }
 
+/**
+ * One row per item: the days of a range staged as one batch (same person, same state)
+ * are folded into a single row that is reviewed and decided as a whole.
+ */
+function groupBatches(appeals: AppealRow[]): AppealRow[] {
+  const groups = new Map<string, AppealRow[]>()
+  const order: string[] = []
+  for (const appeal of appeals) {
+    const key = appeal.batch_id ? `${appeal.batch_id}:${appeal.status}:${appeal.stage ?? ""}` : appeal.id
+    if (!groups.has(key)) {
+      groups.set(key, [])
+      order.push(key)
+    }
+    groups.get(key)!.push(appeal)
+  }
+  return order.map((key) => {
+    const days = [...groups.get(key)!].sort((a, b) => a.appeal_date.localeCompare(b.appeal_date))
+    if (days.length === 1) return days[0]
+    return { ...days[0], days, appeal_date_end: days[days.length - 1].appeal_date }
+  })
+}
+
 function renderStatusBadge(r: AppealRow) {
+  if (r.overridden_at) {
+    return <Badge className="bg-warning/15 text-warning">Overridden</Badge>
+  }
+
   if (r.status === "approved") {
     return <Badge className="bg-success/15 text-success">Approved</Badge>
   }
@@ -59,12 +85,7 @@ function renderStatusBadge(r: AppealRow) {
   }
 
   if (r.stage === "pending_hr_lead") {
-    return (
-      <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-purple/15 text-purple">Pending HR Lead</Badge>
-        <span className="text-muted-foreground pl-0.5 text-xs font-medium">Admin Endorsed ✓</span>
-      </div>
-    )
+    return <Badge className="bg-purple/15 text-purple">Pending Admin & HR Lead</Badge>
   }
 
   return <Badge className="bg-warning/15 text-warning">Pending</Badge>
@@ -97,53 +118,16 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
     await refetch()
   }
 
-  // A bulk change stages one appeal per person per day, so reviewers confirm a batch
-  // at once. Each is still decided by the server's normal per-appeal rules; ones this
-  // reviewer may not confirm come back as failures and are left pending.
-  const [confirmingMany, setConfirmingMany] = useState(false)
-  const confirmSelected = async (rows: AppealRow[]) => {
-    const pending = rows.filter((r) => r.status === "pending")
-    if (pending.length === 0) {
-      toast.info("None of the selected appeals are pending")
-      return
-    }
-    setConfirmingMany(true)
-    let confirmed = 0
-    const failures: string[] = []
-    try {
-      for (const row of pending) {
-        const res = await apiFetch("/api/admin/hr/attendance/appeals", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: row.id, action: "approve", resolution_note: null }),
-        })
-        if (res.ok) {
-          confirmed++
-        } else {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null
-          failures.push(payload?.error || "Failed")
-        }
-      }
-    } finally {
-      setConfirmingMany(false)
-      await load()
-    }
-    if (failures.length === 0) toast.success(`Confirmed ${confirmed} appeal(s)`)
-    else toast.warning(`Confirmed ${confirmed}, ${failures.length} not confirmed: ${failures[0]}`)
-  }
+  const rows = useMemo(() => groupBatches(appeals), [appeals])
 
   const stats = useMemo(() => {
     const now = new Date()
     const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    const pending = appeals.filter((a) => a.status === "pending").length
-    const approvedThisMonth = appeals.filter(
-      (a) => a.status === "approved" && a.created_at.startsWith(currentYM)
-    ).length
-    const rejectedThisMonth = appeals.filter(
-      (a) => a.status === "rejected" && a.created_at.startsWith(currentYM)
-    ).length
+    const pending = rows.filter((a) => a.status === "pending").length
+    const approvedThisMonth = rows.filter((a) => a.status === "approved" && a.created_at.startsWith(currentYM)).length
+    const rejectedThisMonth = rows.filter((a) => a.status === "rejected" && a.created_at.startsWith(currentYM)).length
     return { pending, approvedThisMonth, rejectedThisMonth }
-  }, [appeals])
+  }, [rows])
 
   // Collect unique departments for filter
   const departmentOptions = useMemo(() => {
@@ -178,9 +162,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         accessor: (r) => r.appeal_date,
         render: (r) => (
           <div>
-            <span className="font-medium">
-              {formatWATDate(r.appeal_date, { day: "2-digit", month: "short", year: "numeric" })}
-            </span>
+            <span className="font-medium">{appealDateLabel(r)}</span>
             <div className="text-muted-foreground text-xs">
               Submitted {formatWATDate(r.created_at, { day: "2-digit", month: "short" })}
             </div>
@@ -245,6 +227,14 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         placeholder: "All Statuses",
       },
       {
+        key: "decision",
+        label: "Decision",
+        options: [{ value: "override", label: "Overrides only" }],
+        placeholder: "All Decisions",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || (values.includes("override") && Boolean(row.overridden_at)),
+      },
+      {
         key: "department",
         label: "Department",
         options: departmentOptions,
@@ -285,18 +275,10 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
       </StatGrid>
 
       <DataTable<AppealRow>
-        data={appeals}
+        data={rows}
         columns={columns}
         filters={filters}
         getRowId={(r) => r.id}
-        selectable
-        bulkActions={[
-          {
-            label: confirmingMany ? "Confirming…" : "Confirm selected",
-            icon: CheckCircle2,
-            onClick: (rows) => void confirmSelected(rows),
-          },
-        ]}
         searchPlaceholder="Search employee or department…"
         searchFn={(r, q) => [r.user_name, r.department].join(" ").toLowerCase().includes(q)}
         pagination={{ pageSize: 50 }}
@@ -310,46 +292,21 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
           ),
           title: (r) => `${r.user_name} · ${r.department}`,
-          subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
+          subtitle: (r) => `${appealDateLabel(r)} · ${r.current_status} ➔ ${r.requested_status}`,
           snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),
           expandInline: true,
           trailing: (r) => renderStatusBadge(r),
           detail: {
             title: (r) => `${r.user_name} (${r.department})`,
-            subtitle: (r) => `Appeal for ${formatWATDate(r.appeal_date)}`,
+            subtitle: (r) => `Appeal for ${appealDateLabel(r)}`,
             badges: (r) => renderStatusBadge(r),
             fields: (r) => [
-              { label: "Appeal Date", value: formatWATDate(r.appeal_date) },
+              { label: "Days", value: appealDateLabel(r) },
               { label: "Current Status", value: r.current_status },
               { label: "Requested Status", value: r.requested_status },
-              { label: "Status", value: r.status },
-              {
-                label: "Origin",
-                value: `${r.initiated_by_role === "admin_manual" ? "Admin Manual Alteration" : r.initiated_by_role === "lead_on_behalf" ? "Lead on Behalf" : "Employee Appeal"} by ${r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")} (${formatWATDateTime(r.created_at)})`,
-                fullWidth: true,
-              },
-              {
-                label: "Lead Endorsement",
-                value: r.lead_reviewed_at
-                  ? `Endorsed by ${r.lead_reviewer_name || "Department Lead"} on ${formatWATDateTime(r.lead_reviewed_at)}${r.lead_resolution_note ? ` — "${r.lead_resolution_note}"` : ""}`
-                  : r.stage === "pending_lead"
-                    ? `Awaiting ${r.department_lead_name || "Department Lead"}`
-                    : "Not required / Bypassed",
-                fullWidth: true,
-              },
-              {
-                label: "Admin Review",
-                value: r.admin_reviewed_at
-                  ? `Reviewed by ${r.admin_reviewer_name || r.reviewer_name || "Admin"} on ${formatWATDateTime(r.admin_reviewed_at)}${r.admin_resolution_note || r.resolution_note ? ` — "${r.admin_resolution_note || r.resolution_note}"` : ""}`
-                  : r.status === "approved" || r.status === "rejected"
-                    ? `Reviewed by ${r.reviewer_name || "Admin"}${r.reviewed_at ? ` on ${formatWATDateTime(r.reviewed_at)}` : ""}${r.resolution_note ? ` — "${r.resolution_note}"` : ""}`
-                    : r.stage === "pending_admin"
-                      ? `Awaiting Admin Review by ${r.admin_hr_lead_name ? `${r.admin_hr_lead_name} (Admin & HR Lead)` : "Admin & HR Lead"}`
-                      : `Pending lead then ${r.admin_hr_lead_name || "Admin & HR Lead"}`,
-                fullWidth: true,
-              },
+              { label: "Status", value: r.overridden_at ? "overridden" : r.status },
+              ...appealAuditLines(r).map((line) => ({ ...line, fullWidth: true })),
               { label: "Appeal Reason", value: r.appeal_reason || "No reason specified", fullWidth: true },
-              ...(r.resolution_note ? [{ label: "Resolution Note", value: r.resolution_note, fullWidth: true }] : []),
             ],
             actions: (r) => [
               {
@@ -373,7 +330,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               {renderStatusBadge(r)}
             </div>
             <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <span>Date: {formatWATDate(r.appeal_date)}</span>
+              <span>{appealDateLabel(r)}</span>
               <span>
                 {r.current_status} ➔ {r.requested_status}
               </span>
@@ -414,120 +371,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                 <span className="text-muted-foreground mb-2 block text-xs font-semibold tracking-wide uppercase">
                   Audit History
                 </span>
-                <div className="bg-background/80 divide-y rounded-lg border text-xs">
-                  {/* 1. Origin */}
-                  <div className="flex flex-col justify-between gap-1 p-3 sm:flex-row sm:items-center">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-muted-foreground w-28 shrink-0 font-semibold">Initiated By</span>
-                      <span className="text-foreground font-medium">
-                        {r.initiated_by_role === "admin_manual"
-                          ? "Admin Manual Alteration"
-                          : r.initiated_by_role === "lead_on_behalf"
-                            ? "Lead on Behalf"
-                            : "Employee Appeal"}
-                      </span>
-                      <span className="text-muted-foreground">
-                        by{" "}
-                        <strong className="text-foreground font-medium">
-                          {r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")}
-                        </strong>
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                      {formatWATDateTime(r.created_at)}
-                    </span>
-                  </div>
-
-                  {/* 2. Lead Endorsement */}
-                  <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground w-28 shrink-0 font-semibold">Lead Endorsement</span>
-                        {r.lead_reviewed_at ? (
-                          <span className="text-success font-medium">Endorsed</span>
-                        ) : r.stage === "pending_lead" ? (
-                          <span className="text-warning font-medium">
-                            Awaiting {r.department_lead_name || "Department Lead"}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">Not required / Bypassed</span>
-                        )}
-                      </div>
-                      {r.lead_reviewed_at && (
-                        <span className="text-muted-foreground">
-                          by{" "}
-                          <strong className="text-foreground font-medium">
-                            {r.lead_reviewer_name || "Department Lead"}
-                          </strong>
-                        </span>
-                      )}
-                      {r.lead_resolution_note && (
-                        <span className="text-muted-foreground truncate italic">
-                          &ldquo;{r.lead_resolution_note}&rdquo;
-                        </span>
-                      )}
-                    </div>
-                    {r.lead_reviewed_at && (
-                      <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                        {formatWATDateTime(r.lead_reviewed_at)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 3. Admin Review */}
-                  <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground w-28 shrink-0 font-semibold">Admin Review</span>
-                        {r.admin_reviewed_at || r.status === "approved" || r.status === "rejected" ? (
-                          <span
-                            className={r.status === "rejected" ? "text-danger font-medium" : "text-success font-medium"}
-                          >
-                            {r.status === "rejected" ? "Rejected" : "Approved"}
-                          </span>
-                        ) : r.stage === "pending_admin" ? (
-                          <span className="text-info font-medium">Awaiting Admin Review</span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            Pending lead then {r.admin_hr_lead_name || "Admin & HR Lead"}
-                          </span>
-                        )}
-                      </div>
-                      {r.stage === "pending_admin" && (
-                        <span className="text-muted-foreground">
-                          by{" "}
-                          <strong className="text-foreground font-medium">
-                            {r.admin_hr_lead_name || "Admin & HR Lead"}
-                          </strong>
-                          {r.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-                        </span>
-                      )}
-                      {(r.admin_reviewed_at ||
-                        (r.status !== "pending" && (r.admin_reviewer_name || r.reviewer_name))) && (
-                        <>
-                          {(r.admin_reviewer_name || r.reviewer_name) && (
-                            <span className="text-muted-foreground">
-                              by{" "}
-                              <strong className="text-foreground font-medium">
-                                {r.admin_reviewer_name || r.reviewer_name}
-                              </strong>
-                            </span>
-                          )}
-                          {(r.admin_resolution_note || r.resolution_note) && (
-                            <span className="text-muted-foreground truncate italic">
-                              &ldquo;{r.admin_resolution_note || r.resolution_note}&rdquo;
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {(r.admin_reviewed_at || (r.status !== "pending" && r.reviewed_at)) && (
-                      <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                        {formatWATDateTime(r.admin_reviewed_at || r.reviewed_at!)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <AppealAuditTrail appeal={r} />
               </div>
             </div>
           ),

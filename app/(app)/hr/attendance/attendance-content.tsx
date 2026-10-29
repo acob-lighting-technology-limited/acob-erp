@@ -20,6 +20,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
+import { AppealAuditTrail } from "@/components/hr/appeal-audit-trail"
 import { DeviceStatusDialog } from "@/components/hr/device-status-banner"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -90,6 +91,10 @@ type AppealRecord = {
   reviewed_by?: string | null
   reviewer_name?: string | null
   reviewed_at?: string | null
+  overridden_by_name?: string | null
+  overridden_at?: string | null
+  override_reason?: string | null
+  overridden_stage?: string | null
   requested_status: string
   appeal_reason: string
   resolution_note: string | null
@@ -942,136 +947,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
 
                         <div>
                           <span className="text-muted-foreground mb-2 block text-xs font-semibold">Audit History</span>
-                          <div className="bg-background/80 divide-y rounded-lg border text-xs">
-                            {/* 1. Origin */}
-                            <div className="flex flex-col justify-between gap-1 p-3 sm:flex-row sm:items-center">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-muted-foreground w-28 shrink-0 font-semibold">Initiated By</span>
-                                <span className="text-foreground font-medium">
-                                  {latestAppeal.initiated_by_role === "admin_manual"
-                                    ? "Admin Manual Alteration"
-                                    : latestAppeal.initiated_by_role === "lead_on_behalf"
-                                      ? "Lead on Behalf"
-                                      : "Employee Appeal"}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  by{" "}
-                                  <strong className="text-foreground font-medium">
-                                    {latestAppeal.created_by_name ||
-                                      (latestAppeal.initiated_by_role === "employee"
-                                        ? latestAppeal.user_name || "Employee"
-                                        : "Admin")}
-                                  </strong>
-                                </span>
-                              </div>
-                              <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                                {formatWATDateTime(latestAppeal.created_at)}
-                              </span>
-                            </div>
-
-                            {/* 2. Lead Endorsement */}
-                            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground w-28 shrink-0 font-semibold">
-                                    Lead Endorsement
-                                  </span>
-                                  {latestAppeal.lead_reviewed_at ? (
-                                    <span className="text-success font-medium">Endorsed</span>
-                                  ) : latestAppeal.stage === "pending_lead" ? (
-                                    <span className="text-warning font-medium">
-                                      Awaiting {latestAppeal.department_lead_name || "Department Lead"}
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted-foreground">Not required / Bypassed</span>
-                                  )}
-                                </div>
-                                {latestAppeal.lead_reviewed_at && (
-                                  <span className="text-muted-foreground">
-                                    by{" "}
-                                    <strong className="text-foreground font-medium">
-                                      {latestAppeal.lead_reviewer_name || "Department Lead"}
-                                    </strong>
-                                  </span>
-                                )}
-                                {latestAppeal.lead_resolution_note && (
-                                  <span className="text-muted-foreground truncate italic">
-                                    &ldquo;{latestAppeal.lead_resolution_note}&rdquo;
-                                  </span>
-                                )}
-                              </div>
-                              {latestAppeal.lead_reviewed_at && (
-                                <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                                  {formatWATDateTime(latestAppeal.lead_reviewed_at)}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* 3. Admin Review */}
-                            <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground w-28 shrink-0 font-semibold">
-                                    Admin Review
-                                  </span>
-                                  {latestAppeal.admin_reviewed_at ||
-                                  (latestAppeal.status !== "pending" &&
-                                    (latestAppeal.admin_reviewer_name || latestAppeal.reviewer_name)) ? (
-                                    <span
-                                      className={
-                                        latestAppeal.status === "rejected"
-                                          ? "text-danger font-medium"
-                                          : "text-success font-medium"
-                                      }
-                                    >
-                                      {latestAppeal.status === "rejected" ? "Rejected" : "Approved"}
-                                    </span>
-                                  ) : latestAppeal.stage === "pending_admin" ? (
-                                    <span className="text-info font-medium">Awaiting Admin Review</span>
-                                  ) : (
-                                    <span className="text-muted-foreground">
-                                      Pending lead then {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
-                                    </span>
-                                  )}
-                                </div>
-                                {latestAppeal.stage === "pending_admin" && (
-                                  <span className="text-muted-foreground">
-                                    by{" "}
-                                    <strong className="text-foreground font-medium">
-                                      {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
-                                    </strong>
-                                    {latestAppeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
-                                  </span>
-                                )}
-                                {(latestAppeal.admin_reviewed_at ||
-                                  (latestAppeal.status !== "pending" &&
-                                    (latestAppeal.admin_reviewer_name || latestAppeal.reviewer_name))) && (
-                                  <>
-                                    {(latestAppeal.admin_reviewer_name || latestAppeal.reviewer_name) && (
-                                      <span className="text-muted-foreground">
-                                        by{" "}
-                                        <strong className="text-foreground font-medium">
-                                          {latestAppeal.admin_reviewer_name || latestAppeal.reviewer_name}
-                                        </strong>
-                                      </span>
-                                    )}
-                                    {(latestAppeal.admin_resolution_note || latestAppeal.resolution_note) && (
-                                      <span className="text-muted-foreground truncate italic">
-                                        &ldquo;{latestAppeal.admin_resolution_note || latestAppeal.resolution_note}
-                                        &rdquo;
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                              {(latestAppeal.admin_reviewed_at ||
-                                (latestAppeal.status !== "pending" && latestAppeal.reviewed_at)) && (
-                                <span className="text-muted-foreground shrink-0 whitespace-nowrap">
-                                  {formatWATDateTime(latestAppeal.admin_reviewed_at || latestAppeal.reviewed_at!)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                          <AppealAuditTrail appeal={latestAppeal} />
                         </div>
                       </div>
                     ) : null}

@@ -30,14 +30,14 @@ type LeadProfileRow = {
 }
 
 /** How the attendance state was changed — drives subject + wording. */
-export type AttendanceMailDecision = "created" | "updated" | "approved" | "rejected" | "resolved"
+export type AttendanceMailDecision = "created" | "updated" | "approved" | "rejected" | "resolved" | "overridden"
 
 export interface NotifyAttendanceMailParams {
   /** Employee whose attendance was altered / whose appeal was decided. */
   affectedUserId: string
   /** Admin/approver who performed the action. */
   actorId: string | null
-  /** Day affected, YYYY-MM-DD. */
+  /** Day affected, YYYY-MM-DD, or a range label such as "2026-10-06 to 2026-10-29". */
   date: string
   fromStatus?: string | null
   toStatus?: string | null
@@ -48,6 +48,8 @@ export interface NotifyAttendanceMailParams {
   approverComment?: string | null
   /** When the action happened; defaults to now. */
   occurredAt?: string
+  /** People who also get the Admin & HR lead copy, such as the lead an override skipped. */
+  alsoNotifyUserIds?: string[]
 }
 
 function formatName(row: Pick<ProfileNameEmailRow, "full_name" | "first_name" | "last_name"> | null | undefined) {
@@ -77,6 +79,8 @@ function decisionVerb(decision: AttendanceMailDecision): string {
       return "rejected"
     case "resolved":
       return "resolved"
+    case "overridden":
+      return "approved by override"
     case "created":
       return "recorded"
     default:
@@ -173,9 +177,24 @@ export async function notifyAttendanceMail(client: NotifyClient, params: NotifyA
     const actorName = formatName(actor)
     const employeeEmails = collectEmails(affected)
     const leadEmails = await resolveAdminHrLeadEmails(client)
+    if (params.alsoNotifyUserIds?.length) {
+      const { data: extra } = await client
+        .from("profiles")
+        .select("id, company_email, additional_email")
+        .in("id", params.alsoNotifyUserIds)
+      for (const row of (extra ?? []) as Array<Pick<ProfileNameEmailRow, "company_email" | "additional_email">>) {
+        for (const email of collectEmails(row)) {
+          if (!leadEmails.includes(email.toLowerCase())) leadEmails.push(email.toLowerCase())
+        }
+      }
+    }
 
     const verb = decisionVerb(params.decision)
-    const isAppeal = params.decision === "approved" || params.decision === "rejected" || params.decision === "resolved"
+    const isAppeal =
+      params.decision === "approved" ||
+      params.decision === "rejected" ||
+      params.decision === "resolved" ||
+      params.decision === "overridden"
     const statusTransition =
       params.fromStatus && params.toStatus
         ? `${statusLabel(params.fromStatus)} → ${statusLabel(params.toStatus)}`

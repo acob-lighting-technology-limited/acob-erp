@@ -15,7 +15,9 @@ import {
 import { toLocalISODate } from "@/lib/utils/date"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
+import { randomUUID } from "node:crypto"
 import {
+  loadDepartmentLeads,
   notifyAppealReviewers,
   stageAttendanceChange,
   stagingRoute,
@@ -160,8 +162,14 @@ export async function POST(request: NextRequest) {
     let alreadyPending = 0
     const statusLabel = ATTENDANCE_STATUS_LABELS[status as UnifiedAttendanceStatus] ?? status
 
+    const departmentLeads = await loadDepartmentLeads(dataClient)
     for (const userId of allowedIds) {
       const target = targets.get(userId) ?? null
+      const hasLead = Boolean(
+        target?.department && (departmentLeads.idsByDepartment.get(target.department) ?? []).length > 0
+      )
+      // One person's days of this range list and are decided as one item.
+      const batchId = dates.length > 1 ? randomUUID() : null
       const stagedForUser: Array<{ appealId: string; date: string }> = []
       for (const date of dates) {
         const existing = existingByKey.get(`${userId}::${date}`)
@@ -187,6 +195,8 @@ export async function POST(request: NextRequest) {
           requestedStatus: status,
           reason: manual_comment,
           target,
+          departmentHasLead: hasLead,
+          batchId,
           notify: false,
         })
         if (result.ok) {
@@ -203,7 +213,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (stagedForUser.length > 0) {
-        const route = stagingRoute(scope, target)
+        const route = stagingRoute(scope, target, hasLead)
         const first = stagedForUser[0].date
         const last = stagedForUser[stagedForUser.length - 1].date
         await notifyAppealReviewers(dataClient, {

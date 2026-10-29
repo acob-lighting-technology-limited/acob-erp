@@ -10,6 +10,7 @@ import type { AttendancePolicy } from "@/lib/org-config"
 import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { createNotification } from "@/lib/notifications/create"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
+import { expandDepartmentScopeForQuery, type AdminScope } from "@/lib/admin/rbac"
 
 const log = logger("attendance-appeals")
 
@@ -446,23 +447,105 @@ export async function loadStagingTarget(client: SupabaseClient, userId: string):
 }
 
 /**
- * Two-stage rule for manual attendance changes: whoever makes the change is stage 1
- * and the other side confirms it.
+ * Two sides approve every attendance change: the admin side (any admin, working
+ * from the admin page) and the lead side (the employee's own Department Lead). Who
+ * starts the change fills their own side; the other side approves it.
  *
- * - An admin (any admin, including on their own day) is the Admin & HR stage; the
- *   person's Department Lead confirms — or the Admin & HR Lead when the person is a lead.
- * - A Department Lead is the lead stage; Admin & HR confirms (then the Admin & HR Lead
- *   when the person is a lead — see the appeals PATCH route).
+ * - An admin's change (including on their own day) fills the admin side, so the
+ *   person's lead confirms. A lead confirms a change to their own day.
+ * - A lead's change fills the lead side, so an admin approves.
+ * - Staff in a department with no lead: the Admin & HR Lead approves alone.
  */
 export function stagingRoute(
   actor: StagingActor,
-  target: StagingTarget | null
+  target: StagingTarget | null,
+  departmentHasLead: boolean
 ): { initiatedByRole: "admin_manual" | "lead_on_behalf"; stage: AppealReviewStage; awaiting: string } {
   const isAdmin = actor.isAdminLike && actor.scopeMode !== "lead"
-  if (!isAdmin) return { initiatedByRole: "lead_on_behalf", stage: "pending_admin", awaiting: "Admin & HR" }
-  return target?.is_department_lead
-    ? { initiatedByRole: "admin_manual", stage: "pending_hr_lead", awaiting: "Admin & HR Lead" }
-    : { initiatedByRole: "admin_manual", stage: "pending_lead", awaiting: "Department Lead" }
+  if (!isAdmin) return { initiatedByRole: "lead_on_behalf", stage: "pending_admin", awaiting: "Admin" }
+  return target?.is_department_lead || departmentHasLead
+    ? { initiatedByRole: "admin_manual", stage: "pending_lead", awaiting: "Department Lead" }
+    : { initiatedByRole: "admin_manual", stage: "pending_hr_lead", awaiting: "Admin & HR Lead" }
+}
+
+/** First stage of an employee's own appeal (made on /attendance). */
+export function employeeAppealStage(
+  appellant: { is_department_lead: boolean } | null,
+  departmentHasLead: boolean
+): AppealReviewStage {
+  // A lead is their own lead side, so only the admin side is left.
+  if (appellant?.is_department_lead) return "pending_admin"
+  return departmentHasLead ? "pending_lead" : "pending_hr_lead"
+}
+
+/** Whether anyone leads `department`. */
+export async function departmentHasLead(client: SupabaseClient, department: string | null): Promise<boolean> {
+  if (!department) return false
+  const leads = await loadDepartmentLeads(client)
+  return (leads.idsByDepartment.get(department) ?? []).length > 0
+}
+
+export type AppealReviewer = Pick<
+  AdminScope,
+  "userId" | "department" | "isDepartmentLead" | "leadDepartments" | "isAdminLike" | "scopeMode"
+>
+
+export type ReviewableAppeal = {
+  stage?: string | null
+  initiated_by_role?: string | null
+  created_by?: string | null
+  lead_reviewed_by?: string | null
+}
+
+function leadsDepartment(reviewer: AppealReviewer, department: string | null): boolean {
+  if (!reviewer.isDepartmentLead || !department) return false
+  const leadDepts =
+    reviewer.leadDepartments.length > 0 ? reviewer.leadDepartments : reviewer.department ? [reviewer.department] : []
+  return expandDepartmentScopeForQuery(leadDepts).includes(department)
+}
+
+/**
+ * Why `reviewer` may not approve or reject `appeal` at its current stage, or null
+ * when they may. The PATCH route enforces it and the list sends it to the page.
+ *
+ * Each stage belongs to one side, taken from the employee's record, never from a
+ * role: the lead stage only to the employee's real Department Lead, the admin stage
+ * to any admin, the no-lead stage to the Admin & HR Lead. Whoever made a change
+ * cannot also confirm it, and the lead who endorsed an appeal cannot also approve it
+ * as admin. An admin may approve the admin side of their own appeal: their lead has
+ * already confirmed it. Anything else goes through an override.
+ */
+export function appealReviewBlock(
+  reviewer: AppealReviewer,
+  appeal: ReviewableAppeal,
+  appellantDepartment: string | null
+): string | null {
+  if (appeal.created_by === reviewer.userId && appeal.initiated_by_role !== "employee") {
+    return "You made this change, so someone else must confirm it."
+  }
+
+  const stage = appeal.stage || "pending_lead"
+  if (stage === "pending_lead") {
+    return leadsDepartment(reviewer, appellantDepartment)
+      ? null
+      : `Only the Department Lead for ${appellantDepartment || "this department"} can confirm this.`
+  }
+  if (stage === "pending_admin") {
+    if (!reviewer.isAdminLike || reviewer.scopeMode === "lead") return "Only an admin can approve this stage."
+    if (appeal.lead_reviewed_by === reviewer.userId) {
+      return "You endorsed this as lead, so another admin must approve it."
+    }
+    return null
+  }
+  if (stage === "pending_hr_lead") {
+    return leadsDepartment(reviewer, DEPT_ADMIN_HR) ? null : "Only the Admin & HR Lead can approve this."
+  }
+  return "This appeal is no longer pending."
+}
+
+/** Admins (admin, super admin, developer) may override any pending stage, from the admin side. */
+export function canOverrideAppeal(reviewer: Pick<AdminScope, "isAdminLike" | "scopeMode">): boolean {
+  return reviewer.isAdminLike && reviewer.scopeMode !== "lead"
 }
 
 export type StageChangeResult =
@@ -486,6 +569,10 @@ export async function stageAttendanceChange(
     reason: string
     /** Pass when already loaded (bulk), to skip a profile read per day. */
     target?: StagingTarget | null
+    /** Pass when already known (bulk), to skip a lead lookup per day. */
+    departmentHasLead?: boolean
+    /** Ties the days of one bulk range together (needs the 20261030090000 migration). */
+    batchId?: string | null
     /** Bulk callers send one summary notice per person instead. Default true. */
     notify?: boolean
     /**
@@ -513,7 +600,8 @@ export async function stageAttendanceChange(
   }
 
   const target = params.target !== undefined ? params.target : await loadStagingTarget(client, params.userId)
-  const route = stagingRoute(params.actor, target)
+  const hasLead = params.departmentHasLead ?? (await departmentHasLead(client, target?.department ?? null))
+  const route = stagingRoute(params.actor, target, hasLead)
   const now = new Date().toISOString()
   const firstStage =
     route.initiatedByRole === "admin_manual"
@@ -543,6 +631,7 @@ export async function stageAttendanceChange(
       created_by: params.actor.userId,
       ...firstStage,
       ...(params.change ? { change_kind: params.change.kind, change_payload: params.change.payload } : {}),
+      ...(params.batchId ? { batch_id: params.batchId } : {}),
     })
     .select("id")
     .single<{ id: string }>()

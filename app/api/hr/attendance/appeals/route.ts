@@ -12,7 +12,13 @@ import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
-import { loadDepartmentLeads, notifyAppealReviewers } from "@/lib/hr/attendance-appeals"
+import {
+  departmentHasLead,
+  employeeAppealStage,
+  loadDepartmentLeads,
+  notifyAppealReviewers,
+  type AppealReviewStage,
+} from "@/lib/hr/attendance-appeals"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 
 const log = logger("hr-attendance-appeals")
@@ -67,7 +73,7 @@ export async function GET(request: NextRequest) {
     let query = dataClient
       .from("attendance_appeals")
       .select(
-        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at, overridden_by, overridden_at, override_reason, overridden_stage"
       )
       .eq("user_id", user.id)
       .order("appeal_date", { ascending: false })
@@ -96,6 +102,7 @@ export async function GET(request: NextRequest) {
       if (r.lead_reviewed_by) userIdsToFetch.add(r.lead_reviewed_by)
       if (r.admin_reviewed_by) userIdsToFetch.add(r.admin_reviewed_by)
       if (r.reviewed_by) userIdsToFetch.add(r.reviewed_by)
+      if (r.overridden_by) userIdsToFetch.add(r.overridden_by)
     }
 
     type ProfileRow = {
@@ -139,8 +146,8 @@ export async function GET(request: NextRequest) {
         lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
         admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
         admin_hr_lead_name,
-        reviewer_name:
-          r.status === "pending" ? null : resolveProfileName(r.admin_reviewed_by) || resolveProfileName(r.reviewed_by),
+        overridden_by_name: resolveProfileName(r.overridden_by),
+        reviewer_name: r.status === "pending" ? null : resolveProfileName(r.reviewed_by),
       }
     })
 
@@ -269,7 +276,7 @@ export async function POST(request: NextRequest) {
 
     // Determine target employee & caller roles
     let effectiveUserId = user.id
-    let initiatedByRole: "employee" | "lead_on_behalf" | "admin_manual" = "employee"
+    let initiatedByRole: "employee" | "lead_on_behalf" = "employee"
 
     const { data: callerProfile } = await dataClient
       .from("profiles")
@@ -308,17 +315,21 @@ export async function POST(request: NextRequest) {
           callerProfile.department &&
           callerProfile.department === targetProfile.department
       )
-      const isCallerAdmin = Boolean(isAdminLikeRole(callerProfile?.role))
-
-      if (!isCallerLead && !isCallerAdmin) {
+      // An admin changes someone else's attendance from the admin page, where it is
+      // staged as the admin side. Here only the person's own lead may act for them.
+      if (!isCallerLead) {
         return NextResponse.json(
-          { error: "You are not authorized to submit appeals on behalf of this employee" },
+          {
+            error: isAdminLikeRole(callerProfile?.role)
+              ? "To change someone else's attendance, use the admin attendance page."
+              : "You are not authorized to submit appeals on behalf of this employee",
+          },
           { status: 403 }
         )
       }
 
       effectiveUserId = targetUserId
-      initiatedByRole = isCallerLead ? "lead_on_behalf" : "admin_manual"
+      initiatedByRole = "lead_on_behalf"
     }
 
     // Check for existing pending/approved appeal for effective user on that day
@@ -387,7 +398,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check monthly quota (OOS and Admin manual alterations are uncapped)
+    // Check monthly quota (OOS is uncapped)
     const quotaCheck = await validateLwpAwpMonthlyQuota({
       dataClient,
       userId: effectiveUserId,
@@ -395,7 +406,7 @@ export async function POST(request: NextRequest) {
       date: appealDate,
       isAdminLike: false,
       excludeRecordId: attendanceRecord?.id ?? null,
-      isManualAlteration: initiatedByRole === "admin_manual",
+      isManualAlteration: false,
     })
     if (!quotaCheck.allowed) {
       return NextResponse.json(
@@ -421,20 +432,15 @@ export async function POST(request: NextRequest) {
         last_name: string | null
       }>()
 
-    const isEffectiveLead = Boolean(effectiveProfile?.is_department_lead)
-    let initialStage: "pending_lead" | "pending_admin" | "pending_hr_lead"
-
-    if (initiatedByRole === "lead_on_behalf") {
-      // Lead already reviewed & submitted it -> advances straight to Stage 2 (Admin)
-      initialStage = "pending_admin"
-    } else if (initiatedByRole === "admin_manual") {
-      // Admin alteration -> requires lead confirmation (or HR Lead if target is lead)
-      initialStage = isEffectiveLead ? "pending_hr_lead" : "pending_lead"
-    } else {
-      // Employee submitting for themselves:
-      // If employee is a department lead, Stage 1 is Admin review
-      initialStage = isEffectiveLead ? "pending_admin" : "pending_lead"
-    }
+    // A lead submitting for their staff is the lead side, so an admin approves. An
+    // employee's own appeal goes to their lead first (see employeeAppealStage).
+    const initialStage: AppealReviewStage =
+      initiatedByRole === "lead_on_behalf"
+        ? "pending_admin"
+        : employeeAppealStage(
+            effectiveProfile ?? null,
+            await departmentHasLead(dataClient, effectiveProfile?.department ?? null)
+          )
 
     const now = new Date().toISOString()
     const insertPayload: Record<string, unknown> = {
@@ -454,10 +460,6 @@ export async function POST(request: NextRequest) {
       insertPayload.lead_reviewed_by = user.id
       insertPayload.lead_reviewed_at = now
       insertPayload.lead_resolution_note = "Submitted on behalf by Department Lead"
-    } else if (initiatedByRole === "admin_manual") {
-      insertPayload.admin_reviewed_by = user.id
-      insertPayload.admin_reviewed_at = now
-      insertPayload.admin_resolution_note = appealReason
     }
 
     const { data: appeal, error: insertError } = await dataClient
