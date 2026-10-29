@@ -2,7 +2,8 @@
 
 import { Badge } from "@/components/ui/badge"
 import { DetailSheet } from "@/components/ui/detail-sheet"
-import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, Calendar, FileText } from "lucide-react"
+import { DetailTimeline, DetailTimelineEntry } from "@/components/ui/detail-dialog"
+import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, FileText } from "lucide-react"
 import type { Asset } from "@/app/admin/assets/admin-assets-content"
 import { formatDateTime } from "@/lib/format"
 import { EmptyState } from "@/components/ui/patterns/empty-state"
@@ -62,66 +63,66 @@ export function AssetHistorySheet({ isOpen, onOpenChange, selectedAsset, assetHi
       {assetHistory.length === 0 ? (
         <EmptyState compact title="No activity history found for this asset" />
       ) : (
-        assetHistory.map((activity, index) => (
-          <div key={activity.id} className={index === 0 ? "bg-primary/5 -mx-4 px-4 sm:-mx-5 sm:px-5" : undefined}>
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {activity.type === "assignment" && <UserPlus className="h-4 w-4 text-blue-500" />}
-                {activity.type === "unassignment" && <History className="h-4 w-4 text-orange-500" />}
-                {activity.type === "status_change" && <ArrowUpDown className="h-4 w-4 text-purple-500" />}
-                {activity.type === "issue_reported" && <AlertCircle className="h-4 w-4 text-red-500" />}
-                {activity.type === "issue_resolved" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                <span className="text-sm font-bold tracking-wide uppercase">{activity.title}</span>
-              </div>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Calendar className="h-3 w-3" />
-                {formatDateTime(activity.timestamp, "-")}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {activity.user_name && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">User/Location:</span>{" "}
-                  <span className="text-foreground font-semibold">{activity.user_name}</span>
-                </p>
-              )}
-
-              {activity.performed_by_name && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Performed by:</span>{" "}
-                  <span className="text-foreground font-medium">{activity.performed_by_name}</span>
-                </p>
-              )}
-
-              {activity.description && (
-                <div className="bg-background/50 mt-2 rounded border p-3">
-                  <p className="text-muted-foreground text-sm italic">&quot;{activity.description}&quot;</p>
-                </div>
-              )}
-
-              {activity.details?.notes && (
-                <div className="bg-background/50 mt-2 rounded border p-3">
-                  <p className="text-foreground mb-1 flex items-center gap-1 text-xs font-semibold">
-                    <FileText className="h-3 w-3" />
-                    Notes:
+        <DetailTimeline>
+          {assetHistory.map((activity) => (
+            <DetailTimelineEntry
+              key={activity.id}
+              timestamp={formatDateTime(activity.timestamp, "-")}
+              title={
+                <span className="flex items-center gap-2">
+                  {activity.type === "assignment" && <UserPlus className="h-4 w-4 text-blue-500" />}
+                  {activity.type === "unassignment" && <History className="h-4 w-4 text-orange-500" />}
+                  {activity.type === "status_change" && <ArrowUpDown className="h-4 w-4 text-purple-500" />}
+                  {activity.type === "issue_reported" && <AlertCircle className="h-4 w-4 text-red-500" />}
+                  {activity.type === "issue_resolved" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                  <span>{activity.title}</span>
+                </span>
+              }
+            >
+              <div className="space-y-2">
+                {activity.user_name && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">User/Location:</span>{" "}
+                    <span className="text-foreground font-semibold">{activity.user_name}</span>
                   </p>
-                  <p className="text-muted-foreground text-sm">{activity.details.notes}</p>
-                </div>
-              )}
+                )}
 
-              {activity.details?.old_status && (
-                <div className="flex items-center gap-2 text-xs">
-                  <Badge variant="outline" className="opacity-70">
-                    {activity.details.old_status}
-                  </Badge>
-                  <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                  <Badge className={getStatusColor(activity.details.status || "")}>{activity.details.status}</Badge>
-                </div>
-              )}
-            </div>
-          </div>
-        ))
+                {activity.performed_by_name && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Performed by:</span>{" "}
+                    <span className="text-foreground font-medium">{activity.performed_by_name}</span>
+                  </p>
+                )}
+
+                {activity.description && (
+                  <div className="bg-background/50 mt-2 rounded border p-3">
+                    <p className="text-muted-foreground text-sm italic">&quot;{activity.description}&quot;</p>
+                  </div>
+                )}
+
+                {activity.details?.notes && (
+                  <div className="bg-background/50 mt-2 rounded border p-3">
+                    <p className="text-foreground mb-1 flex items-center gap-1 text-xs font-semibold">
+                      <FileText className="h-3 w-3" />
+                      Notes:
+                    </p>
+                    <p className="text-muted-foreground text-sm">{activity.details.notes}</p>
+                  </div>
+                )}
+
+                {activity.details?.old_status && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge variant="outline" className="opacity-70">
+                      {activity.details.old_status}
+                    </Badge>
+                    <ArrowUpDown className="text-muted-foreground h-3 w-3" />
+                    <Badge className={getStatusColor(activity.details.status || "")}>{activity.details.status}</Badge>
+                  </div>
+                )}
+              </div>
+            </DetailTimelineEntry>
+          ))}
+        </DetailTimeline>
       )}
     </DetailSheet>
   )

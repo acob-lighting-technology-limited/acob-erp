@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Label } from "@/components/ui/label"
 import { EmptyState } from "@/components/ui/patterns"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 import { Plus, Users } from "lucide-react"
 import { formatDDMMYYYY } from "@/lib/utils/date"
 
@@ -98,9 +99,7 @@ export function RoleUsersSheet({
       )}
 
       {roleUsersLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-        </div>
+        <RowsSkeleton rows={5} className="py-2" />
       ) : roleUsers.length === 0 ? (
         <EmptyState title="No users in this role" icon={Users} />
       ) : (

@@ -135,6 +135,13 @@ export const RELEASES: Release[] = [
         ],
       },
       {
+        area: "Operations",
+        items: [
+          "Asset history now follows a clear event timeline",
+          "Fleet booking decisions are confirmed separately from the booking record",
+        ],
+      },
+      {
         area: "Tools",
         items: [
           "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",

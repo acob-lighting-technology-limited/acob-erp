@@ -1,8 +1,6 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-import { DetailSheet } from "@/components/ui/detail-sheet"
-import { MarkdownContent } from "@/components/ui/markdown-content"
+import { DocumentReaderSheet } from "./document-reader-sheet"
 import type { AdminDocumentation } from "./admin-doc-types"
 
 interface AdminDocViewSheetProps {
@@ -15,12 +13,12 @@ interface AdminDocViewSheetProps {
 
 export function AdminDocViewSheet({ open, onOpenChange, doc, getStatusColor, formatDate }: AdminDocViewSheetProps) {
   return (
-    <DetailSheet
+    <DocumentReaderSheet
       open={open}
       onOpenChange={onOpenChange}
-      wide
       title={doc?.title ?? "Documentation"}
-      badges={<Badge className={getStatusColor(doc?.is_draft || false)}>{doc?.is_draft ? "Draft" : "Published"}</Badge>}
+      isDraft={doc?.is_draft || false}
+      statusClassName={getStatusColor(doc?.is_draft || false)}
       description={
         <>
           {doc?.category && <span>Category: {doc.category}</span>}
@@ -30,19 +28,8 @@ export function AdminDocViewSheet({ open, onOpenChange, doc, getStatusColor, for
           <span>{doc?.created_at && formatDate(doc.created_at)}</span>
         </>
       }
-    >
-      {doc?.tags && doc.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {doc.tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-      <div className="bg-muted/50 rounded-lg p-4">
-        <MarkdownContent content={doc?.content || ""} />
-      </div>
-    </DetailSheet>
+      tags={doc?.tags}
+      content={doc?.content || ""}
+    />
   )
 }
