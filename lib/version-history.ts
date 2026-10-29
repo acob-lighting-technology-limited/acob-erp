@@ -58,6 +58,7 @@ export const RELEASES: Release[] = [
       {
         area: "Mailboxes",
         items: [
+          "Activity history drawer on the Mailboxes page showing a full timeline of cPanel operations (creations, password resets, quota changes and suspensions)",
           "New mailboxes default to 250 MB quota with preset buttons up to 5 GB and custom quota support",
           "Create, suspend, restore and forward staff mailboxes from Matrix, and reset mailbox passwords",
           "Admin Mailboxes page with storage usage and alerts when a mailbox is nearly full",

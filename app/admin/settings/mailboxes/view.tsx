@@ -1,12 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import {
   AlertTriangle,
   Database,
   HardDrive,
+  History,
   Inbox,
   KeyRound,
   Link2,
@@ -24,9 +25,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { MailboxUsageBar } from "@/components/mailbox/mailbox-usage-bar"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { MAILBOX_ALERT_PERCENT, formatBytes, mailboxLevel } from "@/lib/cpanel/quota"
 import type { MailboxReport, MailboxReportRow, MissingMailboxRow } from "@/lib/cpanel/mailboxes"
 import { CreateMailboxDialog } from "./_components/create-mailbox-dialog"
+import { MailboxHistorySheet } from "./_components/history-sheet"
 import { LinkDialog } from "./_components/link-dialog"
 import { PasswordDialog } from "./_components/password-dialog"
 import { QuotaDialog } from "./_components/quota-dialog"
@@ -98,12 +101,19 @@ export function MailboxesPage() {
     return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "active"
   })
   const [createOpen, setCreateOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [linkTarget, setLinkTarget] = useState<MailboxReportRow | null>(null)
   const [passwordTarget, setPasswordTarget] = useState<MailboxReportRow | null>(null)
   const [quotaTarget, setQuotaTarget] = useState<MailboxReportRow | null>(null)
   const [suspensionTarget, setSuspensionTarget] = useState<SuspensionTarget | null>(null)
 
+  const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: MAILBOXES_QUERY_KEY, queryFn: fetchReport })
+
+  const invalidateAll = () => {
+    void refetch()
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminMailboxHistory() })
+  }
   const mailboxes = useMemo(() => data?.mailboxes ?? [], [data])
   const missing = useMemo(() => data?.missing ?? [], [data])
   const attention = useMemo(() => mailboxes.filter((m) => m.needsAttention), [mailboxes])
@@ -317,10 +327,16 @@ export function MailboxesPage() {
       description="Staff and project mailboxes on cPanel, matched against employee and project records. Usage is read live from cPanel."
       icon={HardDrive}
       actions={
-        <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Create Mailbox
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setHistoryOpen(true)} className="gap-1.5">
+            <History className="h-4 w-4" />
+            History
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Create Mailbox
+          </Button>
+        </div>
       }
       tabs={tabs}
       activeTab={tab}
@@ -443,22 +459,27 @@ export function MailboxesPage() {
         />
       )}
 
-      <CreateMailboxDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => void refetch()} />
+      <CreateMailboxDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={invalidateAll} />
+      <MailboxHistorySheet open={historyOpen} onOpenChange={setHistoryOpen} />
       <LinkDialog
         mailbox={linkTarget}
         onOpenChange={(open) => !open && setLinkTarget(null)}
         onLinked={() => void refetch()}
       />
-      <PasswordDialog mailbox={passwordTarget} onOpenChange={(open) => !open && setPasswordTarget(null)} />
+      <PasswordDialog
+        mailbox={passwordTarget}
+        onOpenChange={(open) => !open && setPasswordTarget(null)}
+        onReset={invalidateAll}
+      />
       <QuotaDialog
         mailbox={quotaTarget}
         onOpenChange={(open) => !open && setQuotaTarget(null)}
-        onSaved={() => void refetch()}
+        onSaved={invalidateAll}
       />
       <SuspensionDialog
         target={suspensionTarget}
         onOpenChange={(open) => !open && setSuspensionTarget(null)}
-        onSaved={() => void refetch()}
+        onSaved={invalidateAll}
       />
     </DataTablePage>
   )
