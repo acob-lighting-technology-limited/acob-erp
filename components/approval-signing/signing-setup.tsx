@@ -156,7 +156,7 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
               Image of your signature (PNG, JPG or WebP)
             </Label>
 
-            {file && filePreview ? (
+            {file && filePreview?.startsWith("blob:") ? (
               <div className="border-primary/40 bg-muted/20 relative rounded-lg border-2 border-dashed p-4">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="rounded-md border bg-white p-3 shadow-xs">
