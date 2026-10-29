@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { EmptyState } from "@/components/ui/patterns/empty-state"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiFetch } from "@/lib/api-client"
 import { formatDateTime } from "@/lib/format"
@@ -45,17 +46,19 @@ function ActionIcon({ actionType }: { actionType: MailboxHistoryActionType }) {
 function ActionBadge({ actionType }: { actionType: MailboxHistoryActionType }) {
   switch (actionType) {
     case "create":
-      return <Badge className="bg-emerald-500/15 font-normal text-emerald-600 dark:text-emerald-400">Created</Badge>
+      return <StatusBadge status="create" label="Created" tone="success" className="font-normal" />
     case "password_reset":
-      return <Badge className="bg-amber-500/15 font-normal text-amber-600 dark:text-amber-400">Password</Badge>
+      return <StatusBadge status="password_reset" label="Password" tone="warning" className="font-normal" />
     case "quota_changed":
-      return <Badge className="bg-blue-500/15 font-normal text-blue-600 dark:text-blue-400">Quota</Badge>
+      return <StatusBadge status="quota_changed" label="Quota" tone="info" className="font-normal" />
     case "suspension_changed":
-      return <Badge className="bg-purple-500/15 font-normal text-purple-600 dark:text-purple-400">Suspension</Badge>
+      return <StatusBadge status="suspension_changed" label="Suspension" tone="purple" className="font-normal" />
     default:
       return <Badge variant="outline">Action</Badge>
   }
 }
+
+const SKELETON_ITEMS = ["mailbox-sk-1", "mailbox-sk-2", "mailbox-sk-3", "mailbox-sk-4"] as const
 
 export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetProps) {
   const [search, setSearch] = useState("")
@@ -160,8 +163,8 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
       <div className="py-2">
         {isLoading ? (
           <div className="space-y-3 pt-1">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-card space-y-3 rounded-lg border p-4">
+            {SKELETON_ITEMS.map((itemKey) => (
+              <div key={itemKey} className="bg-card space-y-3 rounded-lg border p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Skeleton className="h-5 w-44" />
