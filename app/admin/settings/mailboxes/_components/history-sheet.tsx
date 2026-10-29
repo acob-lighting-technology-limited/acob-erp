@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { HardDrive, History, KeyRound, Lock, LockOpen, Plus, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { HardDrive, History, KeyRound, Lock, Plus, RefreshCw, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DetailSheet } from "@/components/ui/detail-sheet"
-import { DetailTimeline, DetailTimelineEntry } from "@/components/ui/detail-dialog"
 import { EmptyState } from "@/components/ui/patterns/empty-state"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiFetch } from "@/lib/api-client"
 import { formatDateTime } from "@/lib/format"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -88,12 +88,22 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
     })
   }, [history, search, typeFilter])
 
+  const counts = useMemo(() => {
+    return {
+      all: history.length,
+      create: history.filter((h) => h.actionType === "create").length,
+      password_reset: history.filter((h) => h.actionType === "password_reset").length,
+      quota_changed: history.filter((h) => h.actionType === "quota_changed").length,
+      suspension_changed: history.filter((h) => h.actionType === "suspension_changed").length,
+    }
+  }, [history])
+
   const filterTabs = [
-    { key: "all", label: "All" },
-    { key: "create", label: "Created" },
-    { key: "password_reset", label: "Passwords" },
-    { key: "quota_changed", label: "Quotas" },
-    { key: "suspension_changed", label: "Suspensions" },
+    { key: "all", label: `All (${counts.all})` },
+    { key: "create", label: `Created (${counts.create})` },
+    { key: "password_reset", label: `Passwords (${counts.password_reset})` },
+    { key: "quota_changed", label: `Quotas (${counts.quota_changed})` },
+    { key: "suspension_changed", label: `Suspensions (${counts.suspension_changed})` },
   ]
 
   return (
@@ -105,7 +115,7 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
       description="Audit trail of mailbox creations, password resets, quotas and suspensions executed on cPanel."
       wide
       toolbar={
-        <div className="space-y-3">
+        <div className="bg-muted/10 space-y-3 border-b px-4 py-3 sm:px-5">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
@@ -129,34 +139,43 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            {filterTabs.map((tab) => (
-              <Button
-                key={tab.key}
-                size="sm"
-                variant={typeFilter === tab.key ? "secondary" : "ghost"}
-                onClick={() => setTypeFilter(tab.key)}
-                className="h-7 text-xs"
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
+          <Tabs value={typeFilter} onValueChange={setTypeFilter} className="w-full">
+            <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <TabsList className="bg-muted text-muted-foreground inline-flex h-9 w-max min-w-full items-center justify-start rounded-lg p-1 sm:min-w-0">
+                {filterTabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.key}
+                    value={tab.key}
+                    className="data-[state=active]:bg-background data-[state=active]:text-foreground px-3 py-1 text-xs whitespace-nowrap data-[state=active]:shadow-sm"
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </Tabs>
         </div>
       }
     >
       <div className="py-2">
         {isLoading ? (
-          <div className="space-y-6 pt-2">
+          <div className="space-y-3 pt-1">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex gap-4">
-                <Skeleton className="h-4 w-4 shrink-0 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-24" />
+              <div key={i} className="bg-card space-y-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-44" />
+                    <Skeleton className="h-5 w-16" />
                   </div>
-                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+                <div className="border-border/50 flex justify-between border-t pt-2">
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
               </div>
             ))}
@@ -200,37 +219,44 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
             }
           />
         ) : (
-          <DetailTimeline>
+          <div className="space-y-3 pt-1">
             {filteredHistory.map((item) => (
-              <DetailTimelineEntry
+              <div
                 key={item.id}
-                timestamp={formatDateTime(item.createdAt, "-")}
-                title={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <ActionIcon actionType={item.actionType} />
-                      {item.title}
+                className="bg-card hover:bg-muted/30 space-y-2.5 rounded-lg border p-3.5 transition-colors"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="bg-muted text-foreground rounded px-2 py-0.5 font-mono text-xs font-semibold break-all">
+                      {item.email}
                     </span>
                     <ActionBadge actionType={item.actionType} />
                   </div>
-                }
-              >
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-muted-foreground text-xs">Mailbox:</span>
-                    <span className="bg-muted/70 text-foreground rounded px-2 py-0.5 font-mono text-xs font-semibold break-all">
-                      {item.email}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground text-xs">{item.description}</p>
-                  <p className="text-muted-foreground pt-0.5 text-xs">
-                    Performed by <span className="text-foreground font-medium">{item.actor.name}</span>
-                    {item.actor.email && <span className="opacity-70"> ({item.actor.email})</span>}
-                  </p>
+                  <span className="text-muted-foreground shrink-0 text-xs">{formatDateTime(item.createdAt, "-")}</span>
                 </div>
-              </DetailTimelineEntry>
+
+                <div className="flex items-start gap-2.5 pt-0.5">
+                  <div className="bg-muted/60 mt-0.5 shrink-0 rounded p-1">
+                    <ActionIcon actionType={item.actionType} />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-foreground text-sm font-medium">{item.title}</p>
+                    <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
+                  </div>
+                </div>
+
+                <div className="border-border/50 text-muted-foreground flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t pt-2 text-xs">
+                  <span>
+                    Performed by <span className="text-foreground font-medium">{item.actor.name}</span>
+                    {item.actor.email && <span className="opacity-80"> ({item.actor.email})</span>}
+                  </span>
+                  {item.metadata.ipAddress && (
+                    <span className="font-mono text-xs opacity-75">IP: {item.metadata.ipAddress}</span>
+                  )}
+                </div>
+              </div>
             ))}
-          </DetailTimeline>
+          </div>
         )}
       </div>
     </DetailSheet>
