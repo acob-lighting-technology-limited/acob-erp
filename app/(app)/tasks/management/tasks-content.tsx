@@ -809,7 +809,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         />
       )}
 
-      <TaskSeriesSheet seriesId={openSeriesId} onOpenChange={(open) => !open && setOpenSeriesId(null)} />
+      <TaskSeriesSheet readOnly seriesId={openSeriesId} onOpenChange={(open) => !open && setOpenSeriesId(null)} />
 
       <UserTaskDetailsDialog
         open={isDetailsOpen}

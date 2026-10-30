@@ -33,12 +33,19 @@ export function TaskSeriesSheet({
   onOpenChange,
   assignableEmployees = [],
   onChanged,
+  readOnly = false,
 }: {
   seriesId: string | null
   onOpenChange: (open: boolean) => void
   assignableEmployees?: SeriesAssignableEmployee[]
   /** Called after any change, so the page's task list can reload. */
   onChanged?: () => void
+  /**
+   * The staff /tasks page: show the series, never manage it. Reassign, pause,
+   * end and bulk approval belong to the admin and department task pages, even
+   * for a lead who happens to open their own copy here.
+   */
+  readOnly?: boolean
 }) {
   const queryClient = useQueryClient()
   const [action, setAction] = useState<SeriesActionMode | null>(null)
@@ -113,7 +120,7 @@ export function TaskSeriesSheet({
   }
 
   const series = detail?.series
-  const canManage = Boolean(detail?.can_manage) && series?.status !== "ended"
+  const canManage = !readOnly && Boolean(detail?.can_manage) && series?.status !== "ended"
 
   return (
     <>

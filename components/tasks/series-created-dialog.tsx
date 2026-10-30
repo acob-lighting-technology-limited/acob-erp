@@ -56,7 +56,7 @@ export function SeriesCreatedDialog() {
     {
       icon: Settings2,
       title: "Changing it later",
-      body: "Open it from the Recurring tab to reassign it, pause it (for leave, say) or end it. To change the schedule itself, end it and create a new one.",
+      body: "Open it from the Recurring tab of the admin or department task page to reassign it, pause it (for leave, say) or end it. To change the schedule itself, end it and create a new one.",
     },
   ]
 
