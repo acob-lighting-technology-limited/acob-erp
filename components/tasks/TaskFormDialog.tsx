@@ -296,7 +296,7 @@ export function TaskFormDialog({
   })
 
   const effectiveStartDate = startDateValue || toLocalISODate()
-  // Repeat has no default on a new task: the dates stay locked until it is chosen.
+  // Repeat has no default on a new task: the dates stay hidden until it is chosen.
   const repeatUnchosen = isCreating && repeat.repeat === ""
   const isRepeating = isCreating && repeat.repeat !== "" && repeat.repeat !== "none"
   const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
@@ -676,85 +676,90 @@ export function TaskFormDialog({
             {/* New tasks only; a repeat is managed from its series */}
             {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} />}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="task_start_date" className="text-xs font-semibold">
-                  {isRepeating ? "Starts" : "Start Date"}
-                </Label>
-                <Input
-                  id="task_start_date"
-                  type="date"
-                  {...register("task_start_date")}
-                  disabled={lockLevel !== "none" || repeatUnchosen}
-                  className="mt-1 text-xs"
-                />
-              </div>
-
-              {isRepeating ? (
+            {!repeatUnchosen && (
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="repeat_end_date" className="text-xs font-semibold">
-                    Ends
-                  </Label>
-                  <Select
-                    value={repeat.repeat_end_date ? "on_date" : "never"}
-                    onValueChange={(val) =>
-                      setRepeatField(
-                        "repeat_end_date",
-                        val === "never" ? "" : repeat.repeat_end_date || effectiveStartDate
-                      )
-                    }
-                  >
-                    <SelectTrigger className="mt-1 text-xs" aria-label="When the series ends">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="never">Never</SelectItem>
-                      <SelectItem value="on_date">On a date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {repeat.repeat_end_date && (
-                    <Input
-                      id="repeat_end_date"
-                      type="date"
-                      min={effectiveStartDate}
-                      value={repeat.repeat_end_date}
-                      onChange={(e) => setRepeatField("repeat_end_date", e.target.value)}
-                      className="mt-2 text-xs"
-                    />
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <Label htmlFor="due_date" className="text-xs font-semibold">
-                    Due Date {isCreating && <span className="text-destructive">*</span>}
+                  <Label htmlFor="task_start_date" className="text-xs font-semibold">
+                    {isRepeating ? "Starts" : "Start Date"}
                   </Label>
                   <Input
-                    id="due_date"
-                    required={isCreating}
+                    id="task_start_date"
                     type="date"
-                    {...register("due_date")}
-                    min={isCreating ? effectiveStartDate : undefined}
-                    max={maxDueDate}
-                    disabled={lockLevel !== "none" || repeatUnchosen}
-                    aria-invalid={Boolean(deadlineError)}
-                    aria-describedby={isCreating ? "due_date_hint" : undefined}
+                    {...register("task_start_date")}
+                    disabled={lockLevel !== "none"}
                     className="mt-1 text-xs"
                   />
-                  {isCreating && !repeatUnchosen && (
-                    <p
-                      id="due_date_hint"
-                      className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
-                    >
-                      {deadlineError ?? `Latest ${formatWATDate(maxDueDate!)} (${TASK_MAX_WORKING_DAYS} working days).`}
-                    </p>
-                  )}
                 </div>
-              )}
-            </div>
+
+                {isRepeating ? (
+                  <div>
+                    <Label htmlFor="repeat_end_date" className="text-xs font-semibold">
+                      Ends
+                    </Label>
+                    <Select
+                      value={repeat.repeat_end_date ? "on_date" : "never"}
+                      onValueChange={(val) =>
+                        setRepeatField(
+                          "repeat_end_date",
+                          val === "never" ? "" : repeat.repeat_end_date || effectiveStartDate
+                        )
+                      }
+                    >
+                      <SelectTrigger className="mt-1 text-xs" aria-label="When the series ends">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="never">Never</SelectItem>
+                        <SelectItem value="on_date">On a date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {repeat.repeat_end_date && (
+                      <Input
+                        id="repeat_end_date"
+                        type="date"
+                        min={effectiveStartDate}
+                        value={repeat.repeat_end_date}
+                        onChange={(e) => setRepeatField("repeat_end_date", e.target.value)}
+                        className="mt-2 text-xs"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="due_date" className="text-xs font-semibold">
+                      Due Date {isCreating && <span className="text-destructive">*</span>}
+                    </Label>
+                    <Input
+                      id="due_date"
+                      required={isCreating}
+                      type="date"
+                      {...register("due_date")}
+                      min={isCreating ? effectiveStartDate : undefined}
+                      max={maxDueDate}
+                      disabled={lockLevel !== "none"}
+                      aria-invalid={Boolean(deadlineError)}
+                      aria-describedby={isCreating ? "due_date_hint" : undefined}
+                      className="mt-1 text-xs"
+                    />
+                    {isCreating && (
+                      <p
+                        id="due_date_hint"
+                        className={
+                          deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"
+                        }
+                      >
+                        {deadlineError ??
+                          `Latest ${formatWATDate(maxDueDate!)} (${TASK_MAX_WORKING_DAYS} working days).`}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {repeatUnchosen && (
               <p className="text-muted-foreground text-xs">
-                Choose Repeat first: &quot;Does not repeat&quot; for a one-off task, or how often it recurs.
+                Choose Repeat to set the dates: &quot;Does not repeat&quot; for a one-off task, or how often it recurs.
               </p>
             )}
 

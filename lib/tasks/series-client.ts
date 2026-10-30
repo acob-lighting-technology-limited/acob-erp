@@ -11,7 +11,7 @@ import type { SeriesFrequency, SeriesMonthMode } from "@/lib/tasks/recurrence"
 /**
  * "" means not chosen yet. A new task starts there on purpose: Repeat has no
  * default, so whoever creates a task decides whether it repeats before the
- * dates unlock, rather than leaving a new feature unnoticed.
+ * dates appear, rather than leaving a new feature unnoticed.
  */
 export type RepeatChoice = "" | "none" | SeriesFrequency
 
