@@ -1,22 +1,14 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const NONE = "none"
+const NONE = "__none__"
 
 /**
- * "Part of": the one place a task is tied to a project or a portfolio. A task
- * is one or the other, never both, so a single picker replaces the two
- * dropdowns that each had to explain why you might want the other one.
+ * Project and Portfolio on one row. A task is one or the other, never both,
+ * so picking one clears the other - both stay visible so neither is hidden
+ * behind the other's choice.
  */
 export function TaskWorkLinkField({
   projectId,
@@ -35,63 +27,69 @@ export function TaskWorkLinkField({
   lockedLabel?: string | null
 }) {
   if (lockedLabel) {
-    return (
-      <div>
-        <Label className="text-xs font-semibold">Part of</Label>
-        <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">{lockedLabel}</div>
-      </div>
-    )
+    return <div className="bg-muted/50 text-muted-foreground rounded-md border px-3 py-2 text-xs">{lockedLabel}</div>
   }
 
-  const value = projectId ? `project:${projectId}` : portfolioId ? `portfolio:${portfolioId}` : NONE
   const hint = projectId
     ? "Rated by the project's manager, and counts toward the project's progress."
     : portfolioId
-      ? "Work across the whole portfolio. For one project's work, pick the project."
+      ? "Work across the whole portfolio, not one project."
       : null
 
   return (
     <div>
-      <Label htmlFor="work_link" className="text-xs font-semibold">
-        Part of
-      </Label>
-      <Select
-        value={value}
-        onValueChange={(val) => {
-          const [kind, id = ""] = val.split(":")
-          onChange({ project_id: kind === "project" ? id : "", portfolio_id: kind === "portfolio" ? id : "" })
-        }}
-      >
-        <SelectTrigger id="work_link" className="mt-1">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NONE}>
-            <span className="text-muted-foreground italic">Nothing (everyday work)</span>
-          </SelectItem>
-          {projects.length > 0 && (
-            <SelectGroup>
-              <SelectLabel>Projects</SelectLabel>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
+          <Label htmlFor="project_id" className="text-xs font-semibold">
+            Project
+          </Label>
+          <Select
+            value={projectId || NONE}
+            onValueChange={(val) => onChange({ project_id: val === NONE ? "" : val, portfolio_id: "" })}
+          >
+            <SelectTrigger id="project_id" className="mt-1 w-full min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>
+                <span className="text-muted-foreground italic">None</span>
+              </SelectItem>
               {projects.map((project) => (
-                <SelectItem key={project.id} value={`project:${project.id}`}>
+                <SelectItem key={project.id} value={project.id}>
                   {project.project_name}
                 </SelectItem>
               ))}
-            </SelectGroup>
-          )}
-          {portfolios.length > 0 && (
-            <SelectGroup>
-              <SelectLabel>Portfolios</SelectLabel>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="min-w-0">
+          <Label htmlFor="portfolio_id" className="text-xs font-semibold">
+            Portfolio
+          </Label>
+          <Select
+            value={portfolioId || NONE}
+            onValueChange={(val) => onChange({ project_id: "", portfolio_id: val === NONE ? "" : val })}
+          >
+            <SelectTrigger id="portfolio_id" className="mt-1 w-full min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>
+                <span className="text-muted-foreground italic">None</span>
+              </SelectItem>
               {portfolios.map((portfolio) => (
-                <SelectItem key={portfolio.id} value={`portfolio:${portfolio.id}`}>
+                <SelectItem key={portfolio.id} value={portfolio.id}>
                   {portfolio.label}
                 </SelectItem>
               ))}
-            </SelectGroup>
-          )}
-        </SelectContent>
-      </Select>
-      {hint && <p className="text-muted-foreground mt-1 text-xs">{hint}</p>}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <p className="text-muted-foreground mt-1 text-xs">
+        {hint ?? "Optional. A task is part of a project or a portfolio, not both."}
+      </p>
     </div>
   )
 }

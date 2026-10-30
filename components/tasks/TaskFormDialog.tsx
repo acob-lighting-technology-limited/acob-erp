@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, type ReactNode } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { ChevronDown, Users, User } from "lucide-react"
+import { Users, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,7 +23,7 @@ import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
-import { cn, formatFullName } from "@/lib/utils"
+import { formatFullName } from "@/lib/utils"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
@@ -177,11 +177,12 @@ export function TaskFormDialog({
   lockedPortfolioId = null,
   lockedPortfolioName = null,
 }: TaskFormDialogProps) {
-  const [isMultiAssign, setIsMultiAssign] = useState(false)
+  // New tasks use the checkbox list (tick one person or several); an
+  // existing task belongs to one person, so editing keeps a single picker.
+  const isMultiAssign = !selectedTask
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   // Recurrence is creation-only: an existing repeat is managed from its series.
   const [repeat, setRepeat] = useState<Required<RepeatFormFields>>(DEFAULT_REPEAT_FIELDS)
-  const [showMore, setShowMore] = useState(false)
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -245,18 +246,13 @@ export function TaskFormDialog({
       repeat_end_date: taskForm.repeat_end_date ?? DEFAULT_REPEAT_FIELDS.repeat_end_date,
     })
 
-    setShowMore(Boolean(lockedProjectId || lockedPortfolioId || taskForm.project_id || taskForm.portfolio_id))
-
-    if (taskForm.assigned_users && taskForm.assigned_users.length > 1) {
-      setIsMultiAssign(true)
-      setSelectedUserIds(taskForm.assigned_users)
-    } else if (taskForm.assigned_to) {
-      setIsMultiAssign(false)
-      setSelectedUserIds([taskForm.assigned_to])
-    } else {
-      setIsMultiAssign(false)
-      setSelectedUserIds([])
-    }
+    setSelectedUserIds(
+      taskForm.assigned_users && taskForm.assigned_users.length > 0
+        ? taskForm.assigned_users
+        : taskForm.assigned_to
+          ? [taskForm.assigned_to]
+          : []
+    )
   }, [isOpen, reset, selectedTask, taskForm, lockedProjectId, lockedPlanId, lockedPortfolioId])
 
   const lockLevel = !selectedTask
@@ -463,7 +459,7 @@ export function TaskFormDialog({
                 {
                   label: "Project or Portfolio",
                   value:
-                    "Under More options. A project task is rated by that project's manager and counts toward the project's progress. A portfolio task is work across a whole portfolio, such as a group of sites in development.",
+                    "A project task is rated by that project's manager and counts toward the project's progress. A portfolio task is work across a whole portfolio, such as a group of sites in development.",
                 },
                 {
                   label: "Recurring Tasks",
@@ -538,41 +534,9 @@ export function TaskFormDialog({
 
           <FormSection title="Who and how it counts">
             <div>
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-semibold">
-                  {isMultiAssign ? "Assignees" : "Assignee"} <span className="text-destructive">*</span>
-                </Label>
-                {!selectedTask && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => {
-                      const nextMulti = !isMultiAssign
-                      setIsMultiAssign(nextMulti)
-                      if (!nextMulti) {
-                        if (selectedUserIds.length > 0) {
-                          const firstId = selectedUserIds[0]
-                          setValue("assigned_to", firstId)
-                          const member = scopedAssignableEmployees.find((e) => e.id === firstId)
-                          if (member?.department) {
-                            setValue("department", member.department)
-                          }
-                          setSelectedUserIds([firstId])
-                        }
-                      } else {
-                        if (assignedTo && !selectedUserIds.includes(assignedTo)) {
-                          setSelectedUserIds([assignedTo])
-                        }
-                      }
-                    }}
-                  >
-                    <Users className="mr-1 h-3.5 w-3.5" />
-                    {isMultiAssign ? "Assign one person" : "Assign several people"}
-                  </Button>
-                )}
-              </div>
+              <Label className="text-xs font-semibold">
+                Assign to <span className="text-destructive">*</span>
+              </Label>
 
               {!isMultiAssign ? (
                 <div className="mt-1">
@@ -615,9 +579,11 @@ export function TaskFormDialog({
                     searchPlaceholder="Search staff name or department..."
                     disabled={lockLevel !== "none"}
                   />
-                  <p className="text-muted-foreground text-xs">
-                    {selectedUserIds.length} selected. Each person gets their own copy of the task.
-                  </p>
+                  {selectedUserIds.length > 1 && (
+                    <p className="text-muted-foreground text-xs">
+                      {selectedUserIds.length} people selected. Each gets their own copy of the task.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -685,9 +651,29 @@ export function TaskFormDialog({
                 </Select>
               </div>
             </div>
+            <TaskWorkLinkField
+              projectId={projectId || ""}
+              portfolioId={portfolioId || ""}
+              projects={projectOptions}
+              portfolios={portfolioOptions}
+              onChange={(link) => {
+                setValue("project_id", link.project_id)
+                setValue("portfolio_id", link.portfolio_id)
+              }}
+              lockedLabel={
+                lockedPortfolioId
+                  ? `Portfolio: ${lockedPortfolioName || "This portfolio"}`
+                  : lockedProjectId
+                    ? `Project: ${lockedProjectName || "This project"}${lockedPlanName ? ` · ${lockedPlanName}` : ""}`
+                    : null
+              }
+            />
           </FormSection>
 
           <FormSection title="When">
+            {/* New tasks only; a repeat is managed from its series */}
+            {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} />}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="task_start_date" className="text-xs font-semibold">
@@ -764,9 +750,6 @@ export function TaskFormDialog({
               )}
             </div>
 
-            {/* New tasks only; a repeat is managed from its series */}
-            {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} />}
-
             {repeatSchedule && (
               <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
                 {repeatError ??
@@ -774,39 +757,6 @@ export function TaskFormDialog({
               </p>
             )}
           </FormSection>
-
-          {/* Most tasks are everyday work, so the project/portfolio link starts
-              folded away unless the task already has one. */}
-          <section className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setShowMore((open) => !open)}
-              aria-expanded={showMore}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs font-semibold tracking-wide uppercase"
-            >
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !showMore && "-rotate-90")} />
-              More options
-            </button>
-            {showMore && (
-              <TaskWorkLinkField
-                projectId={projectId || ""}
-                portfolioId={portfolioId || ""}
-                projects={projectOptions}
-                portfolios={portfolioOptions}
-                onChange={(link) => {
-                  setValue("project_id", link.project_id)
-                  setValue("portfolio_id", link.portfolio_id)
-                }}
-                lockedLabel={
-                  lockedPortfolioId
-                    ? `Portfolio: ${lockedPortfolioName || "This portfolio"}`
-                    : lockedProjectId
-                      ? `Project: ${lockedProjectName || "This project"}${lockedPlanName ? ` · ${lockedPlanName}` : ""}`
-                      : null
-                }
-              />
-            )}
-          </section>
         </fieldset>
 
         <DialogFooter className="pt-2">
