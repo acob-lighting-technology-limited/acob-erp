@@ -5,8 +5,8 @@ export type TaskTab = "tasks" | "user_plan" | "recurring"
 
 export const TASK_TABS: DataTableTab[] = [
   { key: "tasks", label: "All Tasks", icon: ClipboardList },
-  { key: "user_plan", label: "User Task Plan", icon: Users },
   { key: "recurring", label: "Recurring", icon: Repeat },
+  { key: "user_plan", label: "User Task Plan", icon: Users },
 ]
 
 /** The page header for each tab of the admin task page. */

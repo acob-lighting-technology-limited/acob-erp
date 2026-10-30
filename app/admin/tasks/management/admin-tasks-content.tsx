@@ -62,7 +62,7 @@ import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
 import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
 import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
 import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
-import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
+import { createSeriesFromForm, isRepeating, showSeriesCreated } from "@/lib/tasks/series-client"
 import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
 
 const log = logger("tasks-management-admin-tasks-content")
@@ -327,7 +327,7 @@ export function AdminTasksContent({
 
       if (!selectedTask && isRepeating(activeTaskForm)) {
         // Repeat set: a series, whose repeats are created on schedule.
-        toast.success(seriesCreatedMessage(await createSeriesFromForm(activeTaskForm)))
+        showSeriesCreated(await createSeriesFromForm(activeTaskForm))
       } else if (selectedTask) {
         const response = await apiFetch(`/api/tasks/${selectedTask.id}`, {
           method: "PATCH",

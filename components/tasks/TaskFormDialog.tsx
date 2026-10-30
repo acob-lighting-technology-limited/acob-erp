@@ -34,7 +34,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchProjectRecords, PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 import { usePortfolios } from "@/hooks/use-portfolios"
 import { portfolioLabel } from "@/lib/tasks/work-links"
-import { describeSchedule, upcomingDueDates } from "@/lib/tasks/recurrence"
+import { creationDateFor, describeSchedule, upcomingDueDates } from "@/lib/tasks/recurrence"
 import { TaskRepeatFields } from "@/components/tasks/task-repeat-fields"
 import { TaskWorkLinkField } from "@/components/tasks/task-work-link-field"
 import { DEFAULT_REPEAT_FIELDS, scheduleFromForm, type RepeatFormFields } from "@/lib/tasks/series-client"
@@ -310,6 +310,16 @@ export function TaskFormDialog({
   // the schedule, so the form shows the next few instead.
   const repeatSchedule = isRepeating ? scheduleFromForm({ ...repeat, task_start_date: effectiveStartDate }) : null
   const repeatPreview = repeatSchedule ? upcomingDueDates(repeatSchedule, effectiveStartDate, 3, holidays) : []
+  // Each repeat is created ahead of its due date, so say when the first one appears.
+  const firstCreated =
+    repeatSchedule && repeatPreview[0]
+      ? creationDateFor(repeatSchedule.frequency, repeatPreview[0], effectiveStartDate, holidays)
+      : null
+  const firstCreatedNote = !firstCreated
+    ? ""
+    : firstCreated <= toLocalISODate()
+      ? " The first task is created as soon as you save."
+      : ` The first task is created on ${formatWATDate(firstCreated)}; until then it shows as "Scheduled".`
   const repeatError = !isRepeating
     ? null
     : effectiveStartDate < toLocalISODate()
@@ -766,7 +776,7 @@ export function TaskFormDialog({
             {repeatSchedule && (
               <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
                 {repeatError ??
-                  `${describeSchedule(repeatSchedule)}. Next due: ${repeatPreview.map((date) => formatWATDate(date)).join(", ")}${repeatPreview.length === 3 ? ", …" : ""}`}
+                  `${describeSchedule(repeatSchedule)}. Next due: ${repeatPreview.map((date) => formatWATDate(date)).join(", ")}${repeatPreview.length === 3 ? ", …" : ""}.${firstCreatedNote}`}
               </p>
             )}
           </FormSection>

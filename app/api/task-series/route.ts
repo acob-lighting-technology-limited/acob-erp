@@ -249,6 +249,15 @@ export async function POST(request: NextRequest) {
       toNotify.push({ series, rows })
     }
 
+    // For the "set up" message: when the first task is due, and the day it is
+    // created if it was not made just now. Every series here shares one schedule.
+    const fromIso = payload.start_date > today ? payload.start_date : today
+    const firstDue = upcomingDueDates(scheduleOf(created[0]), fromIso, 1, holidays)[0] ?? null
+    const firstCreated =
+      firstDue && firstRepeats === 0
+        ? creationDateFor(created[0].frequency, firstDue, created[0].start_date, holidays)
+        : null
+
     await writeAuditLog(
       supabase,
       {
@@ -275,7 +284,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ data: created[0], createdCount: created.length, firstRepeats }, { status: 201 })
+    return NextResponse.json(
+      { data: created[0], createdCount: created.length, firstRepeats, firstDue, firstCreated },
+      { status: 201 }
+    )
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task series POST")
     return apiError("Failed to create recurring task", ApiErrorCode.INTERNAL_ERROR, 500)
