@@ -457,22 +457,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       ],
     },
     {
-      key: "weight",
-      label: "Weight",
-      options: [
-        { value: "1", label: "Weight 1" },
-        { value: "2", label: "Weight 2" },
-        { value: "3", label: "Weight 3" },
-        { value: "4", label: "Weight 4" },
-        { value: "5", label: "Weight 5" },
-      ],
-      mode: "custom",
-      filterFn: (row, vals) => {
-        if (vals.length === 0) return true
-        return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
-      },
-    },
-    {
       key: "urgency",
       label: "Urgency",
       options: [
