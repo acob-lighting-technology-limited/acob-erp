@@ -6,6 +6,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { SeriesCreatedDialog } from "@/components/tasks/series-created-dialog"
 import { Suspense } from "react"
 import { HeaderWrapper } from "@/components/header-wrapper"
 import { SidebarProvider } from "@/components/sidebar-context"
@@ -114,6 +115,7 @@ export default function RootLayout({
                   {/* Intentionally public routes outside (app): /employee/new, /maintenance */}
                   {children}
                   <Toaster />
+                  <SeriesCreatedDialog />
                 </SidebarProvider>
               </ConfirmProvider>
             </QueryProvider>

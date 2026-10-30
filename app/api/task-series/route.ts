@@ -284,8 +284,30 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Names for the "set up" summary, in the order the people were picked.
+    const { data: picked } = await dataClient
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", targetUserIds)
+    const nameById = new Map(
+      ((picked || []) as Array<{ id: string; first_name: string | null; last_name: string | null }>).map((p) => [
+        p.id,
+        `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim(),
+      ])
+    )
+
     return NextResponse.json(
-      { data: created[0], createdCount: created.length, firstRepeats, firstDue, firstCreated },
+      {
+        data: created[0],
+        createdCount: created.length,
+        firstRepeats,
+        firstDue,
+        firstCreated,
+        title: created[0].title,
+        scheduleLabel: describeSchedule(created[0]),
+        endDate: created[0].end_date,
+        assigneeNames: targetUserIds.map((id) => nameById.get(id) || "Unknown"),
+      },
       { status: 201 }
     )
   } catch (error) {

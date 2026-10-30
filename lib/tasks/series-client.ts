@@ -5,9 +5,7 @@
  * a recurring task is saved the same way whichever screen made it.
  */
 
-import { toast } from "sonner"
 import { apiJson } from "@/lib/api-client"
-import { formatWATDate } from "@/lib/utils/date"
 import type { SeriesFrequency, SeriesMonthMode } from "@/lib/tasks/recurrence"
 
 /**
@@ -88,6 +86,11 @@ export async function createSeriesFromForm(
     firstRepeats?: number
     firstDue?: string | null
     firstCreated?: string | null
+    title?: string
+    scheduleLabel?: string
+    endDate?: string | null
+    assigneeNames?: string[]
+    data?: { frequency?: SeriesFrequency }
   }>("/api/task-series", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -112,6 +115,11 @@ export async function createSeriesFromForm(
     firstRepeats: payload.firstRepeats ?? 0,
     firstDue: payload.firstDue ?? null,
     firstCreated: payload.firstCreated ?? null,
+    title: payload.title ?? form.title,
+    scheduleLabel: payload.scheduleLabel ?? "",
+    endDate: payload.endDate ?? null,
+    assigneeNames: payload.assigneeNames ?? [],
+    frequency: payload.data?.frequency ?? null,
   }
 }
 
@@ -122,36 +130,25 @@ export type SeriesCreated = {
   firstDue: string | null
   /** The day the first task will be created, when it was not made straight away. */
   firstCreated: string | null
+  title: string
+  scheduleLabel: string
+  endDate: string | null
+  assigneeNames: string[]
+  frequency: SeriesFrequency | null
 }
+
+/** Window event SeriesCreatedDialog listens for; see showSeriesCreated. */
+export const SERIES_CREATED_EVENT = "acob:task-series-created"
 
 /**
- * The message after creating a series. A recurring task usually has no task
- * yet - a monthly one appears 5 working days before it is due - so the message
- * says when it will appear and where to find it meanwhile, or people go
- * looking for a task that does not exist.
+ * Opens the "recurring task set up" summary. A recurring task usually has no
+ * task yet - a monthly one appears 5 working days before it is due - so a
+ * toast was not enough: people went looking for a task that did not exist.
+ * The summary is mounted once in the root layout, so every screen that
+ * creates a series shows the same one.
  */
-export function seriesCreatedMessage(result: SeriesCreated): { title: string; description: string } {
-  const who = result.createdCount > 1 ? ` for ${result.createdCount} people` : ""
-  const due = result.firstDue ? formatWATDate(result.firstDue) : null
-  if (result.firstRepeats > 0) {
-    return {
-      title: `Recurring task set up${who}`,
-      description: `The first task is in the task list now${due ? `, due ${due}` : ""}. Each later one is created ahead of its due date.`,
-    }
-  }
-  return {
-    title: `Recurring task set up${who}`,
-    description:
-      result.firstCreated && due
-        ? `Its first task will be created on ${formatWATDate(result.firstCreated)}, due ${due}. Until then it shows as "Scheduled" in the task list and under the Recurring tab.`
-        : `Its first task will be created ahead of its due date. Until then it shows under the Recurring tab.`,
-  }
-}
-
-/** Shows seriesCreatedMessage, kept up long enough to read. */
 export function showSeriesCreated(result: SeriesCreated): void {
-  const { title, description } = seriesCreatedMessage(result)
-  toast.success(title, { description, duration: 15000 })
+  window.dispatchEvent(new CustomEvent<SeriesCreated>(SERIES_CREATED_EVENT, { detail: result }))
 }
 
 // ── API shapes ─────────────────────────────────────────────────────────
