@@ -296,7 +296,9 @@ export function TaskFormDialog({
   })
 
   const effectiveStartDate = startDateValue || toLocalISODate()
-  const isRepeating = isCreating && repeat.repeat !== "none"
+  // Repeat has no default on a new task: the dates stay locked until it is chosen.
+  const repeatUnchosen = isCreating && repeat.repeat === ""
+  const isRepeating = isCreating && repeat.repeat !== "" && repeat.repeat !== "none"
   const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
   const deadlineError =
     isCreating && !isRepeating && dueDateValue
@@ -683,7 +685,7 @@ export function TaskFormDialog({
                   id="task_start_date"
                   type="date"
                   {...register("task_start_date")}
-                  disabled={lockLevel !== "none"}
+                  disabled={lockLevel !== "none" || repeatUnchosen}
                   className="mt-1 text-xs"
                 />
               </div>
@@ -733,12 +735,12 @@ export function TaskFormDialog({
                     {...register("due_date")}
                     min={isCreating ? effectiveStartDate : undefined}
                     max={maxDueDate}
-                    disabled={lockLevel !== "none"}
+                    disabled={lockLevel !== "none" || repeatUnchosen}
                     aria-invalid={Boolean(deadlineError)}
                     aria-describedby={isCreating ? "due_date_hint" : undefined}
                     className="mt-1 text-xs"
                   />
-                  {isCreating && (
+                  {isCreating && !repeatUnchosen && (
                     <p
                       id="due_date_hint"
                       className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
@@ -750,10 +752,9 @@ export function TaskFormDialog({
               )}
             </div>
 
-            {/* Recurring tasks are new: point one-off tasks at Repeat so people learn it exists. */}
-            {isCreating && !isRepeating && (
+            {repeatUnchosen && (
               <p className="text-muted-foreground text-xs">
-                One-off task. For work that happens every day, week or month, choose Repeat above.
+                Choose Repeat first: &quot;Does not repeat&quot; for a one-off task, or how often it recurs.
               </p>
             )}
 
@@ -776,6 +777,7 @@ export function TaskFormDialog({
               isSaving ||
               !titleValue ||
               Boolean(deadlineError) ||
+              repeatUnchosen ||
               isMissingDueDate ||
               Boolean(repeatError) ||
               (isMultiAssign ? selectedUserIds.length === 0 : !assignedTo)

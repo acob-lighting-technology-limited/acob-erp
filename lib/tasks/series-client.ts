@@ -8,7 +8,12 @@
 import { apiJson } from "@/lib/api-client"
 import type { SeriesFrequency, SeriesMonthMode } from "@/lib/tasks/recurrence"
 
-export type RepeatChoice = "none" | SeriesFrequency
+/**
+ * "" means not chosen yet. A new task starts there on purpose: Repeat has no
+ * default, so whoever creates a task decides whether it repeats before the
+ * dates unlock, rather than leaving a new feature unnoticed.
+ */
+export type RepeatChoice = "" | "none" | SeriesFrequency
 
 /** The repeat fields TaskFormDialog collects; all optional so existing forms need no change. */
 export type RepeatFormFields = {
@@ -22,7 +27,7 @@ export type RepeatFormFields = {
 }
 
 export const DEFAULT_REPEAT_FIELDS: Required<RepeatFormFields> = {
-  repeat: "none",
+  repeat: "",
   repeat_weekday: 5,
   repeat_month_mode: "last_day",
   repeat_month_day: 1,
@@ -52,7 +57,7 @@ type SeriesFormSource = RepeatFormFields & {
 
 /** The schedule part of a series, from the form's repeat fields. */
 export function scheduleFromForm(form: RepeatFormFields & { task_start_date: string }) {
-  const frequency = (form.repeat === "none" ? "monthly" : form.repeat) as SeriesFrequency
+  const frequency = (isRepeating(form) ? form.repeat : "monthly") as SeriesFrequency
   const usesMonth = frequency === "monthly" || frequency === "yearly"
   const monthMode = form.repeat_month_mode ?? DEFAULT_REPEAT_FIELDS.repeat_month_mode
   return {

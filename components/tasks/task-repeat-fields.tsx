@@ -52,8 +52,8 @@ export function TaskRepeatFields({
           )}
         </Label>
         <Select value={repeat.repeat} onValueChange={(val) => setRepeatField("repeat", val as RepeatChoice)}>
-          <SelectTrigger id="repeat" className="mt-1">
-            <SelectValue />
+          <SelectTrigger id="repeat" className="mt-1" aria-invalid={repeat.repeat === ""}>
+            <SelectValue placeholder="Choose how often" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Does not repeat</SelectItem>
