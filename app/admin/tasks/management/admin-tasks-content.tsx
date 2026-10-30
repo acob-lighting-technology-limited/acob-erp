@@ -421,11 +421,11 @@ export function AdminTasksContent({
         label: "Task Title",
         sortable: true,
         resizable: true,
-        initialWidth: 260,
+        initialWidth: 480,
         accessor: (r) => r.title,
         render: (r) => (
           <div className="flex flex-col gap-0.5">
-            <span className="text-foreground font-medium">{r.title}</span>
+            <span className="text-foreground line-clamp-2 font-medium">{r.title}</span>
             <RecurringTaskBadge task={r} onOpen={setOpenSeriesId} />
             {r.project_name && (
               <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
@@ -483,25 +483,6 @@ export function AdminTasksContent({
         accessor: (r) => r.status,
         render: (r) =>
           isScheduledTask(r) ? <ScheduledTaskBadge task={r} /> : <AdminTaskStatusBadge status={r.status} />,
-      },
-      {
-        key: "goal_title",
-        label: "Strategic Goal",
-        resizable: true,
-        initialWidth: 220,
-        hideOnMobile: true,
-        accessor: (r) => r.goal_title || r.kpi_measure || "",
-        render: (r) =>
-          r.goal_title ? (
-            <div className="flex flex-col">
-              <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
-              {r.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-xs">{r.kpi_measure}</span>}
-            </div>
-          ) : r.kpi_measure ? (
-            <span className="line-clamp-1 text-xs font-medium">{r.kpi_measure}</span>
-          ) : (
-            <span className="text-muted-foreground text-xs">—</span>
-          ),
       },
       {
         key: "due_date",
@@ -743,101 +724,118 @@ export function AdminTasksContent({
           ]}
           expandable={{
             render: (r) => (
-              <div className="grid grid-cols-1 gap-6 text-xs md:grid-cols-2">
-                <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
-                    Description & Scope
-                  </h4>
-                  <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
-                    {r.description || "No description provided."}
+              <div className="space-y-4 text-xs">
+                <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs font-medium">Task Title</span>
+                    <h3 className="text-foreground text-sm leading-snug font-semibold">{r.title}</h3>
                   </div>
-
-                  {r.unable_to_complete_reason && (
-                    <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
-                      {r.unable_to_complete_reason}
-                    </div>
-                  )}
-
-                  {r.failure_reason && (
-                    <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Failure Note:</span>
-                      {r.failure_reason}
-                    </div>
-                  )}
-
-                  {r.extension_reason && (
-                    <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Extension Reason:</span>
-                      {r.extension_reason}
-                    </div>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5 self-start text-xs"
+                    onClick={() => handleOpenReviewDialog(r)}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Review & Take Action
+                  </Button>
                 </div>
 
-                <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
-                    Attribution & Lifecycle
-                  </h4>
-                  <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Assigned To:</span>
-                      <span className="flex items-center gap-1.5 font-medium">
-                        {r.assigned_to_user && (
-                          <StaffAvatar
-                            name={workflowOwnerLabel(r)}
-                            src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
-                            profileId={r.assigned_to}
-                            size="xs"
-                          />
-                        )}
-                        {workflowOwnerLabel(r)}
-                      </span>
+                <div className="grid grid-cols-1 gap-6 text-xs md:grid-cols-2">
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
+                      Description & Scope
+                    </h4>
+                    <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
+                      {r.description || "No description provided."}
                     </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Assigned By:</span>
-                      <span className="flex items-center gap-1.5 font-medium">
-                        {r.assigned_by_user && (
-                          <StaffAvatar
-                            name={formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)}
-                            src={r.assigned_by ? staffAvatars[r.assigned_by] : null}
-                            profileId={r.assigned_by}
-                            size="xs"
-                          />
-                        )}
-                        {r.assigned_by_user
-                          ? formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)
-                          : "System"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Created At:</span>
-                      <span>{formatWATDateTime(r.created_at)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Due Date:</span>
-                      <span className="font-medium">{r.due_date ? formatWATDate(r.due_date) : "No deadline"}</span>
-                    </div>
-                    {r.reviewed_by_user && (
-                      <div className="col-span-2 border-t pt-1">
-                        <span className="text-muted-foreground block text-xs">Reviewed By:</span>
-                        <span className="font-medium">
-                          {formatFullName(r.reviewed_by_user.first_name, r.reviewed_by_user.last_name)}
-                          {r.reviewed_at && ` on ${formatWATDateTime(r.reviewed_at)}`}
-                        </span>
+
+                    {r.unable_to_complete_reason && (
+                      <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
+                        {r.unable_to_complete_reason}
+                      </div>
+                    )}
+
+                    {r.failure_reason && (
+                      <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Failure Note:</span>
+                        {r.failure_reason}
+                      </div>
+                    )}
+
+                    {r.extension_reason && (
+                      <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Extension Reason:</span>
+                        {r.extension_reason}
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 text-xs"
-                      onClick={() => handleOpenReviewDialog(r)}
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Review & Take Action
-                    </Button>
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
+                      Attribution & Lifecycle
+                    </h4>
+                    <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground block text-xs">Strategic Goal:</span>
+                        <span className="font-medium">{r.goal_title || "—"}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground block text-xs">Corporate KPI:</span>
+                        <span className="font-medium">
+                          {r.kpi_measure || "—"}
+                          {r.kpi_pillar ? ` · Pillar: ${r.kpi_pillar}` : ""}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Assigned To:</span>
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {r.assigned_to_user && (
+                            <StaffAvatar
+                              name={workflowOwnerLabel(r)}
+                              src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
+                              profileId={r.assigned_to}
+                              size="xs"
+                            />
+                          )}
+                          {workflowOwnerLabel(r)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Assigned By:</span>
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {r.assigned_by_user && (
+                            <StaffAvatar
+                              name={formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)}
+                              src={r.assigned_by ? staffAvatars[r.assigned_by] : null}
+                              profileId={r.assigned_by}
+                              size="xs"
+                            />
+                          )}
+                          {r.assigned_by_user
+                            ? formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)
+                            : "System"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Created At:</span>
+                        <span>{formatWATDateTime(r.created_at)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Due Date:</span>
+                        <span className="font-medium">{r.due_date ? formatWATDate(r.due_date) : "No deadline"}</span>
+                      </div>
+                      {r.reviewed_by_user && (
+                        <div className="col-span-2 border-t pt-1">
+                          <span className="text-muted-foreground block text-xs">Reviewed By:</span>
+                          <span className="font-medium">
+                            {formatFullName(r.reviewed_by_user.first_name, r.reviewed_by_user.last_name)}
+                            {r.reviewed_at && ` on ${formatWATDateTime(r.reviewed_at)}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
