@@ -89,6 +89,7 @@ type TaskScoreRow = {
   due_date: string | null
   created_at: string | null
   is_archived: boolean | null
+  series_id: string | null
 }
 
 const PRIORITY_WEIGHTS: Record<string, number> = {
@@ -223,7 +224,7 @@ export async function computeIndividualPerformanceScore(
   const userCompletedTaskIds = new Set((userCompletions || []).map((row) => row.task_id))
 
   const TASK_FIELDS =
-    "id, goal_id, title, status, weight, rating, assignment_type, assigned_to, assigned_by, department, task_end_date, due_date, created_at, is_archived"
+    "id, goal_id, title, status, weight, rating, assignment_type, assigned_to, assigned_by, department, task_end_date, due_date, created_at, is_archived, series_id"
 
   // Only work with this person's name on it. There is no department-wide query
   // here any more: it pulled in every task filed under their department and,
@@ -300,7 +301,9 @@ export async function computeIndividualPerformanceScore(
       // weight is what actually decides how much this row moved the number.
       priority_weight: group.availablePoints,
       custom_weight_pct: null,
-      linked_tasks_total: group.taskCount,
+      // Tasks, not scored items: a recurring series is one scored item but
+      // every repeat is still a linked task, alongside the completed count.
+      linked_tasks_total: groupTasks.length,
       linked_tasks_completed: groupTasks.filter((task) => task.status === "completed").length,
       goal_progress_pct: group.score ?? 0,
       effective_kpi_pct: group.score ?? 0,

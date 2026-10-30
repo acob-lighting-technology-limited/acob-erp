@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     .order("recorded_at", { ascending: false })
   let taskQuery = supabase
     .from("tasks")
-    .select("id, kpi_id, department, status, weight, rating, is_archived")
+    .select("id, kpi_id, department, status, weight, rating, is_archived, series_id")
     .not("kpi_id", "is", null)
     .eq("is_archived", false)
 

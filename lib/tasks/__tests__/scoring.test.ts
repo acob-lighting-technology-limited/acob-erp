@@ -147,3 +147,47 @@ test("a project's quality counts unfinished work, an employee's KPI does not", (
   // The project has half its planned work untouched and must not read perfect.
   assert.equal(computeWeightedTaskScore(tasks, { countUnresolvedAsZero: true }).score, 50)
 })
+
+test("a recurring series counts as one item, scored by the average of its repeats", () => {
+  // Ada: 22 daily backup checks, 20 rated 5/5 and 2 failed, plus two missed projects.
+  const backups = [
+    ...Array.from({ length: 20 }, () => ({ status: "completed", weight: 2, rating: 5, series_id: "backup" })),
+    { status: "failed", weight: 2, rating: null, series_id: "backup" },
+    { status: "failed", weight: 2, rating: null, series_id: "backup" },
+  ]
+  const projects = [
+    { status: "failed", weight: 5, rating: null },
+    { status: "failed", weight: 5, rating: null },
+  ]
+  const result = computeWeightedTaskScore([...backups, ...projects])
+  // The series is worth its weight (2) once: 2 * 20/22 earned of 2 + 5 + 5 available.
+  assert.equal(result.taskCount, 3)
+  assert.equal(result.availablePoints, 12)
+  assert.equal(result.score, Math.round(((2 * (20 / 22)) / 12) * 100 * 100) / 100)
+  assert.ok((result.score as number) < 20, "failing the real work cannot hide behind a routine")
+})
+
+test("repeats still in progress or awaiting a rating stay out of the series average", () => {
+  const result = computeWeightedTaskScore([
+    { status: "completed", weight: 3, rating: 4, series_id: "s" },
+    { status: "in_progress", weight: 3, rating: null, series_id: "s" },
+    { status: "submitted_for_review", weight: 3, rating: null, series_id: "s" },
+    { status: "cancelled", weight: 3, rating: null, series_id: "s" },
+  ])
+  assert.equal(result.taskCount, 1)
+  assert.equal(result.score, 80)
+  assert.equal(result.unresolvedCount, 1)
+  assert.equal(result.awaitingRatingCount, 1)
+})
+
+test("project quality counts a series' unfinished repeats as zero within its average", () => {
+  const result = computeWeightedTaskScore(
+    [
+      { status: "completed", weight: 4, rating: 5, series_id: "s" },
+      { status: "pending", weight: 4, rating: null, series_id: "s" },
+    ],
+    { countUnresolvedAsZero: true }
+  )
+  assert.equal(result.taskCount, 1)
+  assert.equal(result.score, 50)
+})

@@ -22,6 +22,7 @@ type TaskRow = {
   assignment_type: string | null
   assigned_to: string | null
   department: string | null
+  series_id: string | null
 }
 
 type TaskCompletionRow = {
@@ -38,6 +39,7 @@ type KpiTableTask = {
   weight: number
   rating: number | null
   kpiTitle?: string | null
+  series_id?: string | null
 }
 
 type KpiTableRow = {
@@ -79,7 +81,7 @@ export default async function PmsKpiPage({
       : quarterlyCycles
 
   const TASK_FIELDS =
-    "id, goal_id, kpi_id, title, description, status, due_date, task_end_date, created_at, weight, rating, assignment_type, assigned_to, department"
+    "id, goal_id, kpi_id, title, description, status, due_date, task_end_date, created_at, weight, rating, assignment_type, assigned_to, department, series_id"
 
   const currentUserId = profile?.id || ""
 
@@ -149,6 +151,7 @@ export default async function PmsKpiPage({
       weight: task.weight ?? TASK_WEIGHT_DEFAULT,
       rating: task.rating,
       kpiTitle: task.kpi_id ? kpiTitleById.get(task.kpi_id) || null : null,
+      series_id: task.series_id,
     }))
 
     const taskScore = computeWeightedTaskScore(cycleTasks)
@@ -160,7 +163,8 @@ export default async function PmsKpiPage({
 
     const effectiveKpi = taskScore.score !== null ? `${Math.round(taskScore.score)}%` : "-"
     const roundedEarned = Math.round(taskScore.earnedPoints * 100) / 100
-    const scoredWeight = taskScore.availablePoints
+    // A recurring series is one item worth its weight once (lib/tasks/scoring.ts).
+    const scoredWeight = Math.round(taskScore.availablePoints * 100) / 100
     const totalWeight = cycleTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
 
     let completionLabel = `${ratedTasks.length}/${cycleTasks.length}`
@@ -194,7 +198,7 @@ export default async function PmsKpiPage({
 
     const effectiveKpi = taskScore.score !== null ? `${Math.round(taskScore.score)}%` : "-"
     const roundedEarned = Math.round(taskScore.earnedPoints * 100) / 100
-    const scoredWeight = taskScore.availablePoints
+    const scoredWeight = Math.round(taskScore.availablePoints * 100) / 100
     const totalWeight = unmatchedTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
 
     let completionLabel = `${unratedTasks.length}/${unmatchedTasks.length}`

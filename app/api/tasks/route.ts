@@ -20,6 +20,7 @@ import type { Task, TaskPersonSummary } from "@/types/task"
 import { createNotification } from "@/lib/notifications/create"
 import { TaskBodySchema } from "@/lib/tasks/schemas"
 import { loadWorkLinkNames } from "@/lib/tasks/work-links"
+import { withSeriesFrequency } from "@/lib/tasks/series-links"
 
 const log = logger("tasks-route")
 
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest) {
         unable_to_complete_reason,
         failure_reason,
         extension_reason,
+        cancel_reason,
+        series_id,
+        occurrence_date,
         is_archived,
         archived_by,
         archived_at
@@ -123,10 +127,11 @@ export async function GET(request: NextRequest) {
       return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 500)
     }
 
-    const tasks = (rawTasks || []) as Task[]
-    if (tasks.length === 0) {
+    if (!rawTasks || rawTasks.length === 0) {
       return NextResponse.json({ data: [] })
     }
+
+    const tasks = await withSeriesFrequency(getServiceRoleClientOrFallback(supabase), rawTasks as Task[])
 
     // Collect all profile IDs to batch fetch
     const profileIds = new Set<string>()
