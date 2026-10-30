@@ -105,10 +105,13 @@ COMMENT ON COLUMN public.tasks.occurrence_date IS
   'The scheduled due date this task was created for. Fixed even when the task''s own deadline is moved.';
 
 -- The guarantee that a generator run twice, or two runs overlapping, can
--- never create the same repeat twice.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_tasks_series_occurrence
-  ON public.tasks (series_id, occurrence_date)
-  WHERE series_id IS NOT NULL;
+-- never create the same repeat twice. Not a partial index: the generator
+-- inserts with ON CONFLICT (series_id, occurrence_date) DO NOTHING, which
+-- PostgREST cannot pair with a partial index. One-off tasks are unaffected,
+-- since NULL series_ids never conflict with each other.
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS uq_tasks_series_occurrence;
+ALTER TABLE public.tasks
+  ADD CONSTRAINT uq_tasks_series_occurrence UNIQUE (series_id, occurrence_date);
 
 -- Which series a task belongs to is set by the server, never by its
 -- assignee: the tasks update policy lets an assignee update their own row,
