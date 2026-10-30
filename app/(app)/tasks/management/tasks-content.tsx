@@ -42,6 +42,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
 import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
+import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
+import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
 import { RecurringTaskBadge } from "@/components/tasks/recurring-task-badge"
 
 export type { Task, TaskUserProfile } from "@/types/task"
@@ -76,6 +78,7 @@ interface TasksContentProps {
  * already the tap target and an inline control inside it would fight for taps.
  * The editable `TaskStatusControl` lives in the table cell and the detail sheet. */
 function TaskStatusPill({ task }: { task: Task }) {
+  if (isScheduledTask(task)) return <ScheduledTaskBadge task={task} compact />
   const status = task.status || "pending"
   const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
   const today = toLocalISODate()
@@ -122,6 +125,9 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"tasks" | "recurring">("tasks")
+  // Series you hold whose next task is not created yet; table rows only, never the stats.
+  const scheduledRows = useScheduledSeriesRows(tasks, { mine: true })
+  const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isPostingComment, setIsPostingComment] = useState(false)
@@ -231,6 +237,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
   const openTaskDetails = useCallback(
     async (task: Task) => {
+      // A scheduled row is a series whose task is not created yet: open the series instead.
+      if (isScheduledTask(task)) return setOpenSeriesId(task.series_id ?? null)
       setSelectedTask(task)
       await loadTaskUpdates(task.id)
       setIsDetailsOpen(true)
@@ -345,17 +353,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       accessor: (t) => t.status,
       // Changed straight from the row: opening a modal to move a task through
       // three states was the slowest part of the whole workflow.
-      render: (t) => (
-        <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <TaskStatusControl
-            task={t}
-            canReview={canReviewTask(t)}
-            ratingBlockedReason={ratingBlockedReasonFor(t)}
-            onChanged={() => void loadTasks()}
-            size="sm"
-          />
-        </div>
-      ),
+      render: (t) =>
+        isScheduledTask(t) ? (
+          <ScheduledTaskBadge task={t} />
+        ) : (
+          <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            <TaskStatusControl
+              task={t}
+              canReview={canReviewTask(t)}
+              ratingBlockedReason={ratingBlockedReasonFor(t)}
+              onChanged={() => void loadTasks()}
+              size="sm"
+            />
+          </div>
+        ),
     },
     {
       key: "due_date",
@@ -442,6 +453,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         { value: "reassigned", label: "Reassigned" },
         { value: "failed", label: "Failed" },
         { value: "cancelled", label: "Cancelled" },
+        { value: "scheduled", label: "Scheduled (recurring, not created yet)" },
       ],
     },
     {
@@ -560,7 +572,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         <RecurringSeriesTable mine onOpenSeries={setOpenSeriesId} />
       ) : (
         <DataTable<Task>
-          data={tasks}
+          data={tableRows}
           columns={columns}
           getRowId={(t) => t.id}
           searchPlaceholder="Search task title, description, ID..."

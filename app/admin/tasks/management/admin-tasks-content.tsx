@@ -60,6 +60,8 @@ import {
 import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
 import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
 import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
+import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
+import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
 import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
 import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
 
@@ -154,6 +156,7 @@ const STATUS_OPTIONS = [
   { value: "reassigned", label: "Reassigned" },
   { value: "failed", label: "Failed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "scheduled", label: "Scheduled (recurring, not created yet)" },
 ]
 
 export function AdminTasksContent({
@@ -167,6 +170,9 @@ export function AdminTasksContent({
 }: AdminTasksContentProps) {
   const [activeTab, setActiveTab] = useState<TaskTab>("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  // Recurring series whose next task is not created yet; table rows only, never stats or exports.
+  const scheduledRows = useScheduledSeriesRows(tasks)
+  const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])
   const [employee] = useState<employee[]>(initialemployee)
   const assignerProfile = {
     id: userProfile.id,
@@ -475,7 +481,8 @@ export function AdminTasksContent({
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => <AdminTaskStatusBadge status={r.status} />,
+        render: (r) =>
+          isScheduledTask(r) ? <ScheduledTaskBadge task={r} /> : <AdminTaskStatusBadge status={r.status} />,
       },
       {
         key: "goal_title",
@@ -709,7 +716,7 @@ export function AdminTasksContent({
         />
       ) : (
         <DataTable<Task>
-          data={tasks}
+          data={tableRows}
           columns={columns}
           getRowId={(r) => r.id}
           pagination={{ pageSize: 50 }}
@@ -730,8 +737,9 @@ export function AdminTasksContent({
               label: "Review / Decision",
               icon: ShieldCheck,
               onClick: handleOpenReviewDialog,
+              hidden: isScheduledTask,
             },
-            { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog },
+            { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog, hidden: isScheduledTask },
             {
               label: "Recurring Series",
               icon: Repeat,
@@ -742,6 +750,7 @@ export function AdminTasksContent({
               label: "Archive Task",
               icon: Trash2,
               variant: "destructive",
+              hidden: isScheduledTask,
               onClick: (r) => {
                 setTaskToDelete(r)
                 setIsDeleteDialogOpen(true)

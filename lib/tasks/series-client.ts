@@ -169,7 +169,17 @@ export type SeriesListRow = {
   schedule_label: string
   current_assignee: string | null
   current_assignee_name: string | null
+  current_assignee_first_name: string | null
+  current_assignee_last_name: string | null
+  description: string | null
+  priority: string
+  weight: number
+  kpi_id: string | null
+  kpi_measure: string | null
+  created_at: string
   next_due: string | null
+  /** The day the next repeat will be created, for the "Scheduled" row in the task lists. */
+  next_created: string | null
 }
 
 /** Prefix of every series list query, mine or not, so one invalidation refreshes them all. */

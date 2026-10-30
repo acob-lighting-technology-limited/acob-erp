@@ -10,7 +10,7 @@ import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { toLocalISODate } from "@/lib/utils/date"
 import { resolveTaskCreateAuthority } from "@/lib/tasks/create-authority"
 import { TaskSeriesBodySchema } from "@/lib/tasks/schemas"
-import { assigneeOn, describeSchedule, repeatsDue, upcomingDueDates } from "@/lib/tasks/recurrence"
+import { assigneeOn, creationDateFor, describeSchedule, repeatsDue, upcomingDueDates } from "@/lib/tasks/recurrence"
 import {
   TASK_SERIES_COLUMNS,
   createSeriesRepeats,
@@ -82,24 +82,36 @@ export async function GET(request: NextRequest) {
     const { data: people } = holderIds.length
       ? await dataClient.from("profiles").select("id, first_name, last_name").in("id", holderIds)
       : { data: [] }
-    const names = new Map(
-      ((people || []) as Array<{ id: string; first_name: string | null; last_name: string | null }>).map((p) => [
-        p.id,
-        `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim(),
-      ])
-    )
+    const holderProfiles = (people || []) as Array<{ id: string; first_name: string | null; last_name: string | null }>
+    const personById = new Map(holderProfiles.map((p) => [p.id, p]))
 
     const visible = mine ? rows.filter((row) => assigneeOn(assignees.get(row.id) ?? [], today) === user.id) : rows
+
+    // The task lists show a "Scheduled" row for a series with no open repeat
+    // yet, so they need its KPI and the day its next repeat will be created.
+    const kpiIds = Array.from(new Set(visible.map((row) => row.kpi_id).filter((id): id is string => Boolean(id))))
+    const { data: kpis } = kpiIds.length
+      ? await dataClient.from("corporate_kpis").select("id, measure").in("id", kpiIds)
+      : { data: [] }
+    const kpiMeasure = new Map(((kpis || []) as Array<{ id: string; measure: string }>).map((k) => [k.id, k.measure]))
+    const holidays = await loadSeriesHolidays(dataClient, ...seriesHolidayWindow(today))
 
     return NextResponse.json({
       data: visible.map((row) => {
         const holder = assigneeOn(assignees.get(row.id) ?? [], today)
+        const person = holder ? personById.get(holder) : undefined
+        const nextDue =
+          row.status === "ended" ? null : (upcomingDueDates(scheduleOf(row), today, 1, holidays)[0] ?? null)
         return {
           ...row,
           schedule_label: describeSchedule(row),
           current_assignee: holder,
-          current_assignee_name: holder ? (names.get(holder) ?? null) : null,
-          next_due: row.status === "ended" ? null : (upcomingDueDates(scheduleOf(row), today, 1)[0] ?? null),
+          current_assignee_name: person ? `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() : null,
+          current_assignee_first_name: person?.first_name ?? null,
+          current_assignee_last_name: person?.last_name ?? null,
+          kpi_measure: row.kpi_id ? (kpiMeasure.get(row.kpi_id) ?? null) : null,
+          next_due: nextDue,
+          next_created: nextDue ? creationDateFor(row.frequency, nextDue, row.start_date, holidays) : null,
         }
       }),
     })
