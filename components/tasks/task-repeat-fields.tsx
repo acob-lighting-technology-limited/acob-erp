@@ -5,6 +5,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SERIES_FREQUENCIES, SERIES_FREQUENCY_LABELS, SERIES_WEEKDAYS, WEEKDAY_LABELS } from "@/lib/tasks/recurrence"
 import type { RepeatChoice, RepeatFormFields } from "@/lib/tasks/series-client"
+import { Badge } from "@/components/ui/badge"
+import { toLocalISODate } from "@/lib/utils/date"
+
+/** Recurring tasks shipped 30 Oct 2026; the "New" badge flags them until this date, then hides itself. */
+const REPEAT_NEW_UNTIL = "2027-02-01"
 
 const MONTH_NAMES = [
   "January",
@@ -40,8 +45,11 @@ export function TaskRepeatFields({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div>
-        <Label htmlFor="repeat" className="text-xs font-semibold">
+        <Label htmlFor="repeat" className="flex items-center gap-1.5 text-xs font-semibold">
           Repeat
+          {toLocalISODate() < REPEAT_NEW_UNTIL && (
+            <Badge className="px-1.5 py-0 text-xs leading-4 font-semibold">New</Badge>
+          )}
         </Label>
         <Select value={repeat.repeat} onValueChange={(val) => setRepeatField("repeat", val as RepeatChoice)}>
           <SelectTrigger id="repeat" className="mt-1">

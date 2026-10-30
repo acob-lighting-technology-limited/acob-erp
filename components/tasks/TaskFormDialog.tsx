@@ -750,6 +750,13 @@ export function TaskFormDialog({
               )}
             </div>
 
+            {/* Recurring tasks are new: point one-off tasks at Repeat so people learn it exists. */}
+            {isCreating && !isRepeating && (
+              <p className="text-muted-foreground text-xs">
+                One-off task. For work that happens every day, week or month, choose Repeat above.
+              </p>
+            )}
+
             {repeatSchedule && (
               <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
                 {repeatError ??
