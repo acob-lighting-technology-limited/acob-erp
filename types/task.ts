@@ -58,6 +58,7 @@ export interface Task {
   unable_to_complete_reason?: string | null
   failure_reason?: string | null
   extension_reason?: string | null
+  cancel_reason?: string | null
   is_archived?: boolean
   archived_by?: string | null
   archived_at?: string | null
