@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { EMPTY_TASK_FORM, TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
-import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
+import { createSeriesFromForm, isRepeating, showSeriesCreated } from "@/lib/tasks/series-client"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { apiJson } from "@/lib/api-client"
 import { portfolioTasksKey } from "@/lib/projects/work-tasks"
@@ -50,9 +50,7 @@ export function PortfolioTaskDialog({
     try {
       if (isRepeating(form)) {
         // Repeat set: portfolio-wide work on a schedule.
-        toast.success(
-          seriesCreatedMessage(await createSeriesFromForm(form, { portfolio_id: portfolio.id, project_id: null }))
-        )
+        showSeriesCreated(await createSeriesFromForm(form, { portfolio_id: portfolio.id, project_id: null }))
         onOpenChange(false)
         setTaskForm({ ...EMPTY_TASK_FORM, portfolio_id: portfolio.id, task_start_date: toLocalISODate() })
         void queryClient.invalidateQueries({ queryKey: portfolioTasksKey(portfolio.id) })

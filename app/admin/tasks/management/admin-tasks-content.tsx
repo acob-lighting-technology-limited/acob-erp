@@ -36,7 +36,8 @@ import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionD
 import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { TAB_COPY, TASK_TABS, type TaskTab } from "./task-tabs"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
@@ -58,7 +59,10 @@ import {
 } from "@/lib/tasks/export"
 import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
 import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
-import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
+import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
+import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
+import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
+import { createSeriesFromForm, isRepeating, showSeriesCreated } from "@/lib/tasks/series-client"
 import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
 
 const log = logger("tasks-management-admin-tasks-content")
@@ -152,11 +156,7 @@ const STATUS_OPTIONS = [
   { value: "reassigned", label: "Reassigned" },
   { value: "failed", label: "Failed" },
   { value: "cancelled", label: "Cancelled" },
-]
-
-const TASK_TABS: DataTableTab[] = [
-  { key: "tasks", label: "All Tasks", icon: ClipboardList },
-  { key: "user_plan", label: "User Task Plan", icon: Users },
+  { value: "scheduled", label: "Scheduled (recurring, not created yet)" },
 ]
 
 export function AdminTasksContent({
@@ -168,8 +168,11 @@ export function AdminTasksContent({
   userProfile,
   initialGoalId = "",
 }: AdminTasksContentProps) {
-  const [activeTab, setActiveTab] = useState<"tasks" | "user_plan">("tasks")
+  const [activeTab, setActiveTab] = useState<TaskTab>("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  // Recurring series whose next task is not created yet; table rows only, never stats or exports.
+  const scheduledRows = useScheduledSeriesRows(tasks)
+  const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])
   const [employee] = useState<employee[]>(initialemployee)
   const assignerProfile = {
     id: userProfile.id,
@@ -324,7 +327,7 @@ export function AdminTasksContent({
 
       if (!selectedTask && isRepeating(activeTaskForm)) {
         // Repeat set: a series, whose repeats are created on schedule.
-        toast.success(seriesCreatedMessage(await createSeriesFromForm(activeTaskForm)))
+        showSeriesCreated(await createSeriesFromForm(activeTaskForm))
       } else if (selectedTask) {
         const response = await apiFetch(`/api/tasks/${selectedTask.id}`, {
           method: "PATCH",
@@ -478,7 +481,8 @@ export function AdminTasksContent({
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => <AdminTaskStatusBadge status={r.status} />,
+        render: (r) =>
+          isScheduledTask(r) ? <ScheduledTaskBadge task={r} /> : <AdminTaskStatusBadge status={r.status} />,
       },
       {
         key: "goal_title",
@@ -528,22 +532,6 @@ export function AdminTasksContent({
         key: "status",
         label: "Status",
         options: STATUS_OPTIONS,
-      },
-      {
-        key: "weight",
-        label: "Weight",
-        options: [
-          { value: "1", label: "Weight 1" },
-          { value: "2", label: "Weight 2" },
-          { value: "3", label: "Weight 3" },
-          { value: "4", label: "Weight 4" },
-          { value: "5", label: "Weight 5" },
-        ],
-        mode: "custom",
-        filterFn: (row, vals) => {
-          if (vals.length === 0) return true
-          return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
-        },
       },
       {
         key: "kpi_status",
@@ -608,25 +596,23 @@ export function AdminTasksContent({
 
   return (
     <DataTablePage
-      title={activeTab === "user_plan" ? "User Task Plan & Workload" : "Task Management"}
-      description={
-        activeTab === "user_plan"
-          ? "User-level task workload, period filters, weight points, and appraisal ratings."
-          : "Operational task tracking, multi-user assignment, and PMS review governance."
-      }
-      icon={activeTab === "user_plan" ? Users : ClipboardList}
+      title={TAB_COPY[activeTab].title}
+      description={TAB_COPY[activeTab].description}
+      icon={TAB_COPY[activeTab].icon}
       tabs={TASK_TABS}
       activeTab={activeTab}
-      onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}
+      onTabChange={(t) => setActiveTab(t as TaskTab)}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <HeaderMoreMenu
             items={[{ label: "Workflow guide", icon: ArrowRight, onSelect: () => setIsWorkflowOpen(true) }]}
           />
-          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
+          {activeTab !== "recurring" && (
+            <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+          )}
           <Button onClick={() => handleOpenTaskDialog()} className="h-8 gap-2" size="sm">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Create Task</span>
@@ -699,7 +685,9 @@ export function AdminTasksContent({
         onSelect={handleExport}
       />
 
-      {activeTab === "user_plan" ? (
+      {activeTab === "recurring" ? (
+        <RecurringSeriesTable onOpenSeries={setOpenSeriesId} />
+      ) : activeTab === "user_plan" ? (
         <AdminUserTasksPlan
           tasks={tasks}
           employees={assignableEmployees}
@@ -712,7 +700,7 @@ export function AdminTasksContent({
         />
       ) : (
         <DataTable<Task>
-          data={tasks}
+          data={tableRows}
           columns={columns}
           getRowId={(r) => r.id}
           pagination={{ pageSize: 50 }}
@@ -733,8 +721,9 @@ export function AdminTasksContent({
               label: "Review / Decision",
               icon: ShieldCheck,
               onClick: handleOpenReviewDialog,
+              hidden: isScheduledTask,
             },
-            { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog },
+            { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog, hidden: isScheduledTask },
             {
               label: "Recurring Series",
               icon: Repeat,
@@ -745,6 +734,7 @@ export function AdminTasksContent({
               label: "Archive Task",
               icon: Trash2,
               variant: "destructive",
+              hidden: isScheduledTask,
               onClick: (r) => {
                 setTaskToDelete(r)
                 setIsDeleteDialogOpen(true)

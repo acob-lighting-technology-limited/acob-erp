@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
   ClipboardList,
+  Repeat,
   Clock,
   CheckCircle2,
   MessageSquare,
@@ -30,7 +31,7 @@ import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
 import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
-import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import { DataTable, DataTablePage, type DataTableTab } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -40,6 +41,9 @@ import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
+import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
+import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
+import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
 import { RecurringTaskBadge } from "@/components/tasks/recurring-task-badge"
 
 export type { Task, TaskUserProfile } from "@/types/task"
@@ -74,6 +78,7 @@ interface TasksContentProps {
  * already the tap target and an inline control inside it would fight for taps.
  * The editable `TaskStatusControl` lives in the table cell and the detail sheet. */
 function TaskStatusPill({ task }: { task: Task }) {
+  if (isScheduledTask(task)) return <ScheduledTaskBadge task={task} compact />
   const status = task.status || "pending"
   const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
   const today = toLocalISODate()
@@ -104,6 +109,12 @@ function TaskStatusPill({ task }: { task: Task }) {
 }
 
 /** Past its deadline and still actionable - a closed-out task is not overdue. */
+// Recurring lists the series you hold, including ones whose first task is not created yet.
+const STAFF_TASK_TABS: DataTableTab[] = [
+  { key: "tasks", label: "My Tasks", icon: ClipboardList },
+  { key: "recurring", label: "Recurring", icon: Repeat },
+]
+
 function isTaskOverdue(task: Task): boolean {
   return isTaskPastDeadline(task, toLocalISODate())
 }
@@ -113,6 +124,10 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const staffAvatars = useStaffAvatars()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<"tasks" | "recurring">("tasks")
+  // Series you hold whose next task is not created yet; table rows only, never the stats.
+  const scheduledRows = useScheduledSeriesRows(tasks, { mine: true })
+  const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isPostingComment, setIsPostingComment] = useState(false)
@@ -222,6 +237,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
   const openTaskDetails = useCallback(
     async (task: Task) => {
+      // A scheduled row is a series whose task is not created yet: open the series instead.
+      if (isScheduledTask(task)) return setOpenSeriesId(task.series_id ?? null)
       setSelectedTask(task)
       await loadTaskUpdates(task.id)
       setIsDetailsOpen(true)
@@ -336,17 +353,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       accessor: (t) => t.status,
       // Changed straight from the row: opening a modal to move a task through
       // three states was the slowest part of the whole workflow.
-      render: (t) => (
-        <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <TaskStatusControl
-            task={t}
-            canReview={canReviewTask(t)}
-            ratingBlockedReason={ratingBlockedReasonFor(t)}
-            onChanged={() => void loadTasks()}
-            size="sm"
-          />
-        </div>
-      ),
+      render: (t) =>
+        isScheduledTask(t) ? (
+          <ScheduledTaskBadge task={t} />
+        ) : (
+          <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            <TaskStatusControl
+              task={t}
+              canReview={canReviewTask(t)}
+              ratingBlockedReason={ratingBlockedReasonFor(t)}
+              onChanged={() => void loadTasks()}
+              size="sm"
+            />
+          </div>
+        ),
     },
     {
       key: "due_date",
@@ -433,23 +453,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         { value: "reassigned", label: "Reassigned" },
         { value: "failed", label: "Failed" },
         { value: "cancelled", label: "Cancelled" },
+        { value: "scheduled", label: "Scheduled (recurring, not created yet)" },
       ],
-    },
-    {
-      key: "weight",
-      label: "Weight",
-      options: [
-        { value: "1", label: "Weight 1" },
-        { value: "2", label: "Weight 2" },
-        { value: "3", label: "Weight 3" },
-        { value: "4", label: "Weight 4" },
-        { value: "5", label: "Weight 5" },
-      ],
-      mode: "custom",
-      filterFn: (row, vals) => {
-        if (vals.length === 0) return true
-        return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
-      },
     },
     {
       key: "urgency",
@@ -481,305 +486,314 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       description="Manage your operational tasks, track deadlines, and submit completed work for review."
       icon={ClipboardList}
       spacing="tight"
+      tabs={STAFF_TASK_TABS}
+      activeTab={activeTab}
+      onTabChange={(t) => setActiveTab(t as "tasks" | "recurring")}
       stats={
-        <StatGrid>
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            tooltip="All active tasks assigned to you across all statuses"
-          />
-          <StatCard
-            variant="compact"
-            title="Pending"
-            value={stats.pending}
-            icon={Clock}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-            tooltip="Tasks waiting to be started"
-          />
-          <StatCard
-            variant="compact"
-            title="In Progress"
-            value={stats.inProgress}
-            icon={Clock}
-            iconBgColor="bg-sky-500/10"
-            iconColor="text-sky-500"
-            tooltip="Tasks currently underway"
-          />
-          <StatCard
-            variant="compact"
-            title="Submitted"
-            value={stats.submitted}
-            icon={Send}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
-            tooltip="Tasks submitted and awaiting review"
-          />
-          <StatCard
-            variant="compact"
-            title="Completed"
-            value={stats.completed}
-            icon={CheckCircle2}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-            tooltip="Tasks successfully completed"
-          />
-          {stats.overdue > 0 && (
+        activeTab === "recurring" ? undefined : (
+          <StatGrid>
             <StatCard
               variant="compact"
-              title="Overdue"
-              value={stats.overdue}
-              icon={AlertTriangle}
-              iconBgColor="bg-rose-500/10"
-              iconColor="text-rose-500"
-              tooltip="Tasks that have passed their deadline"
+              title="Total Tasks"
+              value={stats.total}
+              icon={ClipboardList}
+              iconBgColor="bg-blue-500/10"
+              iconColor="text-blue-500"
+              tooltip="All active tasks assigned to you across all statuses"
             />
-          )}
-        </StatGrid>
+            <StatCard
+              variant="compact"
+              title="Pending"
+              value={stats.pending}
+              icon={Clock}
+              iconBgColor="bg-amber-500/10"
+              iconColor="text-amber-500"
+              tooltip="Tasks waiting to be started"
+            />
+            <StatCard
+              variant="compact"
+              title="In Progress"
+              value={stats.inProgress}
+              icon={Clock}
+              iconBgColor="bg-sky-500/10"
+              iconColor="text-sky-500"
+              tooltip="Tasks currently underway"
+            />
+            <StatCard
+              variant="compact"
+              title="Submitted"
+              value={stats.submitted}
+              icon={Send}
+              iconBgColor="bg-purple-500/10"
+              iconColor="text-purple-500"
+              tooltip="Tasks submitted and awaiting review"
+            />
+            <StatCard
+              variant="compact"
+              title="Completed"
+              value={stats.completed}
+              icon={CheckCircle2}
+              iconBgColor="bg-emerald-500/10"
+              iconColor="text-emerald-500"
+              tooltip="Tasks successfully completed"
+            />
+            {stats.overdue > 0 && (
+              <StatCard
+                variant="compact"
+                title="Overdue"
+                value={stats.overdue}
+                icon={AlertTriangle}
+                iconBgColor="bg-rose-500/10"
+                iconColor="text-rose-500"
+                tooltip="Tasks that have passed their deadline"
+              />
+            )}
+          </StatGrid>
+        )
       }
     >
-      <DataTable<Task>
-        data={tasks}
-        columns={columns}
-        getRowId={(t) => t.id}
-        searchPlaceholder="Search task title, description, ID..."
-        // `q` is already trimmed and lowercased by DataTable.
-        searchFn={(task, q) =>
-          `${task.title} ${task.description || ""} ${task.work_item_number || ""} ${task.goal_title || ""}`
-            .toLowerCase()
-            .includes(q)
-        }
-        filters={filters}
-        rowActions={[
-          {
-            label: "View",
-            icon: Eye,
-            onClick: (t) => void openTaskDetails(t),
-          },
-        ]}
-        pagination={{ pageSize: 25 }}
-        stickyToolbar
-        viewToggle
-        contactsView
-        // Eight columns are worth a table where they fit and unreadable where they
-        // do not, so the opening view follows the width.
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          // Overdue outranks priority: a late task needs answering whatever its
-          // priority was when it was set.
-          title: (t) => t.title,
-          subtitle: (t) =>
-            [
-              t.work_item_number || null,
-              `Weight ${t.weight ?? TASK_WEIGHT_DEFAULT}`,
-              t.due_date ? `Due ${formatWATDate(t.due_date)}` : "No deadline",
-              t.kpi_measure || t.goal_title || null,
-              (t.comment_count || 0) > 0 ? `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          trailing: (t) => <TaskStatusPill task={t} />,
-          detail: {
+      {activeTab === "recurring" ? (
+        <RecurringSeriesTable mine onOpenSeries={setOpenSeriesId} />
+      ) : (
+        <DataTable<Task>
+          data={tableRows}
+          columns={columns}
+          getRowId={(t) => t.id}
+          searchPlaceholder="Search task title, description, ID..."
+          // `q` is already trimmed and lowercased by DataTable.
+          searchFn={(task, q) =>
+            `${task.title} ${task.description || ""} ${task.work_item_number || ""} ${task.goal_title || ""}`
+              .toLowerCase()
+              .includes(q)
+          }
+          filters={filters}
+          rowActions={[
+            {
+              label: "View",
+              icon: Eye,
+              onClick: (t) => void openTaskDetails(t),
+            },
+          ]}
+          pagination={{ pageSize: 25 }}
+          stickyToolbar
+          viewToggle
+          contactsView
+          // Eight columns are worth a table where they fit and unreadable where they
+          // do not, so the opening view follows the width.
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            // Overdue outranks priority: a late task needs answering whatever its
+            // priority was when it was set.
             title: (t) => t.title,
-            subtitle: (t) => t.work_item_number || undefined,
-            badges: (t) => (
-              <>
+            subtitle: (t) =>
+              [
+                t.work_item_number || null,
+                `Weight ${t.weight ?? TASK_WEIGHT_DEFAULT}`,
+                t.due_date ? `Due ${formatWATDate(t.due_date)}` : "No deadline",
+                t.kpi_measure || t.goal_title || null,
+                (t.comment_count || 0) > 0 ? `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            trailing: (t) => <TaskStatusPill task={t} />,
+            detail: {
+              title: (t) => t.title,
+              subtitle: (t) => t.work_item_number || undefined,
+              badges: (t) => (
+                <>
+                  <TaskStatusPill task={t} />
+                  <Badge
+                    variant="outline"
+                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}
+                  >
+                    Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
+                  </Badge>
+                </>
+              ),
+              fields: (t) => [
+                { label: "Item #", value: t.work_item_number || "-", copyable: true },
+                { label: "Status", value: t.status.replace(/_/g, " ") },
+                { label: "Task Weight", value: `${t.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
+                {
+                  label: "Corporate KPI",
+                  value: t.kpi_measure ? `${t.kpi_measure}${t.kpi_pillar ? ` (🎯 ${t.kpi_pillar})` : ""}` : "—",
+                },
+                { label: "Strategic Goal", value: t.goal_title || "—" },
+                { label: "Start Date", value: t.task_start_date ? formatWATDate(t.task_start_date) : "—" },
+                { label: "Due Date", value: t.due_date ? formatWATDate(t.due_date) : "No deadline" },
+                {
+                  label: "Assignee",
+                  value: t.assigned_to_user ? `${t.assigned_to_user.first_name} ${t.assigned_to_user.last_name}` : "-",
+                },
+                { label: "Department", value: t.department || t.assigned_to_user?.department || "-" },
+                { label: "Description", value: t.description || null, fullWidth: true },
+              ],
+              actions: (t) => [
+                {
+                  label: "View Full Details",
+                  onClick: () => void openTaskDetails(t),
+                },
+              ],
+            },
+            onSelect: (t) => void openTaskDetails(t),
+          }}
+          cardRenderer={(t) => (
+            <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-foreground line-clamp-2 text-sm font-semibold">{t.title}</span>
+                  <span className="text-muted-foreground block font-mono text-xs">{t.work_item_number || "---"}</span>
+                </div>
                 <TaskStatusPill task={t} />
-                <Badge
+              </div>
+              <div className="text-muted-foreground grid gap-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                  <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : undefined}>
+                    {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Target className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{t.kpi_measure || t.goal_title || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Scale className="h-3.5 w-3.5 shrink-0" />
+                  <span>Weight {t.weight ?? TASK_WEIGHT_DEFAULT}</span>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-end border-t pt-2">
+                <Button
+                  type="button"
+                  size="sm"
                   variant="outline"
-                  className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}
+                  className="h-7 gap-1.5 text-xs font-medium"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void openTaskDetails(t)
+                  }}
                 >
-                  Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
-                </Badge>
-              </>
+                  <Eye className="h-3 w-3" />
+                  <span>View</span>
+                </Button>
+              </div>
+            </div>
+          )}
+          expandable={{
+            render: (t) => (
+              <div className="space-y-4 text-xs">
+                <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs font-medium">Task Title</span>
+                    <h3 className="text-foreground text-sm leading-snug font-semibold">{t.title}</h3>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1.5 self-start text-xs"
+                        onClick={() => void openTaskDetails(t)}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        View Details & Comments {(t.comment_count || 0) > 0 ? `(${t.comment_count})` : ""}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Open task modal to view full history, attachments & comments
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-xs font-semibold">Description & Scope</h4>
+
+                    {isTaskEscalated(t, toLocalISODate()) && (
+                      <div className="border-destructive/40 bg-destructive/10 text-destructive rounded border p-2.5 dark:text-rose-400">
+                        <span className="mb-0.5 flex items-center gap-1.5 font-semibold">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Overdue Escalation:
+                        </span>
+                        Deadline and grace period have expired without submission. Action required by Lead: extend
+                        deadline, reassign, or mark as failed.
+                      </div>
+                    )}
+
+                    <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
+                      {t.description || "No description provided."}
+                    </div>
+
+                    {t.unable_to_complete_reason && (
+                      <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
+                        {t.unable_to_complete_reason}
+                      </div>
+                    )}
+
+                    {t.failure_reason && (
+                      <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Failure Note:</span>
+                        {t.failure_reason}
+                      </div>
+                    )}
+
+                    {t.extension_reason && (
+                      <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
+                        <span className="mb-0.5 block font-semibold">Extension Reason:</span>
+                        {t.extension_reason}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-xs font-semibold">Context & Details</h4>
+                    <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Strategic Goal:</span>
+                        <span className="font-medium">{t.goal_title || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Corporate KPI:</span>
+                        <span className="font-medium">{t.kpi_measure || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Assigned By:</span>
+                        <span className="font-medium">
+                          {t.assigned_by_user
+                            ? formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)
+                            : "System"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Department:</span>
+                        <span className="font-medium">{t.department || t.assigned_to_user?.department || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Start Date:</span>
+                        <span>{t.task_start_date ? formatWATDate(t.task_start_date) : "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Due Date:</span>
+                        <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : "font-medium"}>
+                          {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ),
-            fields: (t) => [
-              { label: "Item #", value: t.work_item_number || "-", copyable: true },
-              { label: "Status", value: t.status.replace(/_/g, " ") },
-              { label: "Task Weight", value: `${t.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
-              {
-                label: "Corporate KPI",
-                value: t.kpi_measure ? `${t.kpi_measure}${t.kpi_pillar ? ` (🎯 ${t.kpi_pillar})` : ""}` : "—",
-              },
-              { label: "Strategic Goal", value: t.goal_title || "—" },
-              { label: "Start Date", value: t.task_start_date ? formatWATDate(t.task_start_date) : "—" },
-              { label: "Due Date", value: t.due_date ? formatWATDate(t.due_date) : "No deadline" },
-              {
-                label: "Assignee",
-                value: t.assigned_to_user ? `${t.assigned_to_user.first_name} ${t.assigned_to_user.last_name}` : "-",
-              },
-              { label: "Department", value: t.department || t.assigned_to_user?.department || "-" },
-              { label: "Description", value: t.description || null, fullWidth: true },
-            ],
-            actions: (t) => [
-              {
-                label: "View Full Details",
-                onClick: () => void openTaskDetails(t),
-              },
-            ],
-          },
-          onSelect: (t) => void openTaskDetails(t),
-        }}
-        cardRenderer={(t) => (
-          <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <span className="text-foreground line-clamp-2 text-sm font-semibold">{t.title}</span>
-                <span className="text-muted-foreground block font-mono text-xs">{t.work_item_number || "---"}</span>
-              </div>
-              <TaskStatusPill task={t} />
-            </div>
-            <div className="text-muted-foreground grid gap-1 text-xs">
-              <div className="flex items-center gap-1.5">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : undefined}>
-                  {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.kpi_measure || t.goal_title || "—"}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Scale className="h-3.5 w-3.5 shrink-0" />
-                <span>Weight {t.weight ?? TASK_WEIGHT_DEFAULT}</span>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center justify-end border-t pt-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 text-xs font-medium"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void openTaskDetails(t)
-                }}
-              >
-                <Eye className="h-3 w-3" />
-                <span>View</span>
-              </Button>
-            </div>
-          </div>
-        )}
-        expandable={{
-          render: (t) => (
-            <div className="space-y-4 text-xs">
-              <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground text-xs font-medium">Task Title</span>
-                  <h3 className="text-foreground text-sm leading-snug font-semibold">{t.title}</h3>
-                </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 gap-1.5 self-start text-xs"
-                      onClick={() => void openTaskDetails(t)}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      View Details & Comments {(t.comment_count || 0) > 0 ? `(${t.comment_count})` : ""}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Open task modal to view full history, attachments & comments
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+          }}
+          emptyTitle="No tasks"
+          emptyDescription="Tasks assigned to you will appear here."
+          emptyIcon={ClipboardList}
+          skeletonRows={6}
+          urlSync
+        />
+      )}
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold">Description & Scope</h4>
-
-                  {isTaskEscalated(t, toLocalISODate()) && (
-                    <div className="border-destructive/40 bg-destructive/10 text-destructive rounded border p-2.5 dark:text-rose-400">
-                      <span className="mb-0.5 flex items-center gap-1.5 font-semibold">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Overdue Escalation:
-                      </span>
-                      Deadline and grace period have expired without submission. Action required by Lead: extend
-                      deadline, reassign, or mark as failed.
-                    </div>
-                  )}
-
-                  <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
-                    {t.description || "No description provided."}
-                  </div>
-
-                  {t.unable_to_complete_reason && (
-                    <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
-                      {t.unable_to_complete_reason}
-                    </div>
-                  )}
-
-                  {t.failure_reason && (
-                    <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Failure Note:</span>
-                      {t.failure_reason}
-                    </div>
-                  )}
-
-                  {t.extension_reason && (
-                    <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
-                      <span className="mb-0.5 block font-semibold">Extension Reason:</span>
-                      {t.extension_reason}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold">Context & Details</h4>
-                  <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Strategic Goal:</span>
-                      <span className="font-medium">{t.goal_title || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Corporate KPI:</span>
-                      <span className="font-medium">{t.kpi_measure || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Assigned By:</span>
-                      <span className="font-medium">
-                        {t.assigned_by_user
-                          ? formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)
-                          : "System"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Department:</span>
-                      <span className="font-medium">{t.department || t.assigned_to_user?.department || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Start Date:</span>
-                      <span>{t.task_start_date ? formatWATDate(t.task_start_date) : "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Due Date:</span>
-                      <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : "font-medium"}>
-                        {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ),
-        }}
-        emptyTitle="No tasks"
-        emptyDescription="Tasks assigned to you will appear here."
-        emptyIcon={ClipboardList}
-        skeletonRows={6}
-        urlSync
-      />
-
-      <TaskSeriesSheet seriesId={openSeriesId} onOpenChange={(open) => !open && setOpenSeriesId(null)} />
+      <TaskSeriesSheet readOnly seriesId={openSeriesId} onOpenChange={(open) => !open && setOpenSeriesId(null)} />
 
       <UserTaskDetailsDialog
         open={isDetailsOpen}

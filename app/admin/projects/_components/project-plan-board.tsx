@@ -59,7 +59,7 @@ import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import { countWork } from "@/lib/projects/health"
 import { EMPTY_TASK_FORM, TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
-import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
+import { createSeriesFromForm, isRepeating, showSeriesCreated } from "@/lib/tasks/series-client"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import type { Project } from "@/components/projects/project-list-content"
@@ -330,7 +330,7 @@ export function ProjectPlanBoard({
       } else if (isRepeating(form)) {
         // Repeat set: a series in this project, whose repeats are created on schedule.
         const result = await createSeriesFromForm(form, { project_id: project.id, plan_id: form.plan_id || null })
-        toast.success(seriesCreatedMessage(result))
+        showSeriesCreated(result)
       } else {
         const res = await apiFetch("/api/tasks", {
           method: "POST",
