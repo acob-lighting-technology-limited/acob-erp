@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
     const dataClient = getServiceRoleClientOrFallback(supabase)
     const url = new URL(request.url)
     const statusFilter = url.searchParams.get("status")
+    // ?mine=1 is the staff /tasks view: only series this person holds now, even for a lead.
+    const mine = url.searchParams.get("mine") === "1"
 
     const scope = await getRequestScope()
-    const scopedDepts = scope ? getScopedDepartments(scope) : []
+    const scopedDepts = mine ? [] : scope ? getScopedDepartments(scope) : []
 
     let query = dataClient.from("task_series").select(TASK_SERIES_COLUMNS).order("created_at", { ascending: false })
     if (statusFilter && statusFilter !== "all") query = query.eq("status", statusFilter)
@@ -87,8 +89,10 @@ export async function GET(request: NextRequest) {
       ])
     )
 
+    const visible = mine ? rows.filter((row) => assigneeOn(assignees.get(row.id) ?? [], today) === user.id) : rows
+
     return NextResponse.json({
-      data: rows.map((row) => {
+      data: visible.map((row) => {
         const holder = assigneeOn(assignees.get(row.id) ?? [], today)
         return {
           ...row,

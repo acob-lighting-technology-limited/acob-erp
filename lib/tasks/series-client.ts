@@ -157,7 +157,32 @@ export type PausePreview = {
   hold: Array<{ id: string; due: string | null }>
 }
 
+/** A row of GET /api/task-series: the series plus who holds it now and when it is next due. */
+export type SeriesListRow = {
+  id: string
+  title: string
+  department: string | null
+  frequency: SeriesFrequency
+  start_date: string
+  end_date: string | null
+  status: "active" | "paused" | "ended"
+  schedule_label: string
+  current_assignee: string | null
+  current_assignee_name: string | null
+  next_due: string | null
+}
+
+/** Prefix of every series list query, mine or not, so one invalidation refreshes them all. */
+export const seriesListKey = ["task-series", "list"] as const
 export const seriesDetailKey = (seriesId: string) => ["task-series", seriesId] as const
+
+/** `mine` limits the list to series the viewer holds now, for the staff /tasks page. */
+export async function listSeries(mine = false): Promise<SeriesListRow[]> {
+  const payload = await apiJson<{ data?: SeriesListRow[] }>(`/api/task-series${mine ? "?mine=1" : ""}`, {
+    cache: "no-store",
+  })
+  return payload.data ?? []
+}
 
 export async function fetchSeriesDetail(seriesId: string): Promise<SeriesDetail> {
   const payload = await apiJson<{ data: SeriesDetail }>(`/api/task-series/${seriesId}`, { cache: "no-store" })

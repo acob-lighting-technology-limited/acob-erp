@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { TASK_RATING_MAX, TASK_RATING_MIN } from "@/lib/tasks/scoring"
-import { fetchSeriesDetail, seriesDetailKey } from "@/lib/tasks/series-client"
+import { fetchSeriesDetail, seriesDetailKey, seriesListKey } from "@/lib/tasks/series-client"
 
 const STATUS_LABELS = { active: "Active", paused: "Paused", ended: "Ended" } as const
 
@@ -68,6 +68,7 @@ export function TaskSeriesSheet({
     setSelected(new Set())
     setBulkRating(null)
     void queryClient.invalidateQueries({ queryKey: seriesDetailKey(seriesId ?? "") })
+    void queryClient.invalidateQueries({ queryKey: seriesListKey })
     onChanged?.()
   }
 

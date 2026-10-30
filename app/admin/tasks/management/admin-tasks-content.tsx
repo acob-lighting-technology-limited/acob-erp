@@ -36,7 +36,8 @@ import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionD
 import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { TAB_COPY, TASK_TABS, type TaskTab } from "./task-tabs"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
@@ -58,6 +59,7 @@ import {
 } from "@/lib/tasks/export"
 import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
 import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
+import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
 import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
 import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
 
@@ -154,11 +156,6 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ]
 
-const TASK_TABS: DataTableTab[] = [
-  { key: "tasks", label: "All Tasks", icon: ClipboardList },
-  { key: "user_plan", label: "User Task Plan", icon: Users },
-]
-
 export function AdminTasksContent({
   initialTasks,
   initialemployee,
@@ -168,7 +165,7 @@ export function AdminTasksContent({
   userProfile,
   initialGoalId = "",
 }: AdminTasksContentProps) {
-  const [activeTab, setActiveTab] = useState<"tasks" | "user_plan">("tasks")
+  const [activeTab, setActiveTab] = useState<TaskTab>("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
   const assignerProfile = {
@@ -608,25 +605,23 @@ export function AdminTasksContent({
 
   return (
     <DataTablePage
-      title={activeTab === "user_plan" ? "User Task Plan & Workload" : "Task Management"}
-      description={
-        activeTab === "user_plan"
-          ? "User-level task workload, period filters, weight points, and appraisal ratings."
-          : "Operational task tracking, multi-user assignment, and PMS review governance."
-      }
-      icon={activeTab === "user_plan" ? Users : ClipboardList}
+      title={TAB_COPY[activeTab].title}
+      description={TAB_COPY[activeTab].description}
+      icon={TAB_COPY[activeTab].icon}
       tabs={TASK_TABS}
       activeTab={activeTab}
-      onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}
+      onTabChange={(t) => setActiveTab(t as TaskTab)}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <HeaderMoreMenu
             items={[{ label: "Workflow guide", icon: ArrowRight, onSelect: () => setIsWorkflowOpen(true) }]}
           />
-          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
+          {activeTab !== "recurring" && (
+            <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+          )}
           <Button onClick={() => handleOpenTaskDialog()} className="h-8 gap-2" size="sm">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Create Task</span>
@@ -699,7 +694,9 @@ export function AdminTasksContent({
         onSelect={handleExport}
       />
 
-      {activeTab === "user_plan" ? (
+      {activeTab === "recurring" ? (
+        <RecurringSeriesTable onOpenSeries={setOpenSeriesId} />
+      ) : activeTab === "user_plan" ? (
         <AdminUserTasksPlan
           tasks={tasks}
           employees={assignableEmployees}
