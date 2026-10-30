@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, type ReactNode } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Target, Users, User, Calendar, Scale, FolderKanban, Layers } from "lucide-react"
+import { ChevronDown, Users, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,10 +21,9 @@ import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
-import { formatFullName } from "@/lib/utils"
+import { cn, formatFullName } from "@/lib/utils"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
@@ -35,8 +34,9 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchProjectRecords, PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 import { usePortfolios } from "@/hooks/use-portfolios"
 import { portfolioLabel } from "@/lib/tasks/work-links"
-import { upcomingDueDates } from "@/lib/tasks/recurrence"
+import { describeSchedule, upcomingDueDates } from "@/lib/tasks/recurrence"
 import { TaskRepeatFields } from "@/components/tasks/task-repeat-fields"
+import { TaskWorkLinkField } from "@/components/tasks/task-work-link-field"
 import { DEFAULT_REPEAT_FIELDS, scheduleFromForm, type RepeatFormFields } from "@/lib/tasks/series-client"
 
 interface ProjectOption {
@@ -147,6 +147,15 @@ interface TaskFormDialogProps {
 }
 
 const NO_HOLIDAYS: ReadonlySet<string> = new Set()
+
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{title}</h3>
+      {children}
+    </section>
+  )
+}
 const NO_KPIS: KpiOption[] = []
 
 export function TaskFormDialog({
@@ -172,6 +181,7 @@ export function TaskFormDialog({
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   // Recurrence is creation-only: an existing repeat is managed from its series.
   const [repeat, setRepeat] = useState<Required<RepeatFormFields>>(DEFAULT_REPEAT_FIELDS)
+  const [showMore, setShowMore] = useState(false)
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -234,6 +244,8 @@ export function TaskFormDialog({
       repeat_year_month: taskForm.repeat_year_month ?? DEFAULT_REPEAT_FIELDS.repeat_year_month,
       repeat_end_date: taskForm.repeat_end_date ?? DEFAULT_REPEAT_FIELDS.repeat_end_date,
     })
+
+    setShowMore(Boolean(lockedProjectId || lockedPortfolioId || taskForm.project_id || taskForm.portfolio_id))
 
     if (taskForm.assigned_users && taskForm.assigned_users.length > 1) {
       setIsMultiAssign(true)
@@ -444,9 +456,19 @@ export function TaskFormDialog({
                     "Every task must link to an approved Corporate KPI. The associated Department Goal and Strategic Pillar are automatically selected and aligned.",
                 },
                 {
+                  label: "Weight",
+                  value:
+                    "How much this task matters relative to the assignee's other work. A weight-4 task counts twice as much as a weight-2 one. Weights do not need to add up to anything.",
+                },
+                {
+                  label: "Project or Portfolio",
+                  value:
+                    "Under More options. A project task is rated by that project's manager and counts toward the project's progress. A portfolio task is work across a whole portfolio, such as a group of sites in development.",
+                },
+                {
                   label: "Recurring Tasks",
                   value:
-                    "Set Repeat to create the task on a schedule. Each repeat is an ordinary task, created ahead of its due date, and the whole series counts as one item in the assignee's KPI.",
+                    "Set Repeat to create the task on a schedule. Each repeat is an ordinary task, created ahead of its due date, and the whole series counts as one item in the assignee's KPI. A weekend or public holiday moves to the working day before, within the same month.",
                 },
                 {
                   label: "Review Workflow",
@@ -479,51 +501,51 @@ export function TaskFormDialog({
           </div>
         )}
 
-        <fieldset disabled={lockLevel === "full"} className="w-full min-w-0 space-y-4 py-2 text-sm">
-          <div>
-            <Label htmlFor="title" className="text-xs font-semibold">
-              Task Title *
-            </Label>
-            <Input
-              id="title"
-              {...register("title")}
-              placeholder="e.g. Prepare monthly revenue reconciliation report"
-              className="mt-1"
-            />
-            {errors.title && <p className="text-destructive mt-1 text-xs">{errors.title.message}</p>}
-          </div>
-
-          <div>
-            <Label htmlFor="description" className="text-xs font-semibold">
-              Description
-            </Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Describe expected scope, deliverables, and instructions..."
-              rows={3}
-              className="mt-1"
-            />
-          </div>
-
+        <fieldset disabled={lockLevel === "full"} className="w-full min-w-0 space-y-6 py-2 text-sm">
           {/* Status is not set here. It starts at "pending" for a new task and,
               for an existing one, is owned entirely by TaskStatusControl — the
               dropdown that enforces the mandatory rating on approval. This form
               used to offer "Completed" directly with no rating collected,
               which bypassed that rule completely. */}
 
-          {/* Assignment Section */}
-          <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                <Users className="h-3.5 w-3.5" />
-                Assignee Selection
+          <FormSection title="What">
+            <div>
+              <Label htmlFor="title" className="text-xs font-semibold">
+                Task Title <span className="text-destructive">*</span>
               </Label>
-              {!selectedTask && (
-                <div className="flex items-center gap-2">
+              <Input
+                id="title"
+                {...register("title")}
+                placeholder="e.g. Prepare monthly revenue reconciliation report"
+                className="mt-1"
+              />
+              {errors.title && <p className="text-destructive mt-1 text-xs">{errors.title.message}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="description" className="text-xs font-semibold">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                {...register("description")}
+                placeholder="Describe expected scope, deliverables, and instructions..."
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+          </FormSection>
+
+          <FormSection title="Who and how it counts">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold">
+                  {isMultiAssign ? "Assignees" : "Assignee"} <span className="text-destructive">*</span>
+                </Label>
+                {!selectedTask && (
                   <Button
                     type="button"
-                    variant={isMultiAssign ? "secondary" : "outline"}
+                    variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-xs"
                     onClick={() => {
@@ -546,354 +568,245 @@ export function TaskFormDialog({
                       }
                     }}
                   >
-                    {isMultiAssign ? "Multi-Assign Active" : "Enable Multi-Assign"}
+                    <Users className="mr-1 h-3.5 w-3.5" />
+                    {isMultiAssign ? "Assign one person" : "Assign several people"}
                   </Button>
-                </div>
-              )}
-            </div>
-
-            {!isMultiAssign ? (
-              <div>
-                <SearchableSelect
-                  value={assignedTo || ""}
-                  onValueChange={(val) => {
-                    const member = scopedAssignableEmployees.find((e) => e.id === val)
-                    setValue("assigned_to", val)
-                    if (member?.department) {
-                      setValue("department", member.department)
-                    }
-                    setSelectedUserIds(val ? [val] : [])
-                  }}
-                  placeholder="Select a team member..."
-                  searchPlaceholder="Search staff name or department..."
-                  icon={<User className="h-3.5 w-3.5" />}
-                  options={employeeSelectOptions}
-                  disabled={lockLevel !== "none"}
-                />
+                )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                <SearchableMultiSelect
-                  label="Select Team Members"
-                  icon={<Users className="h-3.5 w-3.5" />}
-                  values={selectedUserIds}
-                  options={employeeSelectOptions}
-                  onChange={(vals) => {
-                    setSelectedUserIds(vals)
-                    if (vals.length === 1) {
-                      setValue("assigned_to", vals[0])
-                      const member = scopedAssignableEmployees.find((e) => e.id === vals[0])
+
+              {!isMultiAssign ? (
+                <div className="mt-1">
+                  <SearchableSelect
+                    value={assignedTo || ""}
+                    onValueChange={(val) => {
+                      const member = scopedAssignableEmployees.find((e) => e.id === val)
+                      setValue("assigned_to", val)
                       if (member?.department) {
                         setValue("department", member.department)
                       }
-                    } else {
-                      setValue("assigned_to", "")
-                    }
-                  }}
-                  placeholder="Select team members..."
-                  searchPlaceholder="Search staff name or department..."
-                  disabled={lockLevel !== "none"}
-                />
-                <div className="text-muted-foreground flex items-center justify-between text-xs">
-                  <span>Individual tasks will be created for each chosen person.</span>
-                  <span>
-                    Selected: <span className="text-foreground font-medium">{selectedUserIds.length}</span> staff
-                    member(s)
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Weight — compulsory */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="weight" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Scale className="text-primary h-3.5 w-3.5" />
-                Task Weight
-              </Label>
-              <Badge variant="outline" className="text-xs">
-                Required
-              </Badge>
-            </div>
-            <Select
-              value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
-              onValueChange={(val) => setValue("weight", Number(val))}
-              disabled={lockLevel !== "none"}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a weight" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
-                  (value) => (
-                    <SelectItem key={value} value={String(value)}>
-                      {value}
-                    </SelectItem>
-                  )
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">
-              How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
-              much as a weight-2 one. Weights do not need to add up to anything.
-            </p>
-          </div>
-
-          {/* Corporate KPI Linking Section */}
-          <div className="w-full min-w-0 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="kpi_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Target className="text-primary h-3.5 w-3.5" />
-                Corporate KPI <span className="text-destructive">*</span>
-              </Label>
-            </div>
-            <Select value={kpiId || ""} onValueChange={(val) => setValue("kpi_id", val)}>
-              <SelectTrigger className="mt-1 w-full max-w-full min-w-0 overflow-hidden">
-                <SelectValue placeholder="Select a Corporate KPI" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedKpis.length === 0 ? (
-                  <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                    No corporate KPIs are assigned to this department yet.
-                  </div>
-                ) : (
-                  sortedKpis.map((kpi) => (
-                    <SelectItem key={kpi.id} value={kpi.id}>
-                      <span className="line-clamp-1">
-                        {kpi.measure} ({kpi.role === "core" ? "Core" : "Support"})
-                      </span>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {selectedKpi && (
-              <div className="bg-muted/30 border-muted-foreground/20 mt-2 space-y-1.5 rounded-md border p-2.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
-                    <Target className="text-primary h-3.5 w-3.5" />
-                    Department Goal
-                  </Label>
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    Auto-selected from KPI
-                  </Badge>
-                </div>
-                <Input
-                  value={selectedKpi.strategic_objective || "—"}
-                  disabled
-                  readOnly
-                  className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
-                />
-                {selectedKpi.strategic_priority && (
-                  <p className="text-muted-foreground text-xs">
-                    🎯 Strategic Pillar:{" "}
-                    <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
-                  </p>
-                )}
-              </div>
-            )}
-            <p className="text-muted-foreground text-xs">
-              Which corporate target this work serves. Every task must link to an approved Corporate KPI.
-            </p>
-          </div>
-
-          {/* Opened from a portfolio: the task is fixed as portfolio-wide work. */}
-          {lockedPortfolioId && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Layers className="text-primary h-3.5 w-3.5" />
-                  Portfolio
-                </Label>
-                <Badge variant="secondary" className="text-xs">
-                  Fixed
-                </Badge>
-              </div>
-              <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">
-                {lockedPortfolioName || "This portfolio"}
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Work across the whole portfolio. For one project&apos;s work, add the task from that project&apos;s plan
-                board instead.
-              </p>
-            </div>
-          )}
-
-          {/* Project Linking Section */}
-          {!lockedPortfolioId && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="project_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                  <FolderKanban className="text-primary h-3.5 w-3.5" />
-                  Project
-                </Label>
-                <Badge variant="secondary" className="text-xs">
-                  {lockedProjectId ? "Fixed" : "Optional"}
-                </Badge>
-              </div>
-              {lockedProjectId ? (
-                <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">
-                  {lockedProjectName || "This project"}
-                  {lockedPlanName ? ` · ${lockedPlanName}` : ""}
+                      setSelectedUserIds(val ? [val] : [])
+                    }}
+                    placeholder="Select a team member..."
+                    searchPlaceholder="Search staff name or department..."
+                    icon={<User className="h-3.5 w-3.5" />}
+                    options={employeeSelectOptions}
+                    disabled={lockLevel !== "none"}
+                  />
                 </div>
               ) : (
-                <Select
-                  value={projectId || "__none__"}
-                  onValueChange={(val) => {
-                    setValue("project_id", val === "__none__" ? "" : val)
-                    if (val !== "__none__") setValue("portfolio_id", "")
-                  }}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select a project (Optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">
-                      <span className="text-muted-foreground italic">None (not project work)</span>
-                    </SelectItem>
-                    {projectOptions.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.project_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-muted-foreground text-xs">
-                A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
-              </p>
-            </div>
-          )}
-
-          {/* Portfolio Linking Section — only for work no single project owns */}
-          {!lockedProjectId && !lockedPortfolioId && !projectId && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="portfolio_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Layers className="text-primary h-3.5 w-3.5" />
-                  Portfolio
-                </Label>
-                <Badge variant="secondary" className="text-xs">
-                  Optional
-                </Badge>
-              </div>
-              <Select
-                value={portfolioId || "__none__"}
-                onValueChange={(val) => setValue("portfolio_id", val === "__none__" ? "" : val)}
-              >
-                <SelectTrigger id="portfolio_id" className="mt-1">
-                  <SelectValue placeholder="Select a portfolio (Optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground italic">None (not portfolio work)</span>
-                  </SelectItem>
-                  {portfolioOptions.map((portfolio) => (
-                    <SelectItem key={portfolio.id} value={portfolio.id}>
-                      {portfolio.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">
-                For work across a whole portfolio, such as a group of sites in development. Pick a project instead when
-                the work belongs to one project.
-              </p>
-            </div>
-          )}
-
-          {/* Repeat Section - new tasks only; a repeat is managed from its series */}
-          {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} schedule={repeatSchedule} />}
-
-          {/* Timeline Section */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="task_start_date" className="flex items-center gap-1 text-xs font-semibold">
-                <Calendar className="h-3 w-3" />
-                {isRepeating ? "Starts" : "Start Date"}
-              </Label>
-              <Input
-                id="task_start_date"
-                type="date"
-                {...register("task_start_date")}
-                disabled={lockLevel !== "none"}
-                className="mt-1 text-xs"
-              />
-            </div>
-
-            {isRepeating ? (
-              <div>
-                <Label htmlFor="repeat_end_date" className="flex items-center gap-1 text-xs font-semibold">
-                  <Calendar className="h-3 w-3" />
-                  Ends
-                </Label>
-                <Select
-                  value={repeat.repeat_end_date ? "on_date" : "never"}
-                  onValueChange={(val) =>
-                    setRepeatField(
-                      "repeat_end_date",
-                      val === "never" ? "" : repeat.repeat_end_date || effectiveStartDate
-                    )
-                  }
-                >
-                  <SelectTrigger className="mt-1 text-xs" aria-label="When the series ends">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="never">Never</SelectItem>
-                    <SelectItem value="on_date">On a date</SelectItem>
-                  </SelectContent>
-                </Select>
-                {repeat.repeat_end_date && (
-                  <Input
-                    id="repeat_end_date"
-                    type="date"
-                    min={effectiveStartDate}
-                    value={repeat.repeat_end_date}
-                    onChange={(e) => setRepeatField("repeat_end_date", e.target.value)}
-                    className="mt-2 text-xs"
+                <div className="mt-1 space-y-1">
+                  <SearchableMultiSelect
+                    icon={<Users className="h-3.5 w-3.5" />}
+                    values={selectedUserIds}
+                    options={employeeSelectOptions}
+                    onChange={(vals) => {
+                      setSelectedUserIds(vals)
+                      if (vals.length === 1) {
+                        setValue("assigned_to", vals[0])
+                        const member = scopedAssignableEmployees.find((e) => e.id === vals[0])
+                        if (member?.department) {
+                          setValue("department", member.department)
+                        }
+                      } else {
+                        setValue("assigned_to", "")
+                      }
+                    }}
+                    placeholder="Select team members..."
+                    searchPlaceholder="Search staff name or department..."
+                    disabled={lockLevel !== "none"}
                   />
-                )}
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="due_date" className="flex items-center gap-1 text-xs font-semibold">
-                  <Calendar className="h-3 w-3" />
-                  Due Date / Deadline
-                  {isCreating && <span className="text-destructive">*</span>}
+                  <p className="text-muted-foreground text-xs">
+                    {selectedUserIds.length} selected. Each person gets their own copy of the task.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+              <div className="min-w-0">
+                <Label htmlFor="kpi_id" className="text-xs font-semibold">
+                  Corporate KPI <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="due_date"
-                  required={isCreating}
-                  type="date"
-                  {...register("due_date")}
-                  min={isCreating ? effectiveStartDate : undefined}
-                  max={maxDueDate}
-                  disabled={lockLevel !== "none"}
-                  aria-invalid={Boolean(deadlineError)}
-                  aria-describedby={isCreating ? "due_date_hint" : undefined}
-                  className="mt-1 text-xs"
-                />
-                {isCreating && (
-                  <p
-                    id="due_date_hint"
-                    className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
-                  >
-                    {deadlineError ??
-                      `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}
+                <Select value={kpiId || ""} onValueChange={(val) => setValue("kpi_id", val)}>
+                  <SelectTrigger id="kpi_id" className="mt-1 w-full max-w-full min-w-0 overflow-hidden">
+                    <SelectValue placeholder="Select a Corporate KPI" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedKpis.length === 0 ? (
+                      <div className="text-muted-foreground px-2 py-1.5 text-xs">
+                        No corporate KPIs are assigned to this department yet.
+                      </div>
+                    ) : (
+                      sortedKpis.map((kpi) => (
+                        <SelectItem key={kpi.id} value={kpi.id}>
+                          <span className="line-clamp-1">
+                            {kpi.measure} ({kpi.role === "core" ? "Core" : "Support"})
+                          </span>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedKpi?.strategic_objective && (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Goal: <span className="text-foreground">{selectedKpi.strategic_objective}</span>
+                    {selectedKpi.strategic_priority && (
+                      <>
+                        {" "}
+                        · Pillar: <span className="text-foreground">{selectedKpi.strategic_priority}</span>
+                      </>
+                    )}
                   </p>
                 )}
               </div>
-            )}
-          </div>
 
-          {isRepeating && (
-            <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
-              {repeatError ??
-                `Next due: ${repeatPreview.map((date) => formatWATDate(date)).join(", ")}${repeatPreview.length === 3 ? ", …" : ""}`}
-            </p>
-          )}
+              <div>
+                <Label htmlFor="weight" className="text-xs font-semibold">
+                  Weight <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
+                  onValueChange={(val) => setValue("weight", Number(val))}
+                  disabled={lockLevel !== "none"}
+                >
+                  <SelectTrigger id="weight" className="mt-1">
+                    <SelectValue placeholder="Select a weight" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
+                      (value) => (
+                        <SelectItem key={value} value={String(value)}>
+                          {value}
+                          {value === TASK_WEIGHT_MIN ? " · lowest" : value === TASK_WEIGHT_MAX ? " · highest" : ""}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection title="When">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="task_start_date" className="text-xs font-semibold">
+                  {isRepeating ? "Starts" : "Start Date"}
+                </Label>
+                <Input
+                  id="task_start_date"
+                  type="date"
+                  {...register("task_start_date")}
+                  disabled={lockLevel !== "none"}
+                  className="mt-1 text-xs"
+                />
+              </div>
+
+              {isRepeating ? (
+                <div>
+                  <Label htmlFor="repeat_end_date" className="text-xs font-semibold">
+                    Ends
+                  </Label>
+                  <Select
+                    value={repeat.repeat_end_date ? "on_date" : "never"}
+                    onValueChange={(val) =>
+                      setRepeatField(
+                        "repeat_end_date",
+                        val === "never" ? "" : repeat.repeat_end_date || effectiveStartDate
+                      )
+                    }
+                  >
+                    <SelectTrigger className="mt-1 text-xs" aria-label="When the series ends">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="on_date">On a date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {repeat.repeat_end_date && (
+                    <Input
+                      id="repeat_end_date"
+                      type="date"
+                      min={effectiveStartDate}
+                      value={repeat.repeat_end_date}
+                      onChange={(e) => setRepeatField("repeat_end_date", e.target.value)}
+                      className="mt-2 text-xs"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="due_date" className="text-xs font-semibold">
+                    Due Date {isCreating && <span className="text-destructive">*</span>}
+                  </Label>
+                  <Input
+                    id="due_date"
+                    required={isCreating}
+                    type="date"
+                    {...register("due_date")}
+                    min={isCreating ? effectiveStartDate : undefined}
+                    max={maxDueDate}
+                    disabled={lockLevel !== "none"}
+                    aria-invalid={Boolean(deadlineError)}
+                    aria-describedby={isCreating ? "due_date_hint" : undefined}
+                    className="mt-1 text-xs"
+                  />
+                  {isCreating && (
+                    <p
+                      id="due_date_hint"
+                      className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
+                    >
+                      {deadlineError ?? `Latest ${formatWATDate(maxDueDate!)} (${TASK_MAX_WORKING_DAYS} working days).`}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* New tasks only; a repeat is managed from its series */}
+            {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} />}
+
+            {repeatSchedule && (
+              <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
+                {repeatError ??
+                  `${describeSchedule(repeatSchedule)}. Next due: ${repeatPreview.map((date) => formatWATDate(date)).join(", ")}${repeatPreview.length === 3 ? ", …" : ""}`}
+              </p>
+            )}
+          </FormSection>
+
+          {/* Most tasks are everyday work, so the project/portfolio link starts
+              folded away unless the task already has one. */}
+          <section className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowMore((open) => !open)}
+              aria-expanded={showMore}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs font-semibold tracking-wide uppercase"
+            >
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !showMore && "-rotate-90")} />
+              More options
+            </button>
+            {showMore && (
+              <TaskWorkLinkField
+                projectId={projectId || ""}
+                portfolioId={portfolioId || ""}
+                projects={projectOptions}
+                portfolios={portfolioOptions}
+                onChange={(link) => {
+                  setValue("project_id", link.project_id)
+                  setValue("portfolio_id", link.portfolio_id)
+                }}
+                lockedLabel={
+                  lockedPortfolioId
+                    ? `Portfolio: ${lockedPortfolioName || "This portfolio"}`
+                    : lockedProjectId
+                      ? `Project: ${lockedProjectName || "This project"}${lockedPlanName ? ` · ${lockedPlanName}` : ""}`
+                      : null
+                }
+              />
+            )}
+          </section>
         </fieldset>
 
         <DialogFooter className="pt-2">
