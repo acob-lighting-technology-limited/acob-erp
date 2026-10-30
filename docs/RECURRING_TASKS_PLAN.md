@@ -1,6 +1,7 @@
 # Recurring Tasks — Build Plan
 
-Status: **proposed, not started** (2026-10-30)
+Status: **built on `feat/recurring-tasks` (2026-10-30); migrations `20261030120000` and
+`20261030130000` not yet applied to the live database**
 
 A lead can set a task to repeat. Each repeat is a normal task row, so overdue
 grace, reminders, rating and PMS keep working unchanged.
@@ -145,14 +146,13 @@ Each phase is one commit, verified with `tsc`, `eslint` and the tests named.
 - "Recurring" filter on the existing tasks `DataTablePage` — no new page, so no
   sidebar change.
 
-## Open decisions
+## Decisions taken
 
-- **A. Due date on a weekend/holiday** — move to the previous working day
-  (recommended: work is ready before the break) or the next one?
-- **B. Notifications for daily series** — notify on the first task and on any
-  change only, not 22 times a month (recommended), or every task?
-- **C. Weekly default day** — Friday (recommended)?
-- **D. Cron missed a day** — skip already-past-due occurrences (recommended,
-  avoids instant overdue tasks) or back-create them?
-- **E. Who manages a series** — the same people who can create tasks: leads in
-  scope and admins (recommended).
+- **A.** A weekend/holiday due date moves to the previous working day, unless that leaves
+  its month (then the next working day).
+- **B.** A daily series notifies a person's first repeat only, and skips the due-today
+  reminder; every other frequency notifies each repeat.
+- **C.** Weekly defaults to Friday.
+- **D.** A repeat whose deadline passed while the generator was down is not created late.
+- **E.** A series is managed by admins, the lead of its department, or whoever set it up.
+- The schedule of an existing series is fixed; a different schedule is a new series.
