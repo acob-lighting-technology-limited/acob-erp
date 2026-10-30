@@ -59,6 +59,12 @@ export interface Task {
   failure_reason?: string | null
   extension_reason?: string | null
   cancel_reason?: string | null
+  /** The recurring series that created this task; null for one-off tasks. */
+  series_id?: string | null
+  /** The scheduled due date this repeat was created for. Fixed when the deadline moves. */
+  occurrence_date?: string | null
+  /** Enriched: the series' frequency, for the "Repeats monthly" badge. */
+  series_frequency?: string | null
   is_archived?: boolean
   archived_by?: string | null
   archived_at?: string | null
