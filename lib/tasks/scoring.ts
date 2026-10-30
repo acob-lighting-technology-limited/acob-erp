@@ -55,6 +55,8 @@ export type ScorableTask = {
   weight?: number | null
   rating?: number | null
   is_archived?: boolean | null
+  /** Repeats of one recurring series are scored together as a single item. */
+  series_id?: string | null
 }
 
 export type CycleAnchoredTask = {
@@ -159,6 +161,7 @@ export type WeightedTaskScore = {
   score: number | null
   earnedPoints: number
   availablePoints: number
+  /** Items scored: a one-off task is one, and so is a whole recurring series. */
   taskCount: number
   ratedCount: number
   /** Delivered but awaiting a rating — held out of the calculation. */
@@ -169,6 +172,13 @@ export type WeightedTaskScore = {
 
 /**
  * Weighted score across a set of tasks: SUM(weight * rating/5) / SUM(weight).
+ *
+ * A recurring series counts as ONE item, worth its weight once, earning that
+ * weight times the average of its repeats (rating/5 each, failed = 0). Scored
+ * one row per repeat, a daily routine would be ~22 items a month and swamp a
+ * person's real projects: 20 backup checks done and both projects missed
+ * would still read as 92%. Grouping happens on whatever set is passed in, so
+ * callers that filter to a review cycle first score a series once per cycle.
  *
  * Returns null rather than 0 when nothing is scorable, so "no work assigned"
  * stays distinguishable from "work assigned and failed".
@@ -194,6 +204,23 @@ export function computeWeightedTaskScore(tasks: ScorableTask[], options: Weighte
   let ratedCount = 0
   let awaitingRatingCount = 0
   let unresolvedCount = 0
+  // Per series: the weights and the share of each repeat's weight it earned.
+  const series = new Map<string, { weights: number[]; earnedShares: number[] }>()
+
+  /** Adds one judged task, either on its own or into its series. */
+  const addJudged = (task: ScorableTask, earnedShare: number) => {
+    const weight = clampWeight(task.weight)
+    if (task.series_id) {
+      const group = series.get(task.series_id) ?? { weights: [], earnedShares: [] }
+      group.weights.push(weight)
+      group.earnedShares.push(earnedShare)
+      series.set(task.series_id, group)
+      return
+    }
+    taskCount++
+    availablePoints += weight
+    earnedPoints += weight * earnedShare
+  }
 
   for (const task of tasks) {
     if (task.is_archived) continue
@@ -205,21 +232,29 @@ export function computeWeightedTaskScore(tasks: ScorableTask[], options: Weighte
     if (isTaskUnresolved(task)) {
       unresolvedCount++
       if (!options.countUnresolvedAsZero) continue
-      availablePoints += clampWeight(task.weight)
-      taskCount++
+      addJudged(task, 0)
       continue
     }
     if (!isTaskScorable(task)) continue
 
-    taskCount++
-    availablePoints += clampWeight(task.weight)
-    earnedPoints += taskEarnedPoints(task)
+    addJudged(task, taskEarnedPoints(task) / clampWeight(task.weight))
     if (isValidRating(task.rating)) ratedCount++
+  }
+
+  for (const group of series.values()) {
+    const weight = average(group.weights)
+    taskCount++
+    availablePoints += weight
+    earnedPoints += weight * average(group.earnedShares)
   }
 
   const score = availablePoints > 0 ? Math.round((earnedPoints / availablePoints) * 100 * 100) / 100 : null
 
   return { score, earnedPoints, availablePoints, taskCount, ratedCount, awaitingRatingCount, unresolvedCount }
+}
+
+function average(values: number[]): number {
+  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
 /**

@@ -7,7 +7,7 @@ import { checkRequestSize } from "@/lib/api/request-size"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
-import { TASK_STATUSES, type TaskStatus } from "@/lib/tasks/constants"
+import { TASK_CANCEL_REASONS, TASK_STATUSES, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, isValidRating } from "@/lib/tasks/scoring"
 import { SELF_RATING_BLOCKED_REASON, isLeadForTaskDepartment, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
@@ -22,13 +22,18 @@ const StatusBodySchema = z.object({
   reassigned_to: z.string().uuid().optional().nullable(),
   due_date: z.string().optional().nullable(),
   extension_reason: z.string().trim().max(5000).optional().nullable(),
+  // Required when cancelling: why the work was called off.
+  cancel_reason: z.enum(TASK_CANCEL_REASONS).optional().nullable(),
   // Required when completing a task: the rater's score of the delivered work.
   rating: z.number().int().min(TASK_RATING_MIN).max(TASK_RATING_MAX).optional().nullable(),
 })
 
+// Cancelling is not here. Cancelled work drops out of the KPI entirely, so an
+// assignee who could cancel their own task could take a failure off their score.
+// TaskStatusControl has always offered it to reviewers only; this now agrees.
 const EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
-  pending: ["in_progress", "submitted_for_review", "unable_to_complete", "cancelled"],
-  in_progress: ["submitted_for_review", "unable_to_complete", "pending", "cancelled"],
+  pending: ["in_progress", "submitted_for_review", "unable_to_complete"],
+  in_progress: ["submitted_for_review", "unable_to_complete", "pending"],
   submitted_for_review: ["in_progress", "unable_to_complete"],
   unable_to_complete: ["in_progress", "submitted_for_review"],
   completed: [],
@@ -250,6 +255,23 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updatePayload.reviewed_by = user.id
       updatePayload.reviewed_at = now
       updatePayload.failure_reason = parsed.data.reason || parsed.data.comment || null
+    }
+
+    if (nextStatus === "cancelled") {
+      if (!canReview) {
+        return apiError("Only department leads or administrators can cancel a task", ApiErrorCode.FORBIDDEN, 403)
+      }
+      if (!parsed.data.cancel_reason) {
+        return apiError("A reason is required to cancel a task", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
+      }
+      if (parsed.data.cancel_reason === "other" && !(parsed.data.reason || parsed.data.comment)) {
+        return apiError("Describe why the task is being cancelled", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
+      }
+      updatePayload.cancel_reason = parsed.data.cancel_reason
+      updatePayload.reviewed_by = user.id
+      updatePayload.reviewed_at = now
+    } else if (oldStatus === "cancelled") {
+      updatePayload.cancel_reason = null
     }
 
     if (nextStatus === "reassigned") {

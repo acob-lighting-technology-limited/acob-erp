@@ -18,7 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import {
+  TASK_CANCEL_REASONS,
+  TASK_CANCEL_REASON_LABELS,
+  TASK_STATUS_CONFIG,
+  type TaskCancelReason,
+  type TaskStatus,
+} from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import type { Task } from "@/types/task"
 
@@ -41,7 +47,7 @@ type StatusOption = {
   /** Why this option cannot be chosen, or null when it can. */
   blockedReason: string | null
   /** Extra input required before the change can be submitted. */
-  requires?: "rating" | "reason"
+  requires?: "rating" | "reason" | "cancel"
 }
 
 /** What an assignee may do with their own task. */
@@ -108,6 +114,7 @@ export function TaskStatusControl({
   const [pending, setPending] = useState<StatusOption | null>(null)
   const [rating, setRating] = useState<number | null>(null)
   const [note, setNote] = useState("")
+  const [cancelReason, setCancelReason] = useState<TaskCancelReason | null>(null)
 
   const current = String(task.status || "pending") as TaskStatus
   const isTerminal = current === "completed" || current === "reassigned"
@@ -136,9 +143,11 @@ export function TaskStatusControl({
         const requires: StatusOption["requires"] =
           value === "completed"
             ? "rating"
-            : value === "failed" || value === "unable_to_complete" || isRework || isReopen
-              ? "reason"
-              : undefined
+            : value === "cancelled"
+              ? "cancel"
+              : value === "failed" || value === "unable_to_complete" || isRework || isReopen
+                ? "reason"
+                : undefined
 
         const blockedReason = value === "completed" ? ratingBlockedReason : null
         return { value, blockedReason, requires }
@@ -160,6 +169,7 @@ export function TaskStatusControl({
       setPending(null)
       setRating(null)
       setNote("")
+      setCancelReason(null)
       await onChanged()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update the task")
@@ -177,6 +187,7 @@ export function TaskStatusControl({
       setPending(option)
       setRating(null)
       setNote("")
+      setCancelReason(null)
       return
     }
     void submit(option)
@@ -224,20 +235,24 @@ export function TaskStatusControl({
             <DialogTitle>
               {pending?.requires === "rating"
                 ? "Approve and rate"
-                : current === "submitted_for_review" && pending?.value === "in_progress"
-                  ? "Return for changes"
-                  : current === "failed" && pending?.value === "in_progress"
-                    ? "Reopen task"
-                    : `Move to ${pending ? getStatusOptionLabel(pending.value, current) : ""}`}
+                : pending?.requires === "cancel"
+                  ? "Cancel task"
+                  : current === "submitted_for_review" && pending?.value === "in_progress"
+                    ? "Return for changes"
+                    : current === "failed" && pending?.value === "in_progress"
+                      ? "Reopen task"
+                      : `Move to ${pending ? getStatusOptionLabel(pending.value, current) : ""}`}
             </DialogTitle>
             <DialogDescription>
               {pending?.requires === "rating"
                 ? "Approving a task records how well the work was done. This is what turns its weight into a score."
-                : current === "submitted_for_review" && pending?.value === "in_progress"
-                  ? "Send the task back to the employee with instructions for what needs to be corrected."
-                  : current === "failed" && pending?.value === "in_progress"
-                    ? "Reopen this task to in progress so the assignee can continue and submit their work."
-                    : "A short reason is kept with the task so the decision can be understood later."}
+                : pending?.requires === "cancel"
+                  ? "Cancelled work is left out of the employee's score entirely, neither credit nor failure."
+                  : current === "submitted_for_review" && pending?.value === "in_progress"
+                    ? "Send the task back to the employee with instructions for what needs to be corrected."
+                    : current === "failed" && pending?.value === "in_progress"
+                      ? "Reopen this task to in progress so the assignee can continue and submit their work."
+                      : "A short reason is kept with the task so the decision can be understood later."}
             </DialogDescription>
           </DialogHeader>
 
@@ -269,9 +284,33 @@ export function TaskStatusControl({
             </div>
           )}
 
+          {pending?.requires === "cancel" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Close as *</Label>
+              <Select value={cancelReason ?? ""} onValueChange={(value) => setCancelReason(value as TaskCancelReason)}>
+                <SelectTrigger className="h-9 text-sm" aria-label="Cancel reason">
+                  <SelectValue placeholder="Choose a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_CANCEL_REASONS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {TASK_CANCEL_REASON_LABELS[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">
-              {pending?.requires === "rating" ? "Approval note (optional)" : "Reason *"}
+              {pending?.requires === "rating"
+                ? "Approval note (optional)"
+                : pending?.requires === "cancel"
+                  ? cancelReason === "other"
+                    ? "Note *"
+                    : "Note (optional)"
+                  : "Reason *"}
             </Label>
             <Textarea
               value={note}
@@ -298,11 +337,16 @@ export function TaskStatusControl({
               disabled={
                 isSaving ||
                 (pending?.requires === "rating" && rating === null) ||
-                (pending?.requires === "reason" && note.trim().length === 0)
+                (pending?.requires === "reason" && note.trim().length === 0) ||
+                (pending?.requires === "cancel" &&
+                  (cancelReason === null || (cancelReason === "other" && note.trim().length === 0)))
               }
               onClick={() => {
                 if (!pending) return
-                void submit(pending, pending.requires === "rating" ? { rating, comment: note } : { reason: note })
+                if (pending.requires === "rating") void submit(pending, { rating, comment: note })
+                else if (pending.requires === "cancel")
+                  void submit(pending, { cancel_reason: cancelReason, reason: note.trim() || undefined })
+                else void submit(pending, { reason: note })
               }}
             >
               {isSaving ? "Saving..." : "Confirm"}

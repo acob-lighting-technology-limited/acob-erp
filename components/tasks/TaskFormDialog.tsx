@@ -35,6 +35,9 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchProjectRecords, PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 import { usePortfolios } from "@/hooks/use-portfolios"
 import { portfolioLabel } from "@/lib/tasks/work-links"
+import { upcomingDueDates } from "@/lib/tasks/recurrence"
+import { TaskRepeatFields } from "@/components/tasks/task-repeat-fields"
+import { DEFAULT_REPEAT_FIELDS, scheduleFromForm, type RepeatFormFields } from "@/lib/tasks/series-client"
 
 interface ProjectOption {
   id: string
@@ -73,7 +76,8 @@ const taskFormSchema = z.object({
 
 type TaskFormValues = z.infer<typeof taskFormSchema>
 
-export interface TaskFormState {
+/** The repeat fields are optional, so a form built without them is a one-off task. */
+export interface TaskFormState extends RepeatFormFields {
   title: string
   description: string
   priority: string
@@ -113,6 +117,7 @@ export const EMPTY_TASK_FORM: TaskFormState = {
   weight: TASK_WEIGHT_DEFAULT,
   task_start_date: "",
   task_end_date: "",
+  ...DEFAULT_REPEAT_FIELDS,
 }
 
 // Stable default: a fresh [] each render changes hook deps and can loop effects.
@@ -165,6 +170,8 @@ export function TaskFormDialog({
 }: TaskFormDialogProps) {
   const [isMultiAssign, setIsMultiAssign] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  // Recurrence is creation-only: an existing repeat is managed from its series.
+  const [repeat, setRepeat] = useState<Required<RepeatFormFields>>(DEFAULT_REPEAT_FIELDS)
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -217,6 +224,15 @@ export function TaskFormDialog({
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
       task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date || "",
+    })
+
+    setRepeat({
+      repeat: taskForm.repeat ?? DEFAULT_REPEAT_FIELDS.repeat,
+      repeat_weekday: taskForm.repeat_weekday ?? DEFAULT_REPEAT_FIELDS.repeat_weekday,
+      repeat_month_mode: taskForm.repeat_month_mode ?? DEFAULT_REPEAT_FIELDS.repeat_month_mode,
+      repeat_month_day: taskForm.repeat_month_day ?? DEFAULT_REPEAT_FIELDS.repeat_month_day,
+      repeat_year_month: taskForm.repeat_year_month ?? DEFAULT_REPEAT_FIELDS.repeat_year_month,
+      repeat_end_date: taskForm.repeat_end_date ?? DEFAULT_REPEAT_FIELDS.repeat_end_date,
     })
 
     if (taskForm.assigned_users && taskForm.assigned_users.length > 1) {
@@ -272,12 +288,29 @@ export function TaskFormDialog({
   })
 
   const effectiveStartDate = startDateValue || toLocalISODate()
+  const isRepeating = isCreating && repeat.repeat !== "none"
   const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
   const deadlineError =
-    isCreating && dueDateValue
+    isCreating && !isRepeating && dueDateValue
       ? taskDeadlineWindowError({ startIso: effectiveStartDate, dueIso: dueDateValue }, holidays)
       : null
-  const isMissingDueDate = isCreating && !dueDateValue
+  const isMissingDueDate = isCreating && !isRepeating && !dueDateValue
+
+  // A recurring task has no single deadline: each repeat takes its own from
+  // the schedule, so the form shows the next few instead.
+  const repeatSchedule = isRepeating ? scheduleFromForm({ ...repeat, task_start_date: effectiveStartDate }) : null
+  const repeatPreview = repeatSchedule ? upcomingDueDates(repeatSchedule, effectiveStartDate, 3, holidays) : []
+  const repeatError = !isRepeating
+    ? null
+    : effectiveStartDate < toLocalISODate()
+      ? "A recurring task cannot start in the past."
+      : repeat.repeat_end_date && repeat.repeat_end_date < effectiveStartDate
+        ? "The end date must be on or after the start date."
+        : repeatPreview.length === 0
+          ? "This schedule has no due dates between its start and end dates."
+          : null
+  const setRepeatField = <K extends keyof RepeatFormFields>(key: K, value: Required<RepeatFormFields>[K]) =>
+    setRepeat((current) => ({ ...current, [key]: value }))
 
   // Corporate KPIs a task may be tagged to: only the ones the target
   // department is CORE or SUPPORT on, per the RACI grid — not all 61.
@@ -379,6 +412,8 @@ export function TaskFormDialog({
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
       task_start_date: values.task_start_date ?? "",
       task_end_date: values.task_end_date ?? "",
+      ...repeat,
+      repeat: isRepeating ? repeat.repeat : "none",
     }
   }
 
@@ -407,6 +442,11 @@ export function TaskFormDialog({
                   label: "Corporate KPI Alignment",
                   value:
                     "Every task must link to an approved Corporate KPI. The associated Department Goal and Strategic Pillar are automatically selected and aligned.",
+                },
+                {
+                  label: "Recurring Tasks",
+                  value:
+                    "Set Repeat to create the task on a schedule. Each repeat is an ordinary task, created ahead of its due date, and the whole series counts as one item in the assignee's KPI.",
                 },
                 {
                   label: "Review Workflow",
@@ -763,12 +803,15 @@ export function TaskFormDialog({
             </div>
           )}
 
+          {/* Repeat Section - new tasks only; a repeat is managed from its series */}
+          {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} schedule={repeatSchedule} />}
+
           {/* Timeline Section */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="task_start_date" className="flex items-center gap-1 text-xs font-semibold">
                 <Calendar className="h-3 w-3" />
-                Start Date
+                {isRepeating ? "Starts" : "Start Date"}
               </Label>
               <Input
                 id="task_start_date"
@@ -779,35 +822,78 @@ export function TaskFormDialog({
               />
             </div>
 
-            <div>
-              <Label htmlFor="due_date" className="flex items-center gap-1 text-xs font-semibold">
-                <Calendar className="h-3 w-3" />
-                Due Date / Deadline
-                {isCreating && <span className="text-destructive">*</span>}
-              </Label>
-              <Input
-                id="due_date"
-                required={isCreating}
-                type="date"
-                {...register("due_date")}
-                min={isCreating ? effectiveStartDate : undefined}
-                max={maxDueDate}
-                disabled={lockLevel !== "none"}
-                aria-invalid={Boolean(deadlineError)}
-                aria-describedby={isCreating ? "due_date_hint" : undefined}
-                className="mt-1 text-xs"
-              />
-              {isCreating && (
-                <p
-                  id="due_date_hint"
-                  className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
+            {isRepeating ? (
+              <div>
+                <Label htmlFor="repeat_end_date" className="flex items-center gap-1 text-xs font-semibold">
+                  <Calendar className="h-3 w-3" />
+                  Ends
+                </Label>
+                <Select
+                  value={repeat.repeat_end_date ? "on_date" : "never"}
+                  onValueChange={(val) =>
+                    setRepeatField(
+                      "repeat_end_date",
+                      val === "never" ? "" : repeat.repeat_end_date || effectiveStartDate
+                    )
+                  }
                 >
-                  {deadlineError ??
-                    `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}
-                </p>
-              )}
-            </div>
+                  <SelectTrigger className="mt-1 text-xs" aria-label="When the series ends">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="on_date">On a date</SelectItem>
+                  </SelectContent>
+                </Select>
+                {repeat.repeat_end_date && (
+                  <Input
+                    id="repeat_end_date"
+                    type="date"
+                    min={effectiveStartDate}
+                    value={repeat.repeat_end_date}
+                    onChange={(e) => setRepeatField("repeat_end_date", e.target.value)}
+                    className="mt-2 text-xs"
+                  />
+                )}
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="due_date" className="flex items-center gap-1 text-xs font-semibold">
+                  <Calendar className="h-3 w-3" />
+                  Due Date / Deadline
+                  {isCreating && <span className="text-destructive">*</span>}
+                </Label>
+                <Input
+                  id="due_date"
+                  required={isCreating}
+                  type="date"
+                  {...register("due_date")}
+                  min={isCreating ? effectiveStartDate : undefined}
+                  max={maxDueDate}
+                  disabled={lockLevel !== "none"}
+                  aria-invalid={Boolean(deadlineError)}
+                  aria-describedby={isCreating ? "due_date_hint" : undefined}
+                  className="mt-1 text-xs"
+                />
+                {isCreating && (
+                  <p
+                    id="due_date_hint"
+                    className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
+                  >
+                    {deadlineError ??
+                      `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
+
+          {isRepeating && (
+            <p className={repeatError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
+              {repeatError ??
+                `Next due: ${repeatPreview.map((date) => formatWATDate(date)).join(", ")}${repeatPreview.length === 3 ? ", …" : ""}`}
+            </p>
+          )}
         </fieldset>
 
         <DialogFooter className="pt-2">
@@ -821,10 +907,17 @@ export function TaskFormDialog({
               !titleValue ||
               Boolean(deadlineError) ||
               isMissingDueDate ||
+              Boolean(repeatError) ||
               (isMultiAssign ? selectedUserIds.length === 0 : !assignedTo)
             }
           >
-            {isSaving ? "Saving..." : selectedTask ? "Update Task" : "Create Task"}
+            {isSaving
+              ? "Saving..."
+              : selectedTask
+                ? "Update Task"
+                : isRepeating
+                  ? "Create Recurring Task"
+                  : "Create Task"}
           </Button>
         </DialogFooter>
       </DialogContent>

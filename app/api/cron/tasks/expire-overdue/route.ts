@@ -24,6 +24,7 @@ type OverdueTaskRow = {
   assigned_by: string | null
   due_date: string | null
   task_end_date: string | null
+  series_id: string | null
 }
 
 function serviceClient(url: string, key: string) {
@@ -96,16 +97,22 @@ export async function GET(request: NextRequest) {
 
     const { data: candidates, error: loadError } = await supabase
       .from("tasks")
-      .select("id, title, assigned_to, assigned_by, due_date, task_end_date")
+      .select("id, title, assigned_to, assigned_by, due_date, task_end_date, series_id")
       .in("status", OPEN_STATUSES)
       .eq("is_archived", false)
       .returns<OverdueTaskRow[]>()
 
     if (loadError) throw loadError
 
+    const pausedFrom = await loadSeriesPauses(supabase, candidates || [])
     const overdue = (candidates || []).filter((task) => {
       const deadline = taskDeadline(task)
-      return deadline !== null && deadline < today
+      if (deadline === null || deadline >= today) return false
+      // A lead paused this task's series: the work is on hold, not late.
+      // Pausing moves or closes most repeats, but a monthly one held by an
+      // open-ended pause keeps its old deadline until the series resumes.
+      const pauseStart = task.series_id ? pausedFrom.get(task.series_id) : undefined
+      return !(pauseStart && deadline >= pauseStart)
     })
 
     if (overdue.length === 0) {
@@ -211,6 +218,26 @@ export async function GET(request: NextRequest) {
     log.error({ err: String(error) }, "Overdue task expiry failed")
     return NextResponse.json({ error: "Failed to expire overdue tasks" }, { status: 500 })
   }
+}
+
+/** Start of the current pause for each paused series these tasks belong to. */
+async function loadSeriesPauses(supabase: Supabase, tasks: OverdueTaskRow[]): Promise<Map<string, string>> {
+  const seriesIds = Array.from(new Set(tasks.map((task) => task.series_id).filter(Boolean) as string[]))
+  const pauses = new Map<string, string>()
+  if (seriesIds.length === 0) return pauses
+  const { data, error } = await supabase
+    .from("task_series")
+    .select("id, paused_from")
+    .in("id", seriesIds)
+    .eq("status", "paused")
+  if (error) {
+    log.error({ err: String(error) }, "Series pause lookup failed; paused repeats may be warned")
+    return pauses
+  }
+  for (const row of (data as Array<{ id: string; paused_from: string | null }> | null) ?? []) {
+    if (row.paused_from) pauses.set(row.id, row.paused_from)
+  }
+  return pauses
 }
 
 /**

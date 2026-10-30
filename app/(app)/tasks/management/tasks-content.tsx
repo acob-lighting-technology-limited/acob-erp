@@ -39,6 +39,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
+import { RecurringTaskBadge } from "@/components/tasks/recurring-task-badge"
 
 export type { Task, TaskUserProfile } from "@/types/task"
 
@@ -110,6 +112,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const staffAvatars = useStaffAvatars()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isPostingComment, setIsPostingComment] = useState(false)
@@ -278,20 +281,23 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       initialWidth: 300,
       accessor: (t) => t.title,
       render: (t) => (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => void openTaskDetails(t)}
-              className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
-            >
+        <div className="flex flex-col gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => void openTaskDetails(t)}
+                className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+              >
+                {t.title}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md">
               {t.title}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-md">
-            {t.title}
-          </TooltipContent>
-        </Tooltip>
+            </TooltipContent>
+          </Tooltip>
+          <RecurringTaskBadge task={t} onOpen={setOpenSeriesId} />
+        </div>
       ),
     },
     {
@@ -772,6 +778,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         skeletonRows={6}
         urlSync
       />
+
+      <TaskSeriesSheet seriesId={openSeriesId} onOpenChange={(open) => !open && setOpenSeriesId(null)} />
 
       <UserTaskDetailsDialog
         open={isDetailsOpen}

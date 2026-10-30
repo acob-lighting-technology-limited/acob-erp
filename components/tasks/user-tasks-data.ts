@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Task, TaskUserProfile, TaskPersonSummary } from "@/types/task"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { withSeriesFrequency } from "@/lib/tasks/series-links"
 
 type ActionItemDueDateRow = {
   id: string
@@ -67,7 +68,10 @@ export async function loadUserTasks(
   const allTasks = [...(directTasks || []), ...(multiTasks || [])].filter(
     (task) => String(task.source_type || "") !== "action_item"
   )
-  const uniqueTasks = Array.from(new Map(allTasks.map((task) => [task.id, task])).values()) as Task[]
+  const uniqueTasks = await withSeriesFrequency(
+    supabase,
+    Array.from(new Map(allTasks.map((task) => [task.id, task])).values()) as Task[]
+  )
   if (uniqueTasks.length === 0) return []
   const taskIds = uniqueTasks.map((task) => task.id)
 

@@ -157,22 +157,39 @@ async function notify(
   }
 }
 
+/** Which of these tasks' series repeat every working day. */
+async function loadDailySeriesIds(
+  supabase: Supabase,
+  tasks: Array<{ series_id: string | null }>
+): Promise<Set<string>> {
+  const seriesIds = Array.from(new Set(tasks.map((task) => task.series_id).filter(Boolean) as string[]))
+  if (seriesIds.length === 0) return new Set()
+  const { data } = await supabase.from("task_series").select("id").in("id", seriesIds).eq("frequency", "working_daily")
+  return new Set(((data as Array<{ id: string }> | null) ?? []).map((row) => row.id))
+}
+
 /** Open work whose deadline lands within the next few days. */
 async function sendDueSoonReminders(supabase: Supabase, today: string): Promise<number> {
   const horizon = toLocalISODate(new Date(Date.parse(`${today}T00:00:00`) + DUE_SOON_DAYS * 86_400_000))
 
   const { data: tasks } = await supabase
     .from("tasks")
-    .select("id, title, status, assigned_to, assigned_by, due_date, task_end_date, updated_at, project_id")
+    .select("id, title, status, assigned_to, assigned_by, due_date, task_end_date, updated_at, project_id, series_id")
     .in("status", ["pending", "in_progress"])
     .eq("is_archived", false)
-    .returns<TaskRow[]>()
+    .returns<Array<TaskRow & { series_id: string | null }>>()
+
+  // A daily repeat is due the morning it is created, so "due today" would
+  // arrive every working day for the same routine. The person was told once,
+  // when it became theirs.
+  const dailySeries = await loadDailySeriesIds(supabase, tasks || [])
 
   let sent = 0
   for (const task of tasks || []) {
     const deadline = (task.task_end_date || task.due_date)?.slice(0, 10)
     if (!deadline || deadline < today || deadline > horizon) continue
     if (!task.assigned_to) continue
+    if (task.series_id && dailySeries.has(task.series_id)) continue
 
     if (await recentlyNotified(supabase, task.assigned_to, task.id, "task_due_soon", TASK_REMINDER_COOLDOWN_HOURS)) {
       continue

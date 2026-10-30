@@ -6,6 +6,7 @@ import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { AdminTasksContent, type employee, type UserProfile } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task, TaskPersonSummary } from "@/types/task"
+import { withSeriesFrequency } from "@/lib/tasks/series-links"
 
 export const metadata: Metadata = { title: "Dept Tasks" }
 import type { Metadata } from "next"
@@ -58,7 +59,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     }),
   ])
 
-  const rawTasks = (tasksResult.data || []) as Task[]
+  const rawTasks = await withSeriesFrequency(dataClient, (tasksResult.data || []) as Task[])
 
   const profileIds = new Set<string>()
   const goalIds = new Set<string>()

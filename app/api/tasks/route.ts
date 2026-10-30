@@ -9,7 +9,7 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
-import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
+import { resolveTaskCreateAuthority } from "@/lib/tasks/create-authority"
 import { TASK_STATUSES, TASK_ASSIGNMENT_TYPES } from "@/lib/tasks/constants"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
 import { taskDeadlineWindowError } from "@/lib/tasks/deadline-window"
@@ -19,7 +19,8 @@ import { toLocalISODate } from "@/lib/utils/date"
 import type { Task, TaskPersonSummary } from "@/types/task"
 import { createNotification } from "@/lib/notifications/create"
 import { TaskBodySchema } from "@/lib/tasks/schemas"
-import { hasWorkLinkConflict, loadWorkLinkNames, WORK_LINK_CONFLICT } from "@/lib/tasks/work-links"
+import { loadWorkLinkNames } from "@/lib/tasks/work-links"
+import { withSeriesFrequency } from "@/lib/tasks/series-links"
 
 const log = logger("tasks-route")
 
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest) {
         unable_to_complete_reason,
         failure_reason,
         extension_reason,
+        cancel_reason,
+        series_id,
+        occurrence_date,
         is_archived,
         archived_by,
         archived_at
@@ -123,10 +127,11 @@ export async function GET(request: NextRequest) {
       return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 500)
     }
 
-    const tasks = (rawTasks || []) as Task[]
-    if (tasks.length === 0) {
+    if (!rawTasks || rawTasks.length === 0) {
       return NextResponse.json({ data: [] })
     }
+
+    const tasks = await withSeriesFrequency(getServiceRoleClientOrFallback(supabase), rawTasks as Task[])
 
     // Collect all profile IDs to batch fetch
     const profileIds = new Set<string>()
@@ -260,81 +265,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, role, department, is_department_lead, lead_departments")
-      .eq("id", user.id)
-      .single()
-
-    const scope = await getRequestScope()
-    const isAdmin = Boolean(scope?.isAdminLike)
-    const isLead = Boolean(profile?.is_department_lead)
-
-    if (!isAdmin && !isLead) {
-      return apiError(
-        "Forbidden: Only department leads and administrators can create tasks",
-        ApiErrorCode.FORBIDDEN,
-        403
-      )
-    }
-
     const payload = parsed.data
-    if (hasWorkLinkConflict(payload.project_id, payload.portfolio_id)) {
-      return apiError(WORK_LINK_CONFLICT, ApiErrorCode.VALIDATION_ERROR, 400)
-    }
-    if (payload.project_id && payload.status !== "completed" && payload.status !== "cancelled") {
-      const { data: linkedProject } = await supabase
-        .from("projects")
-        .select("status")
-        .eq("id", payload.project_id)
-        .maybeSingle()
-      if (linkedProject?.status === "completed") {
-        return apiError("Cannot attach an uncompleted task to a completed project", ApiErrorCode.VALIDATION_ERROR, 400)
-      }
-    }
-    const resolvedDepartment = payload.department || profile?.department || null
-
-    // Determine target users to assign
-    const targetUserIds: string[] = []
-    if (payload.assigned_to) {
-      targetUserIds.push(payload.assigned_to)
-    }
-    if (payload.assigned_users && payload.assigned_users.length > 0) {
-      payload.assigned_users.forEach((uid) => {
-        if (!targetUserIds.includes(uid)) targetUserIds.push(uid)
-      })
-    }
-
-    // Work with nobody responsible for it is not a task. There is no longer a
-    // department-wide shape that opts out of this: a task for a whole team is a
-    // multi-assign, which names every person it lands on.
-    if (targetUserIds.length === 0) {
-      return apiError("A task must be assigned to at least one person", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
-    }
-
-    // Validate scope if assigner is a department lead
-    if (!isAdmin && isLead) {
-      if (resolvedDepartment && !canAssignToDepartment(profile, resolvedDepartment)) {
-        return apiError("You can only create tasks for your assigned department scope", ApiErrorCode.FORBIDDEN, 403)
-      }
-
-      if (targetUserIds.length > 0) {
-        const { data: targetProfiles } = await supabase
-          .from("profiles")
-          .select("id, department")
-          .in("id", targetUserIds)
-
-        for (const target of targetProfiles || []) {
-          if (!canAssignToProfile(profile, target)) {
-            return apiError(
-              "You can only assign tasks to users within your departmental scope",
-              ApiErrorCode.FORBIDDEN,
-              403
-            )
-          }
-        }
-      }
-    }
+    const authority = await resolveTaskCreateAuthority(supabase, user.id, payload)
+    if (!authority.ok) return authority.response
+    const { resolvedDepartment, targetUserIds } = authority
 
     // Every new task needs a deadline, and it may be at most five working days
     // after the task starts. No start date means it starts today, which is what

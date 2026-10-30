@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { CheckCircle2, AlertTriangle, Clock, UserCheck, RotateCcw, XCircle, Calendar } from "lucide-react"
+import { CheckCircle2, AlertTriangle, Clock, UserCheck, RotateCcw, XCircle, Calendar, Ban } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,6 +15,7 @@ import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
+import { TASK_CANCEL_REASONS, TASK_CANCEL_REASON_LABELS, type TaskCancelReason } from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT, isValidRating } from "@/lib/tasks/scoring"
 
 export interface TaskReviewEmployee {
@@ -34,7 +35,7 @@ interface TaskReviewDecisionDialogProps {
   onSuccess: () => void
 }
 
-type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend" | "reopen"
+type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend" | "reopen" | "cancel"
 
 const DECISIONS: Array<{
   id: DecisionId
@@ -99,6 +100,15 @@ const DECISIONS: Array<{
     className: "border-danger/30 text-danger hover:bg-rose-500/10",
     available: (task) => !["completed", "reassigned", "cancelled", "failed"].includes(task.status),
   },
+  {
+    id: "cancel",
+    label: "Cancel (close as not planned)",
+    description: "Call the work off. Left out of the assignee's score entirely, neither credit nor failure.",
+    unavailableReason: "Task closed",
+    icon: Ban,
+    className: "border-border text-muted-foreground hover:bg-muted",
+    available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
+  },
 ]
 
 export function TaskReviewDecisionDialog({
@@ -114,6 +124,7 @@ export function TaskReviewDecisionDialog({
   const [newAssignee, setNewAssignee] = useState("")
   const [newDueDate, setNewDueDate] = useState("")
   const [rating, setRating] = useState<number | null>(null)
+  const [cancelReason, setCancelReason] = useState<TaskCancelReason | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!task) return null
@@ -133,6 +144,7 @@ export function TaskReviewDecisionDialog({
     setNewAssignee("")
     setNewDueDate("")
     setRating(null)
+    setCancelReason(null)
   }
 
   const handleSubmitDecision = async () => {
@@ -176,6 +188,17 @@ export function TaskReviewDecisionDialog({
         payload = {
           status: "failed",
           reason: comment || "Marked as failed by lead/admin",
+        }
+      } else if (actionType === "cancel") {
+        if (!cancelReason || (cancelReason === "other" && !comment.trim())) {
+          toast.error(cancelReason ? "Describe why the task is being cancelled" : "Choose why the task is cancelled")
+          setIsSubmitting(false)
+          return
+        }
+        payload = {
+          status: "cancelled",
+          cancel_reason: cancelReason,
+          reason: comment.trim() || undefined,
         }
       } else if (actionType === "extend" || actionType === "reopen") {
         if (!newDueDate) {
@@ -277,6 +300,7 @@ export function TaskReviewDecisionDialog({
                 setActionType(val as DecisionId)
                 setComment("")
                 setRating(null)
+                setCancelReason(null)
                 setNewAssignee("")
                 setNewDueDate("")
               }}
@@ -329,6 +353,27 @@ export function TaskReviewDecisionDialog({
                 </div>
               )}
 
+              {actionType === "cancel" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Close as *</Label>
+                  <Select
+                    value={cancelReason ?? ""}
+                    onValueChange={(value) => setCancelReason(value as TaskCancelReason)}
+                  >
+                    <SelectTrigger className="w-full" aria-label="Cancel reason">
+                      <SelectValue placeholder="Choose a reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TASK_CANCEL_REASONS.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {TASK_CANCEL_REASON_LABELS[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {actionType === "approve" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Performance Rating *</Label>
@@ -367,7 +412,11 @@ export function TaskReviewDecisionDialog({
                         ? "Reason for rejection *"
                         : actionType === "extend"
                           ? "Extension Reason *"
-                          : "Reassignment Note"}
+                          : actionType === "cancel"
+                            ? cancelReason === "other"
+                              ? "Note *"
+                              : "Note (Optional)"
+                            : "Reassignment Note"}
                 </Label>
                 <Textarea
                   value={comment}

@@ -24,6 +24,7 @@ import {
   FolderKanban,
   Layers,
   Download,
+  Repeat,
 } from "lucide-react"
 import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
@@ -56,6 +57,9 @@ import {
   type TaskExportMeta,
 } from "@/lib/tasks/export"
 import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
+import { TaskSeriesSheet } from "@/components/tasks/task-series-sheet"
+import { createSeriesFromForm, isRepeating, seriesCreatedMessage } from "@/lib/tasks/series-client"
+import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -194,6 +198,7 @@ export function AdminTasksContent({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
   // Export reads exactly what each tab's table currently shows.
   const userPlanExportRef = useRef<UserPlanExportContext | null>(null)
   const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>([])
@@ -317,7 +322,10 @@ export function AdminTasksContent({
         source_type: "manual",
       }
 
-      if (selectedTask) {
+      if (!selectedTask && isRepeating(activeTaskForm)) {
+        // Repeat set: a series, whose repeats are created on schedule.
+        toast.success(seriesCreatedMessage(await createSeriesFromForm(activeTaskForm)))
+      } else if (selectedTask) {
         const response = await apiFetch(`/api/tasks/${selectedTask.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -415,6 +423,7 @@ export function AdminTasksContent({
         render: (r) => (
           <div className="flex flex-col gap-0.5">
             <span className="text-foreground font-medium">{r.title}</span>
+            <RecurringTaskBadge task={r} onOpen={setOpenSeriesId} />
             {r.project_name && (
               <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
                 <FolderKanban className="h-3 w-3 shrink-0" />
@@ -557,6 +566,7 @@ export function AdminTasksContent({
         label: "Department",
         options: departmentOptions.map((d) => ({ value: d, label: d })),
       },
+      recurrenceFilter<Task>(),
     ],
     [departmentOptions]
   )
@@ -725,6 +735,12 @@ export function AdminTasksContent({
               onClick: handleOpenReviewDialog,
             },
             { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog },
+            {
+              label: "Recurring Series",
+              icon: Repeat,
+              onClick: (r) => setOpenSeriesId(r.series_id ?? null),
+              hidden: (r) => !r.series_id,
+            },
             {
               label: "Archive Task",
               icon: Trash2,
@@ -949,6 +965,13 @@ export function AdminTasksContent({
             : null
         }
         onSuccess={loadData}
+      />
+
+      <TaskSeriesSheet
+        seriesId={openSeriesId}
+        onOpenChange={(open) => !open && setOpenSeriesId(null)}
+        assignableEmployees={assignableEmployees}
+        onChanged={loadData}
       />
 
       <TaskDeleteDialog

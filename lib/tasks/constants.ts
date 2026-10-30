@@ -76,6 +76,16 @@ export const TASK_STATUS_CONFIG: Record<TaskStatus, TaskStatusConfig> = {
   },
 }
 
+/** Why a reviewer cancelled a task. Cancelled work is neutral for the KPI. */
+export const TASK_CANCEL_REASONS = ["not_planned", "duplicate", "other"] as const
+export type TaskCancelReason = (typeof TASK_CANCEL_REASONS)[number]
+
+export const TASK_CANCEL_REASON_LABELS: Record<TaskCancelReason, string> = {
+  not_planned: "Not planned / no longer needed",
+  duplicate: "Duplicate",
+  other: "Other",
+}
+
 export function formatTaskStatus(status: string | null | undefined): string {
   if (!status) return "Pending"
   const normalized = status.toLowerCase() as TaskStatus

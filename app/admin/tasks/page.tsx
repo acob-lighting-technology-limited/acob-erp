@@ -9,6 +9,7 @@ import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { loadWorkLinkNames } from "@/lib/tasks/work-links"
+import { withSeriesFrequency } from "@/lib/tasks/series-links"
 
 import type { Metadata } from "next"
 
@@ -87,7 +88,7 @@ async function getAdminTasksData() {
     }),
   ])
 
-  const rawTasks = (tasksResult.data || []) as Task[]
+  const rawTasks = await withSeriesFrequency(dataClient, (tasksResult.data || []) as Task[])
 
   // Collect all profile, goal and KPI IDs
   const profileIds = new Set<string>()
