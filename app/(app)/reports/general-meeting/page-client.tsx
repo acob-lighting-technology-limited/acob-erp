@@ -12,8 +12,9 @@ import {
 } from "lucide-react"
 import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
+import { AgendaDeckExportButton } from "@/components/reports/agenda-deck-export"
 
-export default function PortalGeneralMeetingPage() {
+export default function PortalGeneralMeetingPage({ canExportAgendaDeck = false }: { canExportAgendaDeck?: boolean }) {
   const reportCards = [
     {
       title: "Meeting Attendance",
@@ -96,6 +97,7 @@ export default function PortalGeneralMeetingPage() {
         description="Access the documents and trackers that support your weekly general meeting."
         icon={FileBarChart}
         backLink={{ href: "/reports", label: "Back to Reports" }}
+        actions={canExportAgendaDeck ? <AgendaDeckExportButton /> : undefined}
       />
 
       <PageSection title="Available Trackers & Reports">

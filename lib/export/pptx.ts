@@ -258,7 +258,7 @@ export const exportActionPointToPPTX = async (
 
 /** Returns a heading paragraph with coloured text + underline (no shaded background). */
 
-const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
+export const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
   if (theme === "dark") {
     return {
       canvas: "111111",
@@ -306,13 +306,14 @@ const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
  * title stack, and the week number is set oversized and ghosted behind the right
  * half of the slide as a graphic element.
  */
-const addCoverSlide = (
+export const addCoverSlide = (
   pres: PptxPresentation,
   week: number,
   year: number,
   subtitle?: string,
   theme: WeeklyPptxTheme = "light",
-  meetingDate?: string
+  meetingDate?: string,
+  heading = "Weekly Report"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const isDark = theme === "dark"
@@ -402,7 +403,7 @@ const addCoverSlide = (
 
   // Optical alignment: large Calibri carries a little left side bearing, so the
   // hero is nudged left to line its glyph edge up with the eyebrow above it.
-  slide.addText("Weekly Report", {
+  slide.addText(heading, {
     x: contentX - 0.09,
     y: 2.95,
     w: 9,
@@ -749,7 +750,7 @@ const WEEKLY_CONTENT_LAYOUT = {
   footerH: 0.42,
 }
 
-const applyWeeklySlideTransition = (slide: PptxSlide) => {
+export const applyWeeklySlideTransition = (slide: PptxSlide) => {
   // PptxGenJS transition support varies by viewer/version; keep this guarded.
   try {
     slide.transition = {
@@ -1900,20 +1901,48 @@ export const exportToPPTX = async (
   })
 }
 
-export const exportAllToPPTX = async (
-  reports: WeeklyReport[],
-  week: number,
-  year: number,
-  mode: WeeklyPptxMode = "full",
-  theme: WeeklyPptxTheme = "light",
-  meetingDate?: string,
-  order: WeeklyDeptOrder = "default",
+export interface WeeklyDepartmentSlidesOptions {
+  week: number
+  year: number
+  mode?: WeeklyPptxMode
+  theme?: WeeklyPptxTheme
+  order?: WeeklyDeptOrder
   taskSummaryOptions?: WeeklyTaskSummaryOptions
-) => {
-  const PptxConstructor = await loadPptxGenJS()
-  const pres = new PptxConstructor()
-  pres.layout = "LAYOUT_WIDE"
+  /** Page number of the department index slide; departments follow it. */
+  firstPage: number
+}
 
+/** How many slides addWeeklyDepartmentSlides will add, for numbering slides that come after. */
+export const countWeeklyDepartmentSlides = (
+  reports: WeeklyReport[],
+  mode: WeeklyPptxMode = "full",
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
+) =>
+  1 +
+  reports.reduce(
+    (total, report) =>
+      total + (mode === "compact" ? 2 : buildDepartmentPptxPlan(report, taskSummaryOptions).totalSlides),
+    0
+  )
+
+/**
+ * Appends the department index slide and every department's slides to `pres`,
+ * returning how many slides were added. Shared by the weekly export and the
+ * general-meeting agenda deck, which places them under "Departmental Updates".
+ */
+export const addWeeklyDepartmentSlides = (
+  pres: PptxPresentation,
+  reports: WeeklyReport[],
+  {
+    week,
+    year,
+    mode = "full",
+    theme = "light",
+    order = "default",
+    taskSummaryOptions,
+    firstPage,
+  }: WeeklyDepartmentSlidesOptions
+) => {
   const sortedReports =
     order === "alpha"
       ? [...reports].sort((a, b) =>
@@ -1924,11 +1953,7 @@ export const exportAllToPPTX = async (
         : sortReportsByDepartment(reports)
   const departments = sortedReports.map((entry) => entry.department)
 
-  // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, week, year, undefined, theme, meetingDate)
-  applyWeeklySlideTransition(coverSlide)
-
-  let pageCursor = 3
+  let pageCursor = firstPage + 1
   const departmentStartPages: number[] = []
   if (mode === "compact") {
     sortedReports.forEach((_report) => {
@@ -1944,13 +1969,12 @@ export const exportAllToPPTX = async (
     })
   }
 
-  // Slide 2 — Dept index
   const indexSlide = addDeptIndexSlide(
     pres,
     departments,
     week,
     year,
-    (index) => departmentStartPages[index] ?? 3 + index * 2,
+    (index) => departmentStartPages[index] ?? firstPage + 1 + index * 2,
     theme
   )
   applyWeeklySlideTransition(indexSlide)
@@ -1983,6 +2007,30 @@ export const exportAllToPPTX = async (
       )
     })
   }
+
+  return pageCursor - firstPage
+}
+
+export const exportAllToPPTX = async (
+  reports: WeeklyReport[],
+  week: number,
+  year: number,
+  mode: WeeklyPptxMode = "full",
+  theme: WeeklyPptxTheme = "light",
+  meetingDate?: string,
+  order: WeeklyDeptOrder = "default",
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
+) => {
+  const PptxConstructor = await loadPptxGenJS()
+  const pres = new PptxConstructor()
+  pres.layout = "LAYOUT_WIDE"
+
+  // Slide 1 — Cover
+  const coverSlide = addCoverSlide(pres, week, year, undefined, theme, meetingDate)
+  applyWeeklySlideTransition(coverSlide)
+
+  // Slide 2 — Dept index, then each department
+  addWeeklyDepartmentSlides(pres, reports, { week, year, mode, theme, order, taskSummaryOptions, firstPage: 2 })
 
   await pres.writeFile({
     fileName: buildWeeklyReportFilename({

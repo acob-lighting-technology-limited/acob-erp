@@ -639,6 +639,16 @@
   }
 }
 
+/* /birthday/slide screenshots the spotlight for the agenda deck. A screenshot
+   renders as the first frame, so everything is frozen at rest — otherwise the
+   cards would be caught mid-drop, before they appear. */
+.birthday-page.bd-capture *,
+.birthday-page.bd-capture *::before,
+.birthday-page.bd-capture *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* ── Responsive ────────────────────────────────────────────────── */
 
 @media (max-width: 1100px) {

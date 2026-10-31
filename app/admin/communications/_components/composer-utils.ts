@@ -1,5 +1,6 @@
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
 import { DEFAULT_TEAMS_LINK } from "@/lib/events/types"
+import { GENERAL_MEETING_AGENDA_LINES } from "@/lib/reports/general-meeting-agenda"
 
 export { DEFAULT_TEAMS_LINK }
 
@@ -13,15 +14,7 @@ export const LEGACY_DEFAULT_AGENDA = [
   "Adjournment",
 ]
 
-export const DEFAULT_AGENDA = [
-  "Opening Prayer",
-  "Knowledge Sharing Session (30 minutes)",
-  "Minutes of the Last Meeting",
-  "Departmental Updates",
-  "Any Other Business",
-  "MD's Remarks",
-  "Closing Remarks",
-]
+export const DEFAULT_AGENDA = GENERAL_MEETING_AGENDA_LINES
 
 export function getNextMondayFormatted(): string {
   const now = new Date()

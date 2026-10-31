@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
-import type { CSSProperties } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
@@ -46,6 +46,41 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
     )
   }
 
+  return (
+    <BirthdayClotheslineStage
+      layout={layout}
+      celebrants={celebrants}
+      rangeLabel={rangeLabel}
+      isLoading={isLoading}
+      error={error}
+    >
+      <BirthdayBackButton onClick={state.reset} />
+    </BirthdayClotheslineStage>
+  )
+}
+
+/**
+ * The spotlight itself, without the period picker. Also rendered by
+ * /birthday/slide, which screenshots it for the general-meeting agenda deck —
+ * that copy passes highlightToday={false}, since "Today" would mean the export day.
+ */
+export function BirthdayClotheslineStage({
+  layout,
+  celebrants,
+  rangeLabel,
+  isLoading = false,
+  error = null,
+  highlightToday = true,
+  children,
+}: {
+  layout: "rope" | "cards"
+  celebrants: Celebrant[]
+  rangeLabel: string
+  isLoading?: boolean
+  error?: string | null
+  highlightToday?: boolean
+  children?: ReactNode
+}) {
   const lines = toLines(celebrants)
 
   return (
@@ -70,7 +105,7 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
 
               {line.items.map((celebrant, i) => {
                 const t = (i + 1) / (line.items.length + 1)
-                const isToday = isBirthdayToday(celebrant)
+                const isToday = highlightToday && isBirthdayToday(celebrant)
                 const order = line.start + i
                 return (
                   <figure
@@ -115,7 +150,7 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
         <span className="bd4-range">{rangeLabel}</span>
       </footer>
 
-      <BirthdayBackButton onClick={state.reset} />
+      {children}
     </section>
   )
 }
