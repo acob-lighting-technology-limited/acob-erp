@@ -22,6 +22,12 @@ import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { GENERAL_MEETING_AGENDA } from "@/lib/reports/general-meeting-agenda"
 import type { WeeklyDeptOrder, WeeklyPptxMode, WeeklyPptxTheme } from "@/lib/export-utils"
 
+/** The week's Monday meeting as dd/mm/yy, so a week number can be picked by its date. */
+function formatMeetingMonday(week: number, year: number) {
+  const [yyyy, mm, dd] = getDefaultMeetingDateIso(week, year).split("-")
+  return `${dd}/${mm}/${yyyy.slice(2)}`
+}
+
 /**
  * "Export Agenda Deck" on the General Meeting hub: picks the meeting week, then
  * reuses the weekly export's layout/theme/order steps, and builds one deck that
@@ -121,14 +127,16 @@ export function AgendaDeckExportButton() {
       </Button>
 
       <Dialog open={weekDialogOpen} onOpenChange={setWeekDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-md">
+        {/* overflow-visible: the dialog's default overflow-y-auto makes it the clipping
+            boundary for the week list, which then gets squeezed inside this short dialog. */}
+        <DialogContent className="w-[95vw] max-w-md overflow-visible">
           <DialogHeader>
             <DialogTitle>Export Agenda Deck</DialogTitle>
             <DialogDescription>
               One PowerPoint in agenda order: {GENERAL_MEETING_AGENDA.map((item) => item.title).join(", ")}.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-[2fr_1fr] gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="agenda-deck-week">Meeting week</Label>
               <Select value={String(week)} onValueChange={(value) => setWeek(Number(value))}>
@@ -138,7 +146,7 @@ export function AgendaDeckExportButton() {
                 <SelectContent>
                   {weekOptions.map((option) => (
                     <SelectItem key={option} value={String(option)}>
-                      Week {option}
+                      {`Week ${option} · ${formatMeetingMonday(option, year)}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
