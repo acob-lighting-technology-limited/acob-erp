@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { buildAgendaDeck, planAgendaDeckPages, type AgendaDeckInput } from "../agenda-deck"
+import { fitTitleSlideFontSize, TITLE_SLIDE_TEXT_W } from "../pptx"
 import type { PptxPresentation, PptxTextRun, WeeklyReport } from "../shared"
 
 /** Records every slide and the plain text placed on it. */
@@ -94,4 +95,24 @@ test("missing pieces leave a note on the section slide instead of failing", () =
   assert.match(allText, /no access/)
   // cover + agenda + 7 section slides + 1 birthday slide
   assert.equal(slides.length, 10)
+})
+
+test("only page 1 of the minutes is shown, with a pointer to the rest", () => {
+  const input = baseInput({ minutes: { pages: [image], totalPages: 15, label: "Minutes — Week 22, 2026" } })
+  const { pres, slides } = fakePresentation()
+  buildAgendaDeck(pres, input)
+  const allText = slides.flat().join("\n")
+  assert.match(allText, /Page 1 of 15 shown/)
+  assert.ok(slides.flat().includes("Page 1 of 15"))
+  assert.equal(slides.length, planAgendaDeckPages(input).totalSlides)
+})
+
+test("title slide headings are sized to fit one line beside the ghosted number", () => {
+  // Short names keep the full size; long ones shrink to fit the width.
+  assert.equal(fitTitleSlideFontSize("ACCOUNTS", { uppercase: true }), 54)
+  for (const name of ["REGULATORY AND COMPLIANCE", "OPERATIONS AND MAINTENANCE", "BUSINESS, GROWTH AND INNOVATION"]) {
+    const size = fitTitleSlideFontSize(name, { uppercase: true })
+    assert.ok(size < 54 && size >= 28, `${name}: ${size}pt`)
+    assert.ok((name.length * size * 0.62) / 72 <= TITLE_SLIDE_TEXT_W, `${name} fits`)
+  }
 })

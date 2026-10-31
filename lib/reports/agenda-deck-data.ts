@@ -9,7 +9,12 @@ import { apiFetch } from "@/lib/api-client"
 import { getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { openWithPdfjs, renderPdfPage } from "@/lib/pdf/client-tools"
 import { sortReportsByDepartment, type WeeklyReport } from "@/lib/export-utils"
-import type { AgendaDeckBirthdaySlide, AgendaDeckImage, AgendaDeckKssEntry } from "@/lib/export/agenda-deck"
+import type {
+  AgendaDeckBirthdaySlide,
+  AgendaDeckImage,
+  AgendaDeckInput,
+  AgendaDeckKssEntry,
+} from "@/lib/export/agenda-deck"
 import { captureBirthdaySlide } from "./birthday-slide"
 
 type MeetingDocumentType = "knowledge_sharing_session" | "minutes"
@@ -60,13 +65,16 @@ async function listMeetingDocuments(week: number, year: number, documentType: Me
   return (json?.data || []) as MeetingDocumentRow[]
 }
 
-async function renderDocumentPages(row: MeetingDocumentRow): Promise<AgendaDeckImage[]> {
+async function renderDocumentPages(
+  row: MeetingDocumentRow,
+  maxPages = MAX_PAGES_PER_DOCUMENT
+): Promise<{ pages: AgendaDeckImage[]; totalPages: number }> {
   const res = await apiFetch(row.signed_url)
   if (!res.ok) throw new Error("Could not download the file")
   const pdf = await openWithPdfjs(await res.blob())
   try {
     const pages: AgendaDeckImage[] = []
-    const pageCount = Math.min(pdf.numPages, MAX_PAGES_PER_DOCUMENT)
+    const pageCount = Math.min(pdf.numPages, maxPages)
     for (let n = 1; n <= pageCount; n++) {
       const { canvas } = await renderPdfPage(pdf, n, 4, PAGE_IMAGE_MAX_SIDE)
       pages.push({
@@ -76,7 +84,7 @@ async function renderDocumentPages(row: MeetingDocumentRow): Promise<AgendaDeckI
       })
       canvas.width = canvas.height = 0
     }
-    return pages
+    return { pages, totalPages: pdf.numPages }
   } finally {
     await pdf.destroy()
   }
@@ -94,7 +102,7 @@ export async function loadAgendaKss(week: number, year: number): Promise<AgendaD
       const base = { presenterName: row.presenter_name, department: row.department }
       if (!isPdf(row)) return { ...base, pages: [], note: "presented from their own slides" }
       try {
-        return { ...base, pages: await renderDocumentPages(row) }
+        return { ...base, pages: (await renderDocumentPages(row)).pages }
       } catch {
         return { ...base, pages: [], note: "the PDF could not be read; presented from their own file" }
       }
@@ -107,19 +115,22 @@ export function previousMeetingWeek(meetingDate: string) {
   return getOfficeWeekFromDate(addDays(new Date(`${meetingDate}T00:00:00`), -7))
 }
 
-export async function loadAgendaMinutes(
-  meetingDate: string
-): Promise<{ pages: AgendaDeckImage[]; label: string; note?: string }> {
+/**
+ * Page 1 of last week's minutes. The whole document is 10–15 A4 pages, which
+ * cannot be read on a projected 16:9 slide, so the deck shows the opening page
+ * and points to the full minutes in Matrix.
+ */
+export async function loadAgendaMinutes(meetingDate: string): Promise<AgendaDeckInput["minutes"]> {
   const previous = previousMeetingWeek(meetingDate)
   const label = `Minutes — Week ${previous.week}, ${previous.year}`
   const rows = await listMeetingDocuments(previous.week, previous.year, "minutes")
-  const pdfs = rows.filter(isPdf)
-  if (pdfs.length === 0) {
+  const pdf = rows.find(isPdf)
+  if (!pdf) {
     return { pages: [], label, note: `No minutes have been uploaded for week ${previous.week}.` }
   }
   try {
-    const pages = (await Promise.all(pdfs.map(renderDocumentPages))).flat()
-    return { pages, label }
+    const { pages, totalPages } = await renderDocumentPages(pdf, 1)
+    return { pages, totalPages, label }
   } catch {
     return { pages: [], label, note: `The week ${previous.week} minutes could not be read.` }
   }

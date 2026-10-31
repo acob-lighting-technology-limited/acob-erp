@@ -501,6 +501,21 @@ export const addCoverSlide = (
   return slide
 }
 
+/** Width of a title slide's heading: from the left margin to just short of the ghosted numeral. */
+export const TITLE_SLIDE_TEXT_W = 8.2
+
+/**
+ * Largest size (54pt down to 28pt) at which a title slide heading fits on one
+ * line in TITLE_SLIDE_TEXT_W. Estimated from average bold Calibri glyph widths,
+ * since pptxgenjs cannot measure text and "shrink to fit" only applies once
+ * PowerPoint re-lays the box out.
+ */
+export const fitTitleSlideFontSize = (text: string, { uppercase = false } = {}) => {
+  const emPerChar = uppercase ? 0.62 : 0.52
+  const fitted = Math.floor((TITLE_SLIDE_TEXT_W * 72) / (Math.max(text.length, 1) * emPerChar))
+  return Math.max(28, Math.min(54, fitted))
+}
+
 /**
  * Adds a department title slide (full-bleed green).
  */
@@ -549,12 +564,15 @@ const addDeptTitleSlide = (
     fontFace: "Calibri",
   })
 
-  slide.addText(department.toUpperCase(), {
+  // Kept to one line and clear of the ghosted numeral: a long name used to run
+  // into the number, or wrap below the rule underneath it.
+  const departmentTitle = department.toUpperCase()
+  slide.addText(departmentTitle, {
     x: contentX - 0.08,
     y: 3.17,
-    w: 11,
+    w: TITLE_SLIDE_TEXT_W,
     h: 1.25,
-    fontSize: 54,
+    fontSize: fitTitleSlideFontSize(departmentTitle, { uppercase: true }),
     bold: true,
     color: colors.textInverse,
     valign: "middle",

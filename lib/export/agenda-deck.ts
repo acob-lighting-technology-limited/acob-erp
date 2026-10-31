@@ -12,7 +12,9 @@ import {
   addWeeklyDepartmentSlides,
   applyWeeklySlideTransition,
   countWeeklyDepartmentSlides,
+  fitTitleSlideFontSize,
   getWeeklyPptxThemeColors,
+  TITLE_SLIDE_TEXT_W,
   type WeeklyPptxMode,
 } from "./pptx"
 import {
@@ -64,7 +66,8 @@ export interface AgendaDeckInput {
   taskSummaryOptions?: WeeklyTaskSummaryOptions
   reports: WeeklyReport[]
   kss: AgendaDeckKssEntry[]
-  minutes: { pages: AgendaDeckImage[]; label: string; note?: string }
+  /** Usually just page 1; `totalPages` is the whole document's length. */
+  minutes: { pages: AgendaDeckImage[]; totalPages?: number; label: string; note?: string }
   birthdays: AgendaDeckBirthdaySlide[]
 }
 
@@ -300,9 +303,9 @@ const addAgendaSectionSlide = (
   slide.addText(title, {
     x: contentX - 0.08,
     y: 3.17,
-    w: 8.2,
+    w: TITLE_SLIDE_TEXT_W,
     h: 1.25,
-    fontSize: title.length > 22 ? 44 : 54,
+    fontSize: fitTitleSlideFontSize(title),
     bold: true,
     color: AGENDA_COLORS.white,
     valign: "middle",
@@ -516,9 +519,16 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
       }
       case "minutes": {
         const { pages, label, note } = input.minutes
-        addAgendaSectionSlide(pres, { ...section, lines: [pages.length > 0 ? label : (note ?? label)] })
+        const totalPages = input.minutes.totalPages ?? pages.length
+        const lines =
+          pages.length === 0
+            ? [note ?? label]
+            : totalPages > pages.length
+              ? [label, `Page 1 of ${totalPages} shown. Full minutes: Matrix → General Meeting → Minutes.`]
+              : [label]
+        addAgendaSectionSlide(pres, { ...section, lines })
         pages.forEach((image, n) =>
-          addDocumentPageSlide(pres, image, label, `Page ${n + 1} of ${pages.length}`, page + 1 + n, theme)
+          addDocumentPageSlide(pres, image, label, `Page ${n + 1} of ${totalPages}`, page + 1 + n, theme)
         )
         break
       }
