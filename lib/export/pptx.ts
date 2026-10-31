@@ -505,15 +505,47 @@ export const addCoverSlide = (
 export const TITLE_SLIDE_TEXT_W = 8.2
 
 /**
- * Largest size (54pt down to 28pt) at which a title slide heading fits on one
- * line in TITLE_SLIDE_TEXT_W. Estimated from average bold Calibri glyph widths,
- * since pptxgenjs cannot measure text and "shrink to fit" only applies once
- * PowerPoint re-lays the box out.
+ * Largest size (54pt down to 28pt) at which a mixed-case title slide heading
+ * fits on one line in TITLE_SLIDE_TEXT_W. Estimated from average bold Calibri
+ * glyph widths, since pptxgenjs cannot measure text and "shrink to fit" only
+ * applies once PowerPoint re-lays the box out.
  */
-export const fitTitleSlideFontSize = (text: string, { uppercase = false } = {}) => {
-  const emPerChar = uppercase ? 0.62 : 0.52
+export const fitTitleSlideFontSize = (text: string) => {
+  const emPerChar = 0.52
   const fitted = Math.floor((TITLE_SLIDE_TEXT_W * 72) / (Math.max(text.length, 1) * emPerChar))
   return Math.max(28, Math.min(54, fitted))
+}
+
+/**
+ * Department title heading at the full 54pt where it fits, wrapping a long name
+ * onto a second line rather than shrinking it (only names too long for two
+ * lines get smaller). Lines are broken here, not left to PowerPoint, so the
+ * eyebrow above and the rule below can be placed around the real line count.
+ */
+export const planDepartmentHeading = (department: string) => {
+  const words = department.toUpperCase().split(/\s+/).filter(Boolean)
+  // Average bold Calibri capital, measured from rendered slides.
+  const emPerChar = 0.54
+  const wrap = (fontSize: number) => {
+    const maxChars = Math.floor((TITLE_SLIDE_TEXT_W * 72) / (emPerChar * fontSize))
+    const lines: string[] = []
+    for (const word of words) {
+      const last = lines[lines.length - 1]
+      if (last !== undefined && `${last} ${word}`.length <= maxChars) lines[lines.length - 1] = `${last} ${word}`
+      else lines.push(word)
+    }
+    return lines
+  }
+  let fontSize = 54
+  let lines = wrap(fontSize)
+  while (lines.length > 2 && fontSize > 36) {
+    fontSize -= 2
+    lines = wrap(fontSize)
+  }
+  // The rule under the heading stays at 4.57", so a two-line heading grows upwards.
+  const height = lines.length === 1 ? 1.25 : (lines.length * fontSize * 1.15) / 72 + 0.15
+  const y = 4.42 - height
+  return { text: lines.join("\n"), fontSize, y, height, eyebrowY: y - 0.42 }
 }
 
 /**
@@ -550,10 +582,12 @@ const addDeptTitleSlide = (
     })
   }
 
+  const heading = planDepartmentHeading(department)
+
   // ── Eyebrow ───────────────────────────────────────────────────────────────
   slide.addText(position ? `DEPARTMENT ${pad(position.index)} OF ${pad(position.total)}` : "DEPARTMENT", {
     x: contentX,
-    y: 2.75,
+    y: heading.eyebrowY,
     w: 8,
     h: 0.36,
     fontSize: 14,
@@ -564,15 +598,14 @@ const addDeptTitleSlide = (
     fontFace: "Calibri",
   })
 
-  // Kept to one line and clear of the ghosted numeral: a long name used to run
-  // into the number, or wrap below the rule underneath it.
-  const departmentTitle = department.toUpperCase()
-  slide.addText(departmentTitle, {
+  // Kept clear of the ghosted numeral: a long name used to run into the number,
+  // or wrap below the rule underneath it.
+  slide.addText(heading.text, {
     x: contentX - 0.08,
-    y: 3.17,
+    y: heading.y,
     w: TITLE_SLIDE_TEXT_W,
-    h: 1.25,
-    fontSize: fitTitleSlideFontSize(departmentTitle, { uppercase: true }),
+    h: heading.height,
+    fontSize: heading.fontSize,
     bold: true,
     color: colors.textInverse,
     valign: "middle",

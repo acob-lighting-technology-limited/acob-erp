@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { buildAgendaDeck, planAgendaDeckPages, type AgendaDeckInput } from "../agenda-deck"
-import { fitTitleSlideFontSize, TITLE_SLIDE_TEXT_W } from "../pptx"
+import { buildAgendaDeck, planAgendaDeckPages, toRoman, type AgendaDeckInput } from "../agenda-deck"
+import { planDepartmentHeading } from "../pptx"
 import type { PptxPresentation, PptxTextRun, WeeklyReport } from "../shared"
 
 /** Records every slide and the plain text placed on it. */
@@ -73,7 +73,7 @@ test("agenda slide points each item at the slide its section starts on", () => {
   assert.deepEqual(startPages.slice(0, 4), [3, 4, 8, 11])
   startPages.forEach((page, i) => {
     assert.ok(
-      slides[page - 1].some((text) => text.startsWith(`AGENDA 0${i + 1} OF 07`)),
+      slides[page - 1].some((text) => text.startsWith(`AGENDA ${toRoman(i + 1)} OF VII`)),
       `item ${i + 1} on slide ${page}`
     )
   })
@@ -107,12 +107,28 @@ test("only page 1 of the minutes is shown, with a pointer to the rest", () => {
   assert.equal(slides.length, planAgendaDeckPages(input).totalSlides)
 })
 
-test("title slide headings are sized to fit one line beside the ghosted number", () => {
-  // Short names keep the full size; long ones shrink to fit the width.
-  assert.equal(fitTitleSlideFontSize("ACCOUNTS", { uppercase: true }), 54)
-  for (const name of ["REGULATORY AND COMPLIANCE", "OPERATIONS AND MAINTENANCE", "BUSINESS, GROWTH AND INNOVATION"]) {
-    const size = fitTitleSlideFontSize(name, { uppercase: true })
-    assert.ok(size < 54 && size >= 28, `${name}: ${size}pt`)
-    assert.ok((name.length * size * 0.62) / 72 <= TITLE_SLIDE_TEXT_W, `${name} fits`)
+test("department headings stay at 54pt and wrap long names onto two lines", () => {
+  const short = planDepartmentHeading("Accounts")
+  assert.deepEqual([short.text, short.fontSize], ["ACCOUNTS", 54])
+
+  for (const [name, expected] of [
+    ["Regulatory and Compliance", "REGULATORY AND\nCOMPLIANCE"],
+    ["Operations and Maintenance", "OPERATIONS AND\nMAINTENANCE"],
+    ["Business, Growth and Innovation", "BUSINESS, GROWTH AND\nINNOVATION"],
+  ]) {
+    const heading = planDepartmentHeading(name)
+    assert.equal(heading.text, expected)
+    assert.equal(heading.fontSize, 54)
+    // Grows upwards: the bottom stays on the rule, the eyebrow sits above.
+    assert.ok(Math.abs(heading.y + heading.height - 4.42) < 1e-9)
+    assert.ok(heading.eyebrowY < heading.y)
   }
+})
+
+test("agenda items are numbered in Roman numerals", () => {
+  const { pres, slides } = fakePresentation()
+  buildAgendaDeck(pres, baseInput())
+  const allText = slides.flat()
+  assert.ok(allText.includes("AGENDA VII OF VII"))
+  assert.ok(allText.includes("IV"))
 })

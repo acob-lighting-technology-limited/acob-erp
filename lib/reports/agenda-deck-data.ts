@@ -115,11 +115,7 @@ export function previousMeetingWeek(meetingDate: string) {
   return getOfficeWeekFromDate(addDays(new Date(`${meetingDate}T00:00:00`), -7))
 }
 
-/**
- * Page 1 of last week's minutes. The whole document is 10–15 A4 pages, which
- * cannot be read on a projected 16:9 slide, so the deck shows the opening page
- * and points to the full minutes in Matrix.
- */
+/** Every page of last week's minutes (up to MAX_PAGES_PER_DOCUMENT). */
 export async function loadAgendaMinutes(meetingDate: string): Promise<AgendaDeckInput["minutes"]> {
   const previous = previousMeetingWeek(meetingDate)
   const label = `Minutes — Week ${previous.week}, ${previous.year}`
@@ -129,7 +125,7 @@ export async function loadAgendaMinutes(meetingDate: string): Promise<AgendaDeck
     return { pages: [], label, note: `No minutes have been uploaded for week ${previous.week}.` }
   }
   try {
-    const { pages, totalPages } = await renderDocumentPages(pdf, 1)
+    const { pages, totalPages } = await renderDocumentPages(pdf)
     return { pages, totalPages, label }
   } catch {
     return { pages: [], label, note: `The week ${previous.week} minutes could not be read.` }

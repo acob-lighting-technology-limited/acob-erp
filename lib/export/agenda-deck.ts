@@ -66,12 +66,36 @@ export interface AgendaDeckInput {
   taskSummaryOptions?: WeeklyTaskSummaryOptions
   reports: WeeklyReport[]
   kss: AgendaDeckKssEntry[]
-  /** Usually just page 1; `totalPages` is the whole document's length. */
+  /** `totalPages` is the whole document's length, when longer than the pages shown. */
   minutes: { pages: AgendaDeckImage[]; totalPages?: number; label: string; note?: string }
   birthdays: AgendaDeckBirthdaySlide[]
 }
 
-const pad2 = (n: number) => String(n).padStart(2, "0")
+/** Agenda items are numbered in Roman numerals: I, II … VII. */
+export const toRoman = (n: number) => {
+  const numerals: [number, string][] = [
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ]
+  let rest = n
+  let out = ""
+  for (const [value, numeral] of numerals) {
+    while (rest >= value) {
+      out += numeral
+      rest -= value
+    }
+  }
+  return out
+}
+
+/** Size at which a ghosted Roman numeral fits the 3.5" right of the title (I is narrow, V and X wide). */
+const romanGhostFontSize = (numeral: string) => {
+  const ems = [...numeral].reduce((total, ch) => total + (ch === "I" ? 0.27 : 0.6), 0)
+  return Math.min(200, Math.floor((3.5 * 72) / ems))
+}
 
 /** pptxgenjs wants "image/jpeg;base64,…" without the data: scheme. */
 const toPptxImageData = (dataUrl: string) => dataUrl.replace(/^data:/, "")
@@ -204,7 +228,7 @@ const addAgendaListSlide = (
       fill: { color: AGENDA_COLORS.ink },
       line: { color: AGENDA_COLORS.accent, width: 1.5 },
     })
-    slide.addText(String(i + 1), {
+    slide.addText(toRoman(i + 1), {
       x: 0.8,
       y: y + 0.1,
       w: 0.46,
@@ -273,12 +297,12 @@ const addAgendaSectionSlide = (
   slide.background = { color: AGENDA_COLORS.ink }
   const contentX = 1.05
 
-  slide.addText(pad2(index), {
+  slide.addText(toRoman(index), {
     x: 6.9,
     y: 1.3,
     w: 5.9,
     h: 4.4,
-    fontSize: 200,
+    fontSize: romanGhostFontSize(toRoman(index)),
     bold: true,
     color: AGENDA_COLORS.ghost,
     align: "right",
@@ -286,7 +310,7 @@ const addAgendaSectionSlide = (
     fontFace: "Calibri",
   })
 
-  slide.addText(`AGENDA ${pad2(index)} OF ${pad2(total)}`, {
+  slide.addText(`AGENDA ${toRoman(index)} OF ${toRoman(total)}`, {
     x: contentX,
     y: 2.75,
     w: 8,
