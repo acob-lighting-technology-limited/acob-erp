@@ -80,19 +80,37 @@ const containBox = (image: AgendaDeckImage, frame: { x: number; y: number; w: nu
   return { x: frame.x + (frame.w - w) / 2, y: frame.y + (frame.h - h) / 2, w, h }
 }
 
+/**
+ * Agenda slides (the agenda and each item's section slide) are charcoal and
+ * gold, so in the room they read as "next agenda item" and can never be
+ * mistaken for the green department title slides inside Departmental Updates.
+ * Same in both themes.
+ */
+const AGENDA_COLORS = {
+  ink: "16181C",
+  inkDeep: "0D0E11",
+  ghost: "25282E",
+  gold: "D9A93A",
+  /** Gold dark enough to read as text on the light theme's off-white canvas. */
+  goldOnLight: "8C6A16",
+  white: "FFFFFF",
+  muted: "B8BCC4",
+}
+
 const addFooterBand = (
   pres: PptxPresentation,
   slide: PptxSlide,
   pageNumber: number,
-  colors: ReturnType<typeof getWeeklyPptxThemeColors>
+  colors: ReturnType<typeof getWeeklyPptxThemeColors>,
+  band: { fill: string; text: string } = { fill: colors.footer, text: colors.textInverse }
 ) => {
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
     y: 6.9,
     w: "100%",
     h: 0.6,
-    fill: { color: colors.footer },
-    line: { color: colors.footer },
+    fill: { color: band.fill },
+    line: { color: band.fill },
   })
   const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.34)
   try {
@@ -107,12 +125,14 @@ const addFooterBand = (
     h: 0.6,
     fontSize: 10,
     bold: true,
-    color: colors.textInverse,
+    color: band.text,
     align: "center",
     valign: "middle",
     fontFace: "Calibri",
   })
 }
+
+const AGENDA_FOOTER = { fill: AGENDA_COLORS.inkDeep, text: AGENDA_COLORS.gold }
 
 /** Numbered agenda with the page each item starts on — the deck's table of contents. */
 const addAgendaListSlide = (
@@ -123,6 +143,7 @@ const addAgendaListSlide = (
   theme: WeeklyPptxTheme
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
+  const gold = theme === "dark" ? AGENDA_COLORS.gold : AGENDA_COLORS.goldOnLight
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
 
@@ -131,17 +152,26 @@ const addAgendaListSlide = (
     y: 0,
     w: "100%",
     h: 0.65,
-    fill: { color: colors.header },
-    line: { color: colors.header },
+    fill: { color: AGENDA_COLORS.ink },
+    line: { color: AGENDA_COLORS.ink },
   })
-  slide.addText("Agenda", {
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: 0,
+    y: 0.65,
+    w: "100%",
+    h: 0.05,
+    fill: { color: AGENDA_COLORS.gold },
+    line: { color: AGENDA_COLORS.gold },
+  })
+  slide.addText("AGENDA", {
     x: 0.3,
     y: 0,
     w: 10,
     h: 0.65,
     fontSize: 16,
     bold: true,
-    color: colors.textInverse,
+    color: AGENDA_COLORS.gold,
+    charSpacing: 4,
     valign: "middle",
     fontFace: "Calibri",
   })
@@ -151,7 +181,7 @@ const addAgendaListSlide = (
     w: 3,
     h: 0.65,
     fontSize: 12,
-    color: colors.headerMuted,
+    color: AGENDA_COLORS.muted,
     valign: "middle",
     align: "right",
     fontFace: "Calibri",
@@ -166,8 +196,8 @@ const addAgendaListSlide = (
       y: y + 0.1,
       w: 0.46,
       h: 0.46,
-      fill: { color: colors.accent },
-      line: { color: colors.accent },
+      fill: { color: AGENDA_COLORS.ink },
+      line: { color: AGENDA_COLORS.gold, width: 1.5 },
     })
     slide.addText(String(i + 1), {
       x: 0.8,
@@ -176,7 +206,7 @@ const addAgendaListSlide = (
       h: 0.46,
       fontSize: 13,
       bold: true,
-      color: colors.textInverse,
+      color: AGENDA_COLORS.gold,
       align: "center",
       valign: "middle",
       fontFace: "Calibri",
@@ -197,7 +227,7 @@ const addAgendaListSlide = (
       h: 0.66,
       fontSize: 16,
       bold: true,
-      color: colors.accent,
+      color: gold,
       align: "right",
       valign: "middle",
       fontFace: "Calibri",
@@ -213,14 +243,14 @@ const addAgendaListSlide = (
     }
   })
 
-  addFooterBand(pres, slide, 2, colors)
+  addFooterBand(pres, slide, 2, colors, AGENDA_FOOTER)
   return slide
 }
 
 /**
- * Full-bleed green section slide for one agenda item, in the same style as the
- * weekly export's department title slides. Items with no content of their own
- * (prayer, MD's remarks, closing) are just this slide.
+ * Charcoal section slide for one agenda item: a gold rail down the left edge,
+ * gold eyebrow and rule, and the item number ghosted on the right. Items with
+ * no content of their own (prayer, MD's remarks, closing) are just this slide.
  */
 const addAgendaSectionSlide = (
   pres: PptxPresentation,
@@ -235,20 +265,29 @@ const addAgendaSectionSlide = (
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
-  slide.background = { color: colors.titleFill }
+  slide.background = { color: AGENDA_COLORS.ink }
   const contentX = 1.05
 
   slide.addText(pad2(index), {
     x: 6.9,
-    y: 1.58,
-    w: 5.6,
-    h: 4.2,
-    fontSize: 190,
+    y: 1.3,
+    w: 5.9,
+    h: 4.4,
+    fontSize: 200,
     bold: true,
-    color: colors.ghostOnAccent,
+    color: AGENDA_COLORS.ghost,
     align: "right",
     valign: "middle",
     fontFace: "Calibri",
+  })
+
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: 0,
+    y: 0,
+    w: 0.3,
+    h: 6.9,
+    fill: { color: AGENDA_COLORS.gold },
+    line: { color: AGENDA_COLORS.gold },
   })
 
   slide.addText(`AGENDA ${pad2(index)} OF ${pad2(total)}`, {
@@ -258,20 +297,20 @@ const addAgendaSectionSlide = (
     h: 0.36,
     fontSize: 14,
     bold: true,
-    color: colors.headerMuted,
+    color: AGENDA_COLORS.gold,
     charSpacing: 4,
     valign: "middle",
     fontFace: "Calibri",
   })
 
-  slide.addText(title.toUpperCase(), {
+  slide.addText(title, {
     x: contentX - 0.08,
     y: 3.17,
     w: 11.5,
     h: 1.25,
-    fontSize: title.length > 26 ? 44 : 54,
+    fontSize: title.length > 26 ? 46 : 56,
     bold: true,
-    color: colors.textInverse,
+    color: AGENDA_COLORS.white,
     valign: "middle",
     fit: "shrink",
     fontFace: "Calibri",
@@ -282,8 +321,8 @@ const addAgendaSectionSlide = (
     y: 4.57,
     w: 2.6,
     h: 0.05,
-    fill: { color: colors.textInverse },
-    line: { color: colors.textInverse },
+    fill: { color: AGENDA_COLORS.gold },
+    line: { color: AGENDA_COLORS.gold },
   })
 
   if (lines.length > 0) {
@@ -293,14 +332,14 @@ const addAgendaSectionSlide = (
       w: 11,
       h: 1.6,
       fontSize: 18,
-      color: colors.textInverse,
+      color: AGENDA_COLORS.muted,
       valign: "top",
       paraSpaceAfter: 4,
       fontFace: "Calibri",
     })
   }
 
-  addFooterBand(pres, slide, pageNumber, colors)
+  addFooterBand(pres, slide, pageNumber, colors, AGENDA_FOOTER)
   applyWeeklySlideTransition(slide)
   return slide
 }
