@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-client"
+
 export type Mode = "day" | "week" | "month" | "range"
 
 export interface Celebrant {
@@ -7,6 +9,13 @@ export interface Celebrant {
   /** MM-DD */
   birthday: string
   avatarUrl: string | null
+}
+
+/** The "Coming up" summary shown bottom right of the spotlight. */
+export interface UpcomingBirthdays {
+  /** e.g. "Nov 2 – Nov 8" */
+  label: string
+  celebrants: Celebrant[]
 }
 
 export const MONTHS = [
@@ -34,6 +43,21 @@ export function addDays(date: Date, days: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
+}
+
+/** The seven days after `endDate` — the "Coming up" week after a spotlight period. */
+export function nextWeekAfter(endDate: Date): { start: string; end: string; label: string } {
+  const start = toMMDD(addDays(endDate, 1))
+  const end = toMMDD(addDays(endDate, 7))
+  return { start, end, label: `${formatMMDDLabel(start)} – ${formatMMDDLabel(end)}` }
+}
+
+/** Active staff with a birthday between two MM-DD dates (inclusive, wraps over New Year). */
+export async function fetchCelebrants(start: string, end: string, photo: "large" | "thumb"): Promise<Celebrant[]> {
+  const response = await apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=${photo}`)
+  const payload = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
+  return (payload?.data as Celebrant[]) || []
 }
 
 export function formatMMDDLabel(mmdd: string): string {

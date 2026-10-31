@@ -126,37 +126,34 @@ export async function loadAgendaMinutes(
 }
 
 /**
- * The two Any Other Business birthday slides, anchored on the meeting day:
- * the seven days before it, then the meeting day and the six after.
+ * The Any Other Business birthday slide: the seven days before the meeting as
+ * the spotlight, with the meeting day and the six after it as the "Coming up"
+ * summary in the corner.
  */
 export async function loadAgendaBirthdays(meetingDate: string): Promise<AgendaDeckBirthdaySlide[]> {
   const meeting = new Date(`${meetingDate}T00:00:00`)
-  const periods = [
-    { title: "Birthdays in the Past Week", prefix: "Past week", from: addDays(meeting, -7), to: addDays(meeting, -1) },
-    { title: "Upcoming Birthdays", prefix: "Coming up", from: meeting, to: addDays(meeting, 6) },
-  ]
+  const past = { from: addDays(meeting, -7), to: addDays(meeting, -1) }
+  const next = { from: meeting, to: addDays(meeting, 6) }
+  const pastRange = `${formatShortDate(past.from)} – ${formatShortDate(past.to)}`
+  const title = "Birthdays — past week & coming up"
 
-  const slides: AgendaDeckBirthdaySlide[] = []
-  // One at a time: each capture loads a full page in an iframe.
-  for (const period of periods) {
-    const range = `${formatShortDate(period.from)} – ${formatShortDate(period.to)}`
-    try {
-      const capture = await captureBirthdaySlide({
-        start: toMMDD(period.from),
-        end: toMMDD(period.to),
-        label: `${period.prefix} · ${range}`,
-      })
-      slides.push({
-        title: period.title,
-        image: { dataUrl: capture.dataUrl, width: capture.width, height: capture.height },
-      })
-    } catch (error) {
-      slides.push({
-        title: period.title,
+  try {
+    const capture = await captureBirthdaySlide({
+      start: toMMDD(past.from),
+      end: toMMDD(past.to),
+      label: `Past week · ${pastRange}`,
+      upStart: toMMDD(next.from),
+      upEnd: toMMDD(next.to),
+      upLabel: `${formatShortDate(next.from)} – ${formatShortDate(next.to)}`,
+    })
+    return [{ title, image: { dataUrl: capture.dataUrl, width: capture.width, height: capture.height } }]
+  } catch (error) {
+    return [
+      {
+        title,
         image: null,
-        note: `${range} — ${error instanceof Error ? error.message : "could not be loaded"}`,
-      })
-    }
+        note: `${pastRange} — ${error instanceof Error ? error.message : "could not be loaded"}`,
+      },
+    ]
   }
-  return slides
 }

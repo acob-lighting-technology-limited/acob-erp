@@ -25,6 +25,9 @@ export default async function BirthdaySlidePage({
   const start = read("start")
   const end = read("end")
   const label = read("label").slice(0, 80)
+  const upcomingStart = read("upStart")
+  const upcomingEnd = read("upEnd")
+  const upcomingLabel = read("upLabel").slice(0, 80)
   const captureId = read("id").slice(0, 64)
 
   const supabase = await createClient()
@@ -35,7 +38,16 @@ export default async function BirthdaySlidePage({
 
   let error: string | null = null
   if (!scope || !canAccessAdminSection(scope, "hr")) error = "You need HR access to include birthdays."
-  else if (!MMDD_PATTERN.test(start) || !MMDD_PATTERN.test(end)) error = "Invalid birthday period."
+  else if ([start, end, upcomingStart, upcomingEnd].some((value) => !MMDD_PATTERN.test(value))) {
+    error = "Invalid birthday period."
+  }
 
-  return <BirthdaySlideCapture start={start} end={end} label={label} captureId={captureId} accessError={error} />
+  return (
+    <BirthdaySlideCapture
+      period={{ start, end, label }}
+      upcomingPeriod={{ start: upcomingStart, end: upcomingEnd, label: upcomingLabel }}
+      captureId={captureId}
+      accessError={error}
+    />
+  )
 }

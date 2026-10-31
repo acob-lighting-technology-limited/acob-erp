@@ -23,8 +23,18 @@ export interface BirthdaySlideCapture {
 
 const CAPTURE_TIMEOUT_MS = 45_000
 
-/** `start`/`end` are MM-DD; `label` is the range pill text under the names. */
-export function captureBirthdaySlide(params: { start: string; end: string; label: string }) {
+/**
+ * `start`/`end` are MM-DD and `label` is the range pill under the names; the
+ * `up*` fields are the "Coming up" summary in the bottom-right corner.
+ */
+export function captureBirthdaySlide(params: {
+  start: string
+  end: string
+  label: string
+  upStart: string
+  upEnd: string
+  upLabel: string
+}) {
   return new Promise<BirthdaySlideCapture>((resolve, reject) => {
     const captureId = crypto.randomUUID()
     const iframe = document.createElement("iframe")
@@ -40,6 +50,10 @@ export function captureBirthdaySlide(params: { start: string; end: string; label
       top: "0",
       width: "1920px",
       height: "1080px",
+      // globals.css caps every element at max-width: 100%, which would shrink the
+      // frame to the browser width and leave the slide's right side empty.
+      maxWidth: "none",
+      maxHeight: "none",
       border: "0",
       opacity: "0",
       pointerEvents: "none",

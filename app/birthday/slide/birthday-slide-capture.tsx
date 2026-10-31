@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { apiFetch } from "@/lib/api-client"
 import { BIRTHDAY_SLIDE_MESSAGE, type BirthdaySlidePayload } from "@/lib/reports/birthday-slide"
 import { BirthdayClotheslineStage } from "../birthday-clothesline"
 import { BirthdayShell } from "../birthday-spotlight"
-import type { Celebrant } from "../birthday-utils"
+import { fetchCelebrants, type Celebrant, type UpcomingBirthdays } from "../birthday-utils"
 
 const SLIDE_WIDTH = 1920
 const SLIDE_HEIGHT = 1080
@@ -14,21 +13,24 @@ function postToParent(message: BirthdaySlidePayload) {
   window.parent.postMessage({ type: BIRTHDAY_SLIDE_MESSAGE, ...message }, window.location.origin)
 }
 
+type Period = { start: string; end: string; label: string }
+
 export function BirthdaySlideCapture({
-  start,
-  end,
-  label,
+  period,
+  upcomingPeriod,
   captureId,
   accessError,
 }: {
-  start: string
-  end: string
-  label: string
+  period: Period
+  upcomingPeriod: Period
   captureId: string
   accessError: string | null
 }) {
   const [celebrants, setCelebrants] = useState<Celebrant[] | null>(null)
+  const [upcoming, setUpcoming] = useState<UpcomingBirthdays | null>(null)
   const frameRef = useRef<HTMLDivElement>(null)
+  const { start, end, label } = period
+  const { start: upStart, end: upEnd, label: upLabel } = upcomingPeriod
 
   useEffect(() => {
     if (accessError) {
@@ -36,11 +38,11 @@ export function BirthdaySlideCapture({
       return
     }
     let cancelled = false
-    apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=large`)
-      .then(async (response) => {
-        const payload = await response.json().catch(() => null)
-        if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
-        if (!cancelled) setCelebrants((payload?.data as Celebrant[]) || [])
+    Promise.all([fetchCelebrants(start, end, "large"), fetchCelebrants(upStart, upEnd, "thumb")])
+      .then(([main, next]) => {
+        if (cancelled) return
+        setUpcoming({ label: upLabel, celebrants: next })
+        setCelebrants(main)
       })
       .catch((err: unknown) => {
         if (!cancelled)
@@ -49,7 +51,7 @@ export function BirthdaySlideCapture({
     return () => {
       cancelled = true
     }
-  }, [accessError, captureId, end, start])
+  }, [accessError, captureId, end, start, upEnd, upLabel, upStart])
 
   useEffect(() => {
     const frame = frameRef.current
@@ -86,7 +88,13 @@ export function BirthdaySlideCapture({
   return (
     <div ref={frameRef} style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT, overflow: "hidden" }}>
       <BirthdayShell className="bd-clothesline bd-capture">
-        <BirthdayClotheslineStage layout="cards" celebrants={celebrants} rangeLabel={label} highlightToday={false} />
+        <BirthdayClotheslineStage
+          layout="cards"
+          celebrants={celebrants}
+          rangeLabel={label}
+          highlightToday={false}
+          upcoming={upcoming}
+        />
       </BirthdayShell>
     </div>
   )

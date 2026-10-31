@@ -49,10 +49,7 @@ const baseInput = (overrides: Partial<AgendaDeckInput> = {}): AgendaDeckInput =>
   reports: [report("Accounts"), report("IT and Communications")],
   kss: [{ presenterName: "Ada", department: "Accounts", pages: [image, image, image] }],
   minutes: { pages: [image, image], label: "Minutes — Week 44, 2026" },
-  birthdays: [
-    { title: "Birthdays in the Past Week", image },
-    { title: "Upcoming Birthdays", image: null, note: "Nov 2 – Nov 8 — no access" },
-  ],
+  birthdays: [{ title: "Birthdays — past week & coming up", image }],
   ...overrides,
 })
 
@@ -85,6 +82,7 @@ test("missing pieces leave a note on the section slide instead of failing", () =
   const input = baseInput({
     reports: [],
     kss: [],
+    birthdays: [{ title: "Birthdays — past week & coming up", image: null, note: "Oct 26 – Nov 1 — no access" }],
     minutes: { pages: [], label: "Minutes — Week 44, 2026", note: "No minutes have been uploaded for week 44." },
   })
   const { pres, slides } = fakePresentation()
@@ -93,6 +91,7 @@ test("missing pieces leave a note on the section slide instead of failing", () =
   assert.match(allText, /No KSS file has been uploaded/)
   assert.match(allText, /No minutes have been uploaded for week 44/)
   assert.match(allText, /No weekly reports were submitted/)
-  // 2 + 7 section slides + 2 birthday slides
-  assert.equal(slides.length, 11)
+  assert.match(allText, /no access/)
+  // cover + agenda + 7 section slides + 1 birthday slide
+  assert.equal(slides.length, 10)
 })

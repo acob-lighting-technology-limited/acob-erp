@@ -6,7 +6,14 @@ import type { CSSProperties, ReactNode } from "react"
 import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
-import { displayName, formatMMDDLabel, formatNamesList, isBirthdayToday, type Celebrant } from "./birthday-utils"
+import {
+  displayName,
+  formatMMDDLabel,
+  formatNamesList,
+  isBirthdayToday,
+  type Celebrant,
+  type UpcomingBirthdays,
+} from "./birthday-utils"
 import { useBirthdayCelebrants } from "./use-birthday-celebrants"
 import "./clothesline.css"
 
@@ -53,9 +60,35 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
       rangeLabel={rangeLabel}
       isLoading={isLoading}
       error={error}
+      upcoming={state.upcoming}
     >
       <BirthdayBackButton onClick={state.reset} />
     </BirthdayClotheslineStage>
+  )
+}
+
+/** Bottom-right summary of the week after the spotlight period, so the next celebrants get a mention. */
+function BirthdayUpcoming({ upcoming }: { upcoming: UpcomingBirthdays }) {
+  return (
+    <aside className="bd4-upcoming" aria-label="Upcoming birthdays">
+      <p className="bd4-upcoming-title">Coming up</p>
+      <p className="bd4-upcoming-range">{upcoming.label}</p>
+      {upcoming.celebrants.length > 0 ? (
+        <ul className="bd4-upcoming-list">
+          {upcoming.celebrants.map((celebrant, i) => (
+            <li key={`${celebrant.firstName}-${i}`}>
+              <span className="bd4-upcoming-avatar">
+                <CelebrantPhoto celebrant={celebrant} />
+              </span>
+              <span className="bd4-upcoming-name">{displayName(celebrant.firstName)}</span>
+              <span className="bd4-upcoming-date">{formatMMDDLabel(celebrant.birthday)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="bd4-upcoming-empty">No birthdays this week</p>
+      )}
+    </aside>
   )
 }
 
@@ -71,11 +104,13 @@ export function BirthdayClotheslineStage({
   isLoading = false,
   error = null,
   highlightToday = true,
+  upcoming = null,
   children,
 }: {
   layout: "rope" | "cards"
   celebrants: Celebrant[]
   rangeLabel: string
+  upcoming?: UpcomingBirthdays | null
   isLoading?: boolean
   error?: string | null
   highlightToday?: boolean
@@ -149,6 +184,8 @@ export function BirthdayClotheslineStage({
         </p>
         <span className="bd4-range">{rangeLabel}</span>
       </footer>
+
+      {upcoming && <BirthdayUpcoming upcoming={upcoming} />}
 
       {children}
     </section>
