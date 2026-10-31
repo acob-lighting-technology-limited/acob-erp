@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { canOverrideReportsWeekLock, resolveAdminScope } from "@/lib/admin/rbac"
-import { MeetingDocumentTypeTable } from "@/components/reports/meeting-document-type-table"
+import { MinutesOfMeetingView } from "@/components/reports/minutes-of-meeting-view"
 
 export default async function AdminMinutesOfMeetingPage() {
   const supabase = await createClient()
@@ -21,10 +21,7 @@ export default async function AdminMinutesOfMeetingPage() {
   const scope = await resolveAdminScope(supabase, user.id)
 
   return (
-    <MeetingDocumentTypeTable
-      documentType="minutes"
-      title="Minutes of Meeting"
-      description="Upload and manage Minutes of Meeting PDFs by week."
+    <MinutesOfMeetingView
       backHref="/admin/reports/general-meeting"
       backLabel="Back to General Meeting"
       canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}

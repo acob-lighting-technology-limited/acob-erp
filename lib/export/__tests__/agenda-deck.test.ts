@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { buildAgendaDeck, planAgendaDeckPages, toRoman, type AgendaDeckInput } from "../agenda-deck"
+import { buildAgendaDeck, paginateSlideText, planAgendaDeckPages, toRoman, type AgendaDeckInput } from "../agenda-deck"
 import { planDepartmentHeading } from "../pptx"
 import type { PptxPresentation, PptxTextRun, WeeklyReport } from "../shared"
 
@@ -97,12 +97,12 @@ test("missing pieces leave a note on the section slide instead of failing", () =
   assert.equal(slides.length, 10)
 })
 
-test("only page 1 of the minutes is shown, with a pointer to the rest", () => {
+test("a minutes PDF cut short says how many pages are shown", () => {
   const input = baseInput({ minutes: { pages: [image], totalPages: 15, label: "Minutes — Week 22, 2026" } })
   const { pres, slides } = fakePresentation()
   buildAgendaDeck(pres, input)
   const allText = slides.flat().join("\n")
-  assert.match(allText, /Page 1 of 15 shown/)
+  assert.match(allText, /1 of 15 pages shown/)
   assert.ok(slides.flat().includes("Page 1 of 15"))
   assert.equal(slides.length, planAgendaDeckPages(input).totalSlides)
 })
@@ -131,4 +131,36 @@ test("agenda items are numbered in Roman numerals", () => {
   const allText = slides.flat()
   assert.ok(allText.includes("AGENDA VII OF VII"))
   assert.ok(allText.includes("IV"))
+})
+
+test("a summary of minutes replaces the PDF pages with text slides", () => {
+  const summary = [
+    { kind: "heading" as const, runs: [{ text: "Unit Updates" }] },
+    ...Array.from({ length: 40 }, (_, i) => ({
+      kind: "bullet" as const,
+      runs: [{ text: `Department ${i + 1} reported steady progress on its targets for the week.` }],
+    })),
+  ]
+  const input = baseInput({
+    minutes: { summary, pages: [image, image], label: "Summary of Minutes — Week 22, 2026" },
+  })
+  const pages = paginateSlideText(summary)
+  assert.ok(pages.length > 1, "40 bullets do not fit one slide")
+  assert.deepEqual(pages.flat(), summary, "pagination keeps every block, in order")
+
+  const { pres, slides } = fakePresentation()
+  buildAgendaDeck(pres, input)
+  assert.equal(slides.length, planAgendaDeckPages(input).totalSlides)
+  const allText = slides.flat()
+  assert.ok(allText.includes(`1 of ${pages.length}`))
+  assert.ok(allText.some((text) => text.includes("Department 40 reported")))
+})
+
+test("a heading is never left alone at the bottom of a summary slide", () => {
+  const filler = Array.from({ length: 13 }, () => ({
+    kind: "paragraph" as const,
+    runs: [{ text: "A paragraph of summary text that fills one line on the slide." }],
+  }))
+  const pages = paginateSlideText([...filler, { kind: "heading", runs: [{ text: "Next Section" }] }, ...filler])
+  for (const page of pages) assert.notEqual(page[page.length - 1].kind, "heading")
 })

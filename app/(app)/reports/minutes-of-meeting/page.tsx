@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { MeetingDocumentTypeTable } from "@/components/reports/meeting-document-type-table"
+import { MinutesOfMeetingView } from "@/components/reports/minutes-of-meeting-view"
 
 export default async function DashboardMinutesOfMeetingPage() {
   const supabase = await createClient()
@@ -12,14 +12,5 @@ export default async function DashboardMinutesOfMeetingPage() {
 
   if (userError || !user) redirect("/auth/login")
 
-  return (
-    <MeetingDocumentTypeTable
-      documentType="minutes"
-      title="Minutes of Meeting"
-      description="Upload and manage Minutes of Meeting PDFs by week."
-      backHref="/reports/general-meeting"
-      backLabel="Back to General Meeting"
-      readOnly
-    />
-  )
+  return <MinutesOfMeetingView backHref="/reports/general-meeting" backLabel="Back to General Meeting" readOnly />
 }

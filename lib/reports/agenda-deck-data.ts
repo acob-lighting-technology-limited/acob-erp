@@ -8,6 +8,7 @@
 import { apiFetch } from "@/lib/api-client"
 import { getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { openWithPdfjs, renderPdfPage } from "@/lib/pdf/client-tools"
+import { htmlToSlideTextBlocks } from "@/lib/rich-text"
 import { sortReportsByDepartment, type WeeklyReport } from "@/lib/export-utils"
 import type {
   AgendaDeckBirthdaySlide,
@@ -115,9 +116,26 @@ export function previousMeetingWeek(meetingDate: string) {
   return getOfficeWeekFromDate(addDays(new Date(`${meetingDate}T00:00:00`), -7))
 }
 
-/** Every page of last week's minutes (up to MAX_PAGES_PER_DOCUMENT). */
+/** The previous meeting's summary of minutes as slide text, or null when none was written. */
+async function loadMinutesSummary(week: number, year: number) {
+  const res = await apiFetch(`/api/reports/meeting-minutes-summaries?week=${week}&year=${year}`, { cache: "no-store" })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(json?.error || "Failed to load the summary of minutes")
+  const row = (json?.data as { content_html: string }[] | undefined)?.[0]
+  const blocks = row ? htmlToSlideTextBlocks(row.content_html) : []
+  return blocks.length > 0 ? blocks : null
+}
+
+/**
+ * Last week's summary of minutes as text slides when one was written;
+ * otherwise every page of the full minutes PDF.
+ */
 export async function loadAgendaMinutes(meetingDate: string): Promise<AgendaDeckInput["minutes"]> {
   const previous = previousMeetingWeek(meetingDate)
+  // A failed summary lookup falls through to the full minutes rather than failing the export.
+  const summary = await loadMinutesSummary(previous.week, previous.year).catch(() => null)
+  if (summary) return { summary, pages: [], label: `Summary of Minutes — Week ${previous.week}, ${previous.year}` }
+
   const label = `Minutes — Week ${previous.week}, ${previous.year}`
   const rows = await listMeetingDocuments(previous.week, previous.year, "minutes")
   const pdf = rows.find(isPdf)

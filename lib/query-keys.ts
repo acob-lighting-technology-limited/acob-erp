@@ -355,6 +355,7 @@ export const QUERY_KEYS = {
   meetingDocTable: (...parts: unknown[]) => ["meeting-doc-table", ...parts],
   meetingDocSelectedWeekLock: (...parts: unknown[]) => ["meeting-doc-selected-week-lock", ...parts],
   meetingDocUploadedBy: (...parts: unknown[]) => ["meeting-doc-uploaded-by", ...parts],
+  meetingMinutesSummaries: (...parts: unknown[]) => ["meeting-minutes-summaries", ...parts],
   requisitionTabCount: (...parts: unknown[]) => ["requisition-tab-count", ...parts],
   signingStatus: (...parts: unknown[]) => ["signing-status", ...parts],
   maintenance: (...parts: unknown[]) => ["maintenance", ...parts],

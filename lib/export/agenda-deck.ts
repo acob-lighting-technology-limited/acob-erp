@@ -7,6 +7,7 @@
  */
 import { GENERAL_MEETING_AGENDA, type GeneralMeetingAgendaKey } from "@/lib/reports/general-meeting-agenda"
 import type { WeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
+import type { SlideTextBlock } from "@/lib/rich-text"
 import {
   addCoverSlide,
   addWeeklyDepartmentSlides,
@@ -67,7 +68,14 @@ export interface AgendaDeckInput {
   reports: WeeklyReport[]
   kss: AgendaDeckKssEntry[]
   /** `totalPages` is the whole document's length, when longer than the pages shown. */
-  minutes: { pages: AgendaDeckImage[]; totalPages?: number; label: string; note?: string }
+  minutes: {
+    /** The summary of minutes, when one was written; shown as text slides instead of `pages`. */
+    summary?: SlideTextBlock[]
+    pages: AgendaDeckImage[]
+    totalPages?: number
+    label: string
+    note?: string
+  }
   birthdays: AgendaDeckBirthdaySlide[]
 }
 
@@ -373,6 +381,134 @@ const addPresentationPageSlide = (pres: PptxPresentation, image: AgendaDeckImage
   return slide
 }
 
+// Summary text slides: 18pt body in the area between the header bar and the footer.
+const SUMMARY_BOX = { x: 0.7, y: 0.95, w: SLIDE_W - 1.4, h: 5.75 }
+const SUMMARY_BODY_PT = 18
+const SUMMARY_HEADING_PT = 20
+const SUMMARY_LIST_INDENT_IN = 0.4
+const SUMMARY_PARA_GAP_IN = 0.1
+
+/**
+ * Estimated height of a block (pptxgenjs cannot measure text). 18pt Calibri
+ * measured about 0.43 em per character in PowerPoint; 0.45 leaves a margin.
+ */
+const slideTextBlockHeight = (block: SlideTextBlock) => {
+  const size = block.kind === "heading" ? SUMMARY_HEADING_PT : SUMMARY_BODY_PT
+  const width = SUMMARY_BOX.w - (block.kind === "bullet" || block.kind === "number" ? SUMMARY_LIST_INDENT_IN : 0)
+  const charsPerLine = Math.max(10, Math.floor((width * 72) / (size * 0.45)))
+  const text = block.runs.map((run) => run.text).join("")
+  const lines = text.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0)
+  return (lines * size * 1.2) / 72 + SUMMARY_PARA_GAP_IN
+}
+
+/**
+ * Splits the summary into slides that fit the text area, breaking only between
+ * paragraphs and never leaving a heading alone at the bottom of a slide.
+ */
+export const paginateSlideText = (blocks: SlideTextBlock[]): SlideTextBlock[][] => {
+  const slides: SlideTextBlock[][] = []
+  let current: SlideTextBlock[] = []
+  let used = 0
+  blocks.forEach((block, i) => {
+    const height = slideTextBlockHeight(block)
+    const next = blocks[i + 1]
+    // A heading needs room for itself and the first block it introduces.
+    const needed = block.kind === "heading" && next ? height + slideTextBlockHeight(next) : height
+    if (current.length > 0 && used + needed > SUMMARY_BOX.h) {
+      slides.push(current)
+      current = []
+      used = 0
+    }
+    current.push(block)
+    used += height
+  })
+  if (current.length > 0) slides.push(current)
+  return slides
+}
+
+/** One slide of the summary of minutes, as real (editable) text. */
+const addSummaryTextSlide = (
+  pres: PptxPresentation,
+  blocks: SlideTextBlock[],
+  title: string,
+  pageLabel: string,
+  pageNumber: number,
+  theme: WeeklyPptxTheme
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  const slide = pres.addSlide()
+  slide.background = { color: colors.canvas }
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: 0,
+    y: 0,
+    w: "100%",
+    h: 0.65,
+    fill: { color: colors.header },
+    line: { color: colors.header },
+  })
+  slide.addText(title, {
+    x: 0.3,
+    y: 0,
+    w: 10,
+    h: 0.65,
+    fontSize: 16,
+    bold: true,
+    color: colors.textInverse,
+    valign: "middle",
+    fontFace: "Calibri",
+  })
+  slide.addText(pageLabel, {
+    x: 10,
+    y: 0,
+    w: 3,
+    h: 0.65,
+    fontSize: 12,
+    color: colors.headerMuted,
+    valign: "middle",
+    align: "right",
+    fontFace: "Calibri",
+  })
+
+  const paragraphs = blocks.flatMap((block) => {
+    const isHeading = block.kind === "heading"
+    const paragraph = {
+      fontSize: isHeading ? SUMMARY_HEADING_PT : SUMMARY_BODY_PT,
+      color: isHeading ? colors.accent : colors.textPrimary,
+      paraSpaceAfter: 6,
+    }
+    const bullet =
+      block.kind === "bullet"
+        ? { indent: 18 }
+        : block.kind === "number"
+          ? { type: "number", numberType: "arabicPeriod", numberStartAt: block.number ?? 1, indent: 22 }
+          : null
+    const runs = block.runs.flatMap((run) =>
+      run.text.split("\n").map((text, k) => ({ ...run, text, softBreak: k > 0 }))
+    )
+    // pptxgenjs starts a new paragraph at every run carrying `bullet`, and drops
+    // `breakLine` from such runs. So the bullet goes on the first run only, and a
+    // one-run list item gets an empty run to carry the paragraph break; without
+    // it the next block would run on into this one.
+    const items: { text: string; options: Record<string, unknown> }[] = runs.map((run, k) => ({
+      text: run.text,
+      options: {
+        ...paragraph,
+        bold: isHeading || run.bold,
+        italic: run.italic,
+        ...(k === 0 && bullet && { bullet }),
+        ...(run.softBreak && { softBreakBefore: true }),
+      },
+    }))
+    if (bullet && items.length === 1) items.push({ text: "", options: { ...paragraph } })
+    items[items.length - 1].options.breakLine = true
+    return items
+  })
+  slide.addText(paragraphs, { ...SUMMARY_BOX, valign: "top", fontFace: "Calibri", margin: 0 })
+
+  addFooterBand(pres, slide, pageNumber, colors)
+  return slide
+}
+
 /** A minutes page: the A4 page centred under a header naming the document and page. */
 const addDocumentPageSlide = (
   pres: PptxPresentation,
@@ -469,7 +605,7 @@ const contentSlideCount = (key: GeneralMeetingAgendaKey, input: AgendaDeckInput)
     case "kss":
       return input.kss.reduce((total, entry) => total + entry.pages.length, 0)
     case "minutes":
-      return input.minutes.pages.length
+      return input.minutes.summary ? paginateSlideText(input.minutes.summary).length : input.minutes.pages.length
     case "departments":
       return input.reports.length > 0
         ? countWeeklyDepartmentSlides(input.reports, input.mode, input.taskSummaryOptions)
@@ -542,13 +678,24 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
         break
       }
       case "minutes": {
-        const { pages, label, note } = input.minutes
+        const { summary, pages, label, note } = input.minutes
+        if (summary) {
+          const summarySlides = paginateSlideText(summary)
+          addAgendaSectionSlide(pres, { ...section, lines: [label] })
+          summarySlides.forEach((blocks, n) =>
+            addSummaryTextSlide(pres, blocks, label, `${n + 1} of ${summarySlides.length}`, page + 1 + n, theme)
+          )
+          break
+        }
         const totalPages = input.minutes.totalPages ?? pages.length
         const lines =
           pages.length === 0
             ? [note ?? label]
             : totalPages > pages.length
-              ? [label, `Page 1 of ${totalPages} shown. Full minutes: Matrix → General Meeting → Minutes.`]
+              ? [
+                  label,
+                  `${pages.length} of ${totalPages} pages shown. Full minutes: Matrix → General Meeting → Minutes.`,
+                ]
               : [label]
         addAgendaSectionSlide(pres, { ...section, lines })
         pages.forEach((image, n) =>
