@@ -16,6 +16,7 @@ import {
   type WeeklyPptxMode,
 } from "./pptx"
 import {
+  ACOB_GREEN,
   EXPORT_LOGOS,
   formatMeetingDateForFilename,
   loadPptxGenJS,
@@ -81,20 +82,21 @@ const containBox = (image: AgendaDeckImage, frame: { x: number; y: number; w: nu
 }
 
 /**
- * Agenda slides (the agenda and each item's section slide) are charcoal and
- * gold, so in the room they read as "next agenda item" and can never be
- * mistaken for the green department title slides inside Departmental Updates.
- * Same in both themes.
+ * Agenda slides (the agenda and each item's section slide) are black with
+ * small touches of ACOB green, so in the room they read as "next agenda item"
+ * and can never be mistaken for the full-green department title slides inside
+ * Departmental Updates. Same in both themes.
  */
 const AGENDA_COLORS = {
-  ink: "16181C",
-  inkDeep: "0D0E11",
-  ghost: "25282E",
-  gold: "D9A93A",
-  /** Gold dark enough to read as text on the light theme's off-white canvas. */
-  goldOnLight: "8C6A16",
+  ink: "0A0A0A",
+  inkDeep: "000000",
+  ghost: "1A1A1A",
+  /** Bright enough to read as text on black. */
+  accent: "2FA257",
+  /** ACOB green, for text on the light theme's off-white canvas. */
+  accentOnLight: ACOB_GREEN,
   white: "FFFFFF",
-  muted: "B8BCC4",
+  muted: "A3A3A3",
 }
 
 const addFooterBand = (
@@ -132,7 +134,7 @@ const addFooterBand = (
   })
 }
 
-const AGENDA_FOOTER = { fill: AGENDA_COLORS.inkDeep, text: AGENDA_COLORS.gold }
+const AGENDA_FOOTER = { fill: AGENDA_COLORS.inkDeep, text: AGENDA_COLORS.accent }
 
 /** Numbered agenda with the page each item starts on — the deck's table of contents. */
 const addAgendaListSlide = (
@@ -143,7 +145,7 @@ const addAgendaListSlide = (
   theme: WeeklyPptxTheme
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  const gold = theme === "dark" ? AGENDA_COLORS.gold : AGENDA_COLORS.goldOnLight
+  const accent = theme === "dark" ? AGENDA_COLORS.accent : AGENDA_COLORS.accentOnLight
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
 
@@ -160,8 +162,8 @@ const addAgendaListSlide = (
     y: 0.65,
     w: "100%",
     h: 0.05,
-    fill: { color: AGENDA_COLORS.gold },
-    line: { color: AGENDA_COLORS.gold },
+    fill: { color: AGENDA_COLORS.accent },
+    line: { color: AGENDA_COLORS.accent },
   })
   slide.addText("AGENDA", {
     x: 0.3,
@@ -170,7 +172,7 @@ const addAgendaListSlide = (
     h: 0.65,
     fontSize: 16,
     bold: true,
-    color: AGENDA_COLORS.gold,
+    color: AGENDA_COLORS.accent,
     charSpacing: 4,
     valign: "middle",
     fontFace: "Calibri",
@@ -197,7 +199,7 @@ const addAgendaListSlide = (
       w: 0.46,
       h: 0.46,
       fill: { color: AGENDA_COLORS.ink },
-      line: { color: AGENDA_COLORS.gold, width: 1.5 },
+      line: { color: AGENDA_COLORS.accent, width: 1.5 },
     })
     slide.addText(String(i + 1), {
       x: 0.8,
@@ -206,7 +208,7 @@ const addAgendaListSlide = (
       h: 0.46,
       fontSize: 13,
       bold: true,
-      color: AGENDA_COLORS.gold,
+      color: AGENDA_COLORS.accent,
       align: "center",
       valign: "middle",
       fontFace: "Calibri",
@@ -227,7 +229,7 @@ const addAgendaListSlide = (
       h: 0.66,
       fontSize: 16,
       bold: true,
-      color: gold,
+      color: accent,
       align: "right",
       valign: "middle",
       fontFace: "Calibri",
@@ -248,8 +250,8 @@ const addAgendaListSlide = (
 }
 
 /**
- * Charcoal section slide for one agenda item: a gold rail down the left edge,
- * gold eyebrow and rule, and the item number ghosted on the right. Items with
+ * Black section slide for one agenda item: green eyebrow and short rule, and
+ * the item number ghosted on the right. Items with
  * no content of their own (prayer, MD's remarks, closing) are just this slide.
  */
 const addAgendaSectionSlide = (
@@ -281,15 +283,6 @@ const addAgendaSectionSlide = (
     fontFace: "Calibri",
   })
 
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: 0,
-    y: 0,
-    w: 0.3,
-    h: 6.9,
-    fill: { color: AGENDA_COLORS.gold },
-    line: { color: AGENDA_COLORS.gold },
-  })
-
   slide.addText(`AGENDA ${pad2(index)} OF ${pad2(total)}`, {
     x: contentX,
     y: 2.75,
@@ -297,18 +290,19 @@ const addAgendaSectionSlide = (
     h: 0.36,
     fontSize: 14,
     bold: true,
-    color: AGENDA_COLORS.gold,
+    color: AGENDA_COLORS.accent,
     charSpacing: 4,
     valign: "middle",
     fontFace: "Calibri",
   })
 
+  // Width stops short of the ghosted number, so a long title never runs into it.
   slide.addText(title, {
     x: contentX - 0.08,
     y: 3.17,
-    w: 11.5,
+    w: 8.2,
     h: 1.25,
-    fontSize: title.length > 26 ? 46 : 56,
+    fontSize: title.length > 22 ? 44 : 54,
     bold: true,
     color: AGENDA_COLORS.white,
     valign: "middle",
@@ -321,8 +315,8 @@ const addAgendaSectionSlide = (
     y: 4.57,
     w: 2.6,
     h: 0.05,
-    fill: { color: AGENDA_COLORS.gold },
-    line: { color: AGENDA_COLORS.gold },
+    fill: { color: AGENDA_COLORS.accent },
+    line: { color: AGENDA_COLORS.accent },
   })
 
   if (lines.length > 0) {
