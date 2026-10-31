@@ -107,6 +107,7 @@ export const RELEASES: Release[] = [
       {
         area: "Reports & Meetings",
         items: [
+          "Email recipients for general meeting attendance and transcripts can be managed directly from a dedicated button on the Records page",
           "Weekly PowerPoint export shows task and action point counts for every staff member",
           "Weekly KSS and General Meeting appear on the calendar with the Teams link",
         ],

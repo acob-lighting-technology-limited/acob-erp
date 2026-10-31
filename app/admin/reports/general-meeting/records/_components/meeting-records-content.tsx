@@ -3,16 +3,18 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { AlertCircle, CalendarDays, Download, FileText, RefreshCw, Users } from "lucide-react"
+import { AlertCircle, CalendarDays, Download, FileText, Mail, RefreshCw, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { MeetingSyncModal } from "./meeting-sync-modal"
+import { MeetingEmailRecipientsDialog } from "./meeting-email-recipients-dialog"
 
 import { apiFetch } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -45,6 +47,7 @@ function formatMeetingDate(value: string | null): string {
 export function MeetingRecordsContent() {
   const [tab, setTab] = useState<ArtifactTab>("attendance")
   const [syncOpen, setSyncOpen] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
   const officeWeek = getCurrentOfficeWeek()
 
   const {
@@ -159,10 +162,27 @@ export function MeetingRecordsContent() {
       activeTab={tab}
       onTabChange={(key) => setTab(key as ArtifactTab)}
       actions={
-        <Button variant="outline" onClick={() => setSyncOpen(true)}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Meeting Sync
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" onClick={() => setEmailOpen(true)}>
+                <Mail className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Email Recipients</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Configure automatic email recipients</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" onClick={() => setSyncOpen(true)}>
+                <RefreshCw className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Meeting Sync</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Sync Teams meetings & download recordings</TooltipContent>
+          </Tooltip>
+        </div>
       }
       stats={
         <StatGrid>
@@ -193,6 +213,7 @@ export function MeetingRecordsContent() {
         </StatGrid>
       }
     >
+      <MeetingEmailRecipientsDialog open={emailOpen} onOpenChange={setEmailOpen} />
       <MeetingSyncModal open={syncOpen} onOpenChange={setSyncOpen} />
 
       <DataTable<Row>
