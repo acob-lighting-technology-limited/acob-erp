@@ -34,6 +34,7 @@ import {
   toLocalISODate,
   toLocalYearMonth,
   isLate,
+  isWeekend,
 } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
@@ -271,7 +272,7 @@ function getHourBreakdown(
     status === "absent_with_permission" ||
     status === "lateness_with_permission" ||
     status === "cds"
-  if (covered) {
+  if (covered || (recordDate && isWeekend(recordDate))) {
     const inMin = parseTimeToMinutes(record?.clock_in)
     const outMin = parseTimeToMinutes(record?.clock_out)
     const total = inMin !== null && outMin !== null && outMin > inMin ? (outMin - inMin) / 60 : null

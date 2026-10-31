@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { AttendanceRecord } from "./page"
 import { logger } from "@/lib/logger"
-import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
+import { isWeekend, toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { computeAttendanceDay, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import {
   ATTENDANCE_STATUS_COLORS,
@@ -362,17 +362,27 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
 
         const normalizedStatus =
           (unified.status as AttendanceRow["normalizedStatus"]) || normalizeStatus(existing, workday)
+        const isWknd = isWeekend(workday)
         const isInProgress = workday === toLocalISODate() && Boolean(existing.clock_in) && !existing.clock_out
         const breakdown = isCoveredStatus(normalizedStatus)
           ? { total: null, work: null, missed: null }
-          : calculateHourBreakdown(
-              existing.clock_in,
-              existing.clock_out,
-              (unified as any).late_resumption_time,
-              (unified as any).early_closure_time,
-              normalizedStatus,
-              isInProgress
-            )
+          : isWknd
+            ? {
+                total:
+                  existing.clock_in && existing.clock_out
+                    ? minutesToHours(parseClockToMinutes(existing.clock_out)! - parseClockToMinutes(existing.clock_in)!)
+                    : null,
+                work: null,
+                missed: null,
+              }
+            : calculateHourBreakdown(
+                existing.clock_in,
+                existing.clock_out,
+                (unified as any).late_resumption_time,
+                (unified as any).early_closure_time,
+                normalizedStatus,
+                isInProgress
+              )
 
         return {
           ...existing,
@@ -581,13 +591,14 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
 
   const todayIso = toLocalISODate()
   const todayHours = todayRecord?.total_hours ? `${todayRecord.total_hours.toFixed(2)} hrs` : "-"
-  const todayStatus = todayRecord ? normalizeStatus(todayRecord, todayIso) : "absent"
+  const todayStatus = todayRecord ? normalizeStatus(todayRecord, todayIso) : isWeekend(todayIso) ? "weekend" : "absent"
 
   // Computed stats from current month workdays
   const { totalWorkedHours, totalMissedHours, attendedDays, totalWorkdays } = useMemo(() => {
     const currentYM = toLocalYearMonth()
     const scorable = rows.filter((row) => {
       if (!row.date.startsWith(currentYM)) return false
+      if (isWeekend(row.date)) return false
       if (isCoveredStatus(row.normalizedStatus)) return false
       // Exclude a day still in progress (clocked in today, not yet clocked out)
       if (row.date === todayIso && row.clock_in && !row.clock_out) return false

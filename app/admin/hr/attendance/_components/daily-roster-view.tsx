@@ -33,7 +33,7 @@ import {
   Calendar,
 } from "lucide-react"
 import { toast } from "sonner"
-import { toLocalISODate, isLate } from "@/lib/hr/attendance-utils"
+import { toLocalISODate, isLate, isWeekend } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
@@ -69,7 +69,7 @@ export function getHourBreakdown(r: AttendanceRecord, policy: AttendancePolicy =
     r.status === "absent_with_permission" ||
     r.status === "lateness_with_permission" ||
     r.status === "cds"
-  if (covered) {
+  if (covered || (r.date && isWeekend(r.date))) {
     const total = inMin !== null && outMin !== null && outMin > inMin ? (outMin - inMin) / 60 : null
     return { total, work: null, overtime: null, missed: null }
   }
@@ -397,7 +397,9 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       accessor: (r) => r.clock_in ?? "",
       render: (r) => {
         const isLateArrival =
-          (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) && r.status !== "early"
+          !isWeekend(r.date) &&
+          (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) &&
+          r.status !== "early"
         return (
           <span className="flex items-center justify-center gap-1 text-sm">
             {r.clock_in ? (

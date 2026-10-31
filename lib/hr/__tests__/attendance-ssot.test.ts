@@ -10,6 +10,7 @@ import {
   NET_DAY_HOURS,
 } from "@/lib/hr/attendance-ssot"
 import { DEFAULT_ATTENDANCE_POLICY, type AttendancePolicy } from "@/lib/org-config"
+import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 
 /**
  * The agreed penalty table is the contract for payroll, HR reports, the staff
@@ -323,5 +324,45 @@ describe("the derived percentage view", () => {
   it("scales across a period", () => {
     // 20 working days, 8.5 hours lost across the period = one day's worth.
     assert.equal(attendanceRateFrom(NET_DAY_HOURS, 20), 95)
+  })
+})
+
+describe("weekend clock-in handling", () => {
+  it("derives present on weekend when punches exist, without late/incomplete penalties", () => {
+    const saturday = "2026-10-31"
+    const statusIn = deriveUnifiedAttendanceStatus({
+      record: { clock_in: "10:00:00", clock_out: null, status: null, waived: false },
+      recordDate: saturday,
+    })
+    assert.equal(statusIn, "present")
+
+    const statusInOut = deriveUnifiedAttendanceStatus({
+      record: { clock_in: "10:00:00", clock_out: "14:00:00", status: null, waived: false },
+      recordDate: saturday,
+    })
+    assert.equal(statusInOut, "present")
+
+    const statusNoPunch = deriveUnifiedAttendanceStatus({
+      record: null,
+      recordDate: saturday,
+    })
+    assert.equal(statusNoPunch, "weekend")
+  })
+
+  it("computeAttendanceDay charges 0 hours lost and 0 penalties on weekend punches", () => {
+    const saturday = "2026-10-31"
+    const result = computeAttendanceDay({
+      status: "present",
+      clockIn: "10:00",
+      clockOut: "14:00",
+      recordDate: saturday,
+    })
+    assert.equal(result.hoursLost, 0)
+    assert.equal(result.hoursWorked, 0)
+    assert.equal(result.isAbsent, false)
+    assert.equal(result.covered, true)
+    assert.equal(result.lateBracket, 0)
+    assert.equal(result.earlyBracket, 0)
+    assert.equal(result.breakdown, "Weekend — non-working day")
   })
 })
