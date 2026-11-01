@@ -7,7 +7,7 @@
  */
 import { GENERAL_MEETING_AGENDA, type GeneralMeetingAgendaKey } from "@/lib/reports/general-meeting-agenda"
 import type { WeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
-import type { SlideTextBlock } from "@/lib/rich-text"
+import type { SlideTextBlock, SlideTextRun } from "@/lib/rich-text"
 import {
   addCoverSlide,
   addWeeklyDepartmentSlides,
@@ -392,20 +392,65 @@ const SUMMARY_PARA_GAP_IN = 0.1
  * Estimated height of a block (pptxgenjs cannot measure text). 18pt Calibri
  * measured about 0.43 em per character in PowerPoint; 0.45 leaves a margin.
  */
-const slideTextBlockHeight = (block: SlideTextBlock) => {
+const slideTextMetrics = (block: SlideTextBlock) => {
   const size = block.kind === "heading" ? SUMMARY_HEADING_PT : SUMMARY_BODY_PT
   const width = SUMMARY_BOX.w - (block.kind === "bullet" || block.kind === "number" ? SUMMARY_LIST_INDENT_IN : 0)
-  const charsPerLine = Math.max(10, Math.floor((width * 72) / (size * 0.45)))
+  return { lineHeight: (size * 1.2) / 72, charsPerLine: Math.max(10, Math.floor((width * 72) / (size * 0.45))) }
+}
+
+const slideTextBlockHeight = (block: SlideTextBlock) => {
+  const { lineHeight, charsPerLine } = slideTextMetrics(block)
   const text = block.runs.map((run) => run.text).join("")
   const lines = text.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0)
-  return (lines * size * 1.2) / 72 + SUMMARY_PARA_GAP_IN
+  return lines * lineHeight + SUMMARY_PARA_GAP_IN
 }
 
 /**
- * Splits the summary into slides that fit the text area, breaking only between
- * paragraphs and never leaving a heading alone at the bottom of a slide.
+ * A block taller than the whole text area, split into pieces that each fit a
+ * slide. Breaks between words, after a sentence where one falls in the second
+ * half of a piece. Continuations of a list item carry no second marker.
  */
-export const paginateSlideText = (blocks: SlideTextBlock[]): SlideTextBlock[][] => {
+const splitOversizedBlock = (block: SlideTextBlock): SlideTextBlock[] => {
+  if (slideTextBlockHeight(block) <= SUMMARY_BOX.h) return [block]
+  const { lineHeight, charsPerLine } = slideTextMetrics(block)
+  // Word wrap leaves part of every line empty; 0.9 keeps the estimate on the safe side.
+  const maxChars = Math.floor(charsPerLine * Math.floor((SUMMARY_BOX.h - SUMMARY_PARA_GAP_IN) / lineHeight) * 0.9)
+  const words = block.runs.flatMap((run) =>
+    run.text.split(/(?<=\s)/).map((text) => ({ ...run, text: text.replace(/\n/g, " ") }))
+  )
+
+  const pieces: SlideTextBlock[] = []
+  let start = 0
+  while (start < words.length) {
+    let end = start
+    let length = 0
+    let sentenceEnd = -1
+    while (end < words.length && (end === start || length + words[end].text.length <= maxChars)) {
+      length += words[end].text.length
+      if (/[.!?;:]\s*$/.test(words[end].text) && length > maxChars / 2) sentenceEnd = end + 1
+      end++
+    }
+    if (end < words.length && sentenceEnd > start) end = sentenceEnd
+    const runs = words.slice(start, end).reduce<SlideTextRun[]>((merged, word) => {
+      const last = merged[merged.length - 1]
+      if (last && !!last.bold === !!word.bold && !!last.italic === !!word.italic) last.text += word.text
+      else merged.push({ ...word })
+      return merged
+    }, [])
+    runs[runs.length - 1].text = runs[runs.length - 1].text.trimEnd()
+    pieces.push({ ...block, runs, ...(pieces.length > 0 && { continued: true }) })
+    start = end
+  }
+  return pieces
+}
+
+/**
+ * Splits the summary into slides that fit the text area, breaking between
+ * paragraphs (and inside one only when it is taller than a slide), and never
+ * leaving a heading alone at the bottom of a slide.
+ */
+export const paginateSlideText = (input: SlideTextBlock[]): SlideTextBlock[][] => {
+  const blocks = input.flatMap(splitOversizedBlock)
   const slides: SlideTextBlock[][] = []
   let current: SlideTextBlock[] = []
   let used = 0
@@ -476,8 +521,9 @@ const addSummaryTextSlide = (
       color: isHeading ? colors.accent : colors.textPrimary,
       paraSpaceAfter: 6,
     }
-    const bullet =
-      block.kind === "bullet"
+    const bullet = block.continued
+      ? null
+      : block.kind === "bullet"
         ? { indent: 18 }
         : block.kind === "number"
           ? { type: "number", numberType: "arabicPeriod", numberStartAt: block.number ?? 1, indent: 22 }

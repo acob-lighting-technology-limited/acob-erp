@@ -6,7 +6,7 @@ import DOMPurify from "dompurify"
 import { Bold, Heading, Italic, List, ListOrdered, Redo2, Underline, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { cleanSlideTextHtml, convertMarkdownToHtml } from "@/lib/rich-text"
+import { cleanSlideTextHtml, convertMarkdownToHtml, plainTextToSlideHtml } from "@/lib/rich-text"
 import { cn } from "@/lib/utils"
 
 export interface RichTextEditorHandle {
@@ -134,7 +134,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       if (!pastedText) return
 
       event.preventDefault()
-      runCommand("insertHTML", convertMarkdownToHtml(pastedText))
+      runCommand(
+        "insertHTML",
+        pasteMode === "slide-text"
+          ? cleanSlideTextHtml(plainTextToSlideHtml(pastedText))
+          : convertMarkdownToHtml(pastedText)
+      )
     },
     [pasteMode, runCommand]
   )

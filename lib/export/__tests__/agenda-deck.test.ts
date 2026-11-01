@@ -2,6 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { buildAgendaDeck, paginateSlideText, planAgendaDeckPages, toRoman, type AgendaDeckInput } from "../agenda-deck"
 import { planDepartmentHeading } from "../pptx"
+import { plainTextToSlideHtml } from "@/lib/rich-text"
 import type { PptxPresentation, PptxTextRun, WeeklyReport } from "../shared"
 
 /** Records every slide and the plain text placed on it. */
@@ -163,4 +164,31 @@ test("a heading is never left alone at the bottom of a summary slide", () => {
   }))
   const pages = paginateSlideText([...filler, { kind: "heading", runs: [{ text: "Next Section" }] }, ...filler])
   for (const page of pages) assert.notEqual(page[page.length - 1].kind, "heading")
+})
+
+test("text copied from a PDF gets its paragraphs, headings and lists back", () => {
+  const long = "The session explained the importance of conducting proper community assessments before"
+  const html = plainTextToSlideHtml(
+    ["1.0", "OPENING", long, "a.m. with prayers.", long, "the end.", "• First point", "• Second point"].join("\n")
+  )
+  assert.equal(
+    html,
+    `<h3>1.0 OPENING</h3><p>${long} a.m. with prayers.</p><p>${long} the end.</p>` +
+      "<ul><li>First point</li><li>Second point</li></ul>"
+  )
+})
+
+test("a paragraph taller than a slide is split across slides without losing text", () => {
+  const sentence = "Department heads reported steady progress on their targets for the week. "
+  const block = { kind: "bullet" as const, runs: [{ text: sentence.repeat(40).trim() }] }
+  const pages = paginateSlideText([block])
+  assert.ok(pages.length > 1)
+  const pieces = pages.flat()
+  assert.equal(pieces.map((piece) => piece.runs.map((run) => run.text).join("")).join(" "), block.runs[0].text)
+  assert.deepEqual(
+    pieces.map((piece) => !!piece.continued),
+    pieces.map((_, i) => i > 0)
+  )
+  // Pieces break after a sentence, not mid-sentence.
+  for (const piece of pieces.slice(0, -1)) assert.match(piece.runs[piece.runs.length - 1].text, /\.$/)
 })
