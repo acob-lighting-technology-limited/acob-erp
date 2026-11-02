@@ -87,6 +87,29 @@ export function PptxModeDialog({
 
         {step === 1 && (
           <div className="grid gap-3">
+            {/* Above the layout buttons: choosing a layout moves straight to the next step. */}
+            {showFullMeetingOption && (
+              <>
+                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Slides</p>
+                <label className="hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                  <Checkbox
+                    checked={fullMeeting}
+                    onCheckedChange={(checked) => setFullMeeting(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="text-sm font-semibold">Include the meeting agenda</span>
+                    <span className="text-muted-foreground text-xs">
+                      Adds opening prayer, KSS, summary of minutes, birthdays and closing remarks around the department
+                      slides.
+                    </span>
+                  </span>
+                </label>
+                <p className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">
+                  Department slide layout
+                </p>
+              </>
+            )}
             <Button
               variant="outline"
               className="h-14 flex-col items-start justify-center gap-0.5 px-4"
@@ -103,22 +126,6 @@ export function PptxModeDialog({
               <span className="font-semibold">Full</span>
               <span className="text-muted-foreground text-xs font-normal">3 slides per department</span>
             </Button>
-            {showFullMeetingOption && (
-              <label className="hover:bg-muted/50 mt-1 flex cursor-pointer items-start gap-3 rounded-lg border p-3">
-                <Checkbox
-                  checked={fullMeeting}
-                  onCheckedChange={(checked) => setFullMeeting(checked === true)}
-                  className="mt-0.5"
-                />
-                <span className="grid gap-0.5">
-                  <span className="text-sm font-semibold">Full meeting</span>
-                  <span className="text-muted-foreground text-xs">
-                    The whole agenda: prayer, KSS, summary of minutes, these department slides, birthdays and remarks.
-                    Untick for the department slides only.
-                  </span>
-                </span>
-              </label>
-            )}
           </div>
         )}
 
