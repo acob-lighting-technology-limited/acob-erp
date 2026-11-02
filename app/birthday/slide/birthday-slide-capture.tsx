@@ -38,9 +38,7 @@ export function BirthdaySlideCapture({
       return
     }
     let cancelled = false
-    // An empty week puts the coming week's celebrants on the rope, so they need full-size photos.
-    fetchCelebrants(start, end, "large")
-      .then(async (main) => [main, await fetchCelebrants(upStart, upEnd, main.length > 0 ? "thumb" : "large")])
+    Promise.all([fetchCelebrants(start, end, "large"), fetchCelebrants(upStart, upEnd, "thumb")])
       .then(([main, next]) => {
         if (cancelled) return
         setUpcoming({ label: upLabel, celebrants: next })

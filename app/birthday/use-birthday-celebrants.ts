@@ -82,18 +82,14 @@ export function useBirthdayCelebrants() {
     setError(null)
     try {
       const nextWeek = nextWeekAfter(endDate)
-      const response = await apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=large`)
+      const [response, upcomingResult] = await Promise.all([
+        apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=large`),
+        // The summary is a bonus: if it fails, the spotlight still shows.
+        fetchCelebrants(nextWeek.start, nextWeek.end, "thumb").catch(() => null),
+      ])
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
-      const found: Celebrant[] = payload?.data || []
-      // The summary is a bonus: if it fails, the spotlight still shows. An empty
-      // period puts the next week's celebrants on the rope, so they need full-size photos.
-      const upcomingResult = await fetchCelebrants(
-        nextWeek.start,
-        nextWeek.end,
-        found.length > 0 ? "thumb" : "large"
-      ).catch(() => null)
-      setCelebrants(found)
+      setCelebrants(payload?.data || [])
       setRangeLabel(label)
       setUpcoming(upcomingResult ? { label: nextWeek.label, celebrants: upcomingResult } : null)
       setIsGenerated(true)
