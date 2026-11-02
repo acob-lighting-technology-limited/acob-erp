@@ -6,6 +6,7 @@
  * meeting even when one piece is missing.
  */
 import { apiFetch } from "@/lib/api-client"
+import { createClient } from "@/lib/supabase/client"
 import { getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { openWithPdfjs, renderPdfPage } from "@/lib/pdf/client-tools"
 import { htmlToSlideTextBlocks } from "@/lib/rich-text"
@@ -51,11 +52,16 @@ const formatShortDate = (date: Date) => `${MONTH_SHORT[date.getMonth()]} ${date.
 const isPdf = (row: MeetingDocumentRow) =>
   row.mime_type === "application/pdf" || (row.file_name ?? "").toLowerCase().endsWith(".pdf")
 
+/** The week's submitted reports, read under RLS like the staff Weekly Reports page, so any staff member can export. */
 export async function fetchAgendaWeeklyReports(week: number, year: number): Promise<WeeklyReport[]> {
-  const res = await apiFetch(`/api/admin/reports/weekly-reports?week=${week}&year=${year}`, { cache: "no-store" })
-  const json = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(json?.error || "Failed to load weekly reports")
-  return sortReportsByDepartment((json?.reports || []) as WeeklyReport[])
+  const { data, error } = await createClient()
+    .from("weekly_reports")
+    .select("id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at")
+    .eq("status", "submitted")
+    .eq("week_number", week)
+    .eq("year", year)
+  if (error) throw new Error(error.message || "Failed to load weekly reports")
+  return sortReportsByDepartment((data || []) as WeeklyReport[])
 }
 
 async function listMeetingDocuments(week: number, year: number, documentType: MeetingDocumentType) {

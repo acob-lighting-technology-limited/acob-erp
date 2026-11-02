@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { BIRTHDAY_SLIDE_MESSAGE, type BirthdaySlidePayload } from "@/lib/reports/birthday-slide"
 import { BirthdayClotheslineStage } from "../birthday-clothesline"
 import { BirthdayShell } from "../birthday-spotlight"
-import { fetchCelebrants, type Celebrant, type UpcomingBirthdays } from "../birthday-utils"
+import { fetchMeetingCelebrants, type Celebrant, type UpcomingBirthdays } from "../birthday-utils"
 
 const SLIDE_WIDTH = 1920
 const SLIDE_HEIGHT = 1080
@@ -38,7 +38,7 @@ export function BirthdaySlideCapture({
       return
     }
     let cancelled = false
-    Promise.all([fetchCelebrants(start, end, "large"), fetchCelebrants(upStart, upEnd, "thumb")])
+    Promise.all([fetchMeetingCelebrants(start, end, "large"), fetchMeetingCelebrants(upStart, upEnd, "thumb")])
       .then(([main, next]) => {
         if (cancelled) return
         setUpcoming({ label: upLabel, celebrants: next })

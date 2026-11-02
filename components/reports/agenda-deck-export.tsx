@@ -15,9 +15,9 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
-import { apiJson } from "@/lib/api-client"
+import { createClient } from "@/lib/supabase/client"
 import { getReportingOfficeWeek, getWeeksInOfficeYear } from "@/lib/meeting-week"
-import { getDefaultMeetingDateIso, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
+import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { GENERAL_MEETING_AGENDA } from "@/lib/reports/general-meeting-agenda"
 import type { WeeklyDeptOrder, WeeklyPptxMode, WeeklyPptxTheme } from "@/lib/export-utils"
@@ -56,10 +56,7 @@ export async function runAgendaDeckExport({
       import("@/lib/reports/agenda-deck-data"),
     ])
 
-    const lockState = await apiJson<WeeklyReportLockState>(
-      `/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`,
-      { cache: "no-store" }
-    ).catch(() => null)
+    const lockState = await fetchWeeklyReportLockState(createClient(), week, year).catch(() => null)
     const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(week, year)
 
     progress("Loading weekly reports…")

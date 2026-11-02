@@ -1,19 +1,19 @@
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
-import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { MMDD_PATTERN, birthdayRangeDays } from "@/lib/hr/birthdays"
 import { BirthdaySlideCapture } from "./birthday-slide-capture"
 
 export const metadata: Metadata = { title: "Birthday slide" }
-
-const MMDD_PATTERN = /^\d{2}-\d{2}$/
 
 /**
  * Renders the /birthday spotlight for a fixed period inside a hidden 1920×1080
  * iframe on the General Meeting page, screenshots it, and posts the image to the
  * parent for the agenda deck. Not a page people visit.
  *
- * Same HR gate as /birthday, but reported back to the parent instead of
- * redirecting, so the export can carry on without the birthday slides.
+ * Any signed-in staff member may export the deck, so unlike /birthday this is
+ * not HR-only: it shows what the meeting shows everyone, one week either side
+ * (see /api/reports/meeting-birthdays). Problems are reported back to the
+ * parent instead of redirecting, so the export carries on without the slide.
  */
 export default async function BirthdaySlidePage({
   searchParams,
@@ -34,11 +34,13 @@ export default async function BirthdaySlidePage({
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const scope = user ? await resolveAdminScope(supabase, user.id) : null
-
   let error: string | null = null
-  if (!scope || !canAccessAdminSection(scope, "hr")) error = "You need HR access to include birthdays."
-  else if ([start, end, upcomingStart, upcomingEnd].some((value) => !MMDD_PATTERN.test(value))) {
+  if (!user) error = "Sign in to include birthdays."
+  else if (
+    [start, end, upcomingStart, upcomingEnd].some((value) => !MMDD_PATTERN.test(value)) ||
+    birthdayRangeDays(start, end) > 7 ||
+    birthdayRangeDays(upcomingStart, upcomingEnd) > 7
+  ) {
     error = "Invalid birthday period."
   }
 
