@@ -343,6 +343,7 @@ export const QUERY_KEYS = {
   controlledDocs: (...parts: unknown[]) => ["controlled-docs", ...parts],
   hrEmployeeMailbox: (...parts: unknown[]) => ["hr-employee-mailbox", ...parts],
   adminHrBirthdaysAll: (...parts: unknown[]) => ["admin-hr-birthdays-all", ...parts],
+  adminHrBirthdayReminder: (...parts: unknown[]) => ["admin-hr-birthday-reminder", ...parts],
   contractCategoriesAll: (...parts: unknown[]) => ["contract-categories-all", ...parts],
   contractCategoriesKey: (...parts: unknown[]) => ["contract-categories", ...parts],
   pendingApprovalEmailPreview: (...parts: unknown[]) => ["pending-approval-email-preview", ...parts],

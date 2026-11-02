@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Cake, Loader2, PartyPopper, Search, X } from "lucide-react"
+import { BellRing, Cake, Loader2, PartyPopper, Search, X } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/ui/patterns"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { BirthdayReminderDialog } from "@/components/hr/birthday-reminder-dialog"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -61,6 +63,7 @@ async function fetchAllBirthdays(): Promise<CelebrantApiRow[]> {
 export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDialogProps) {
   const [now, setNow] = useState<Date | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [reminderOpen, setReminderOpen] = useState(false)
 
   useEffect(() => {
     setNow(new Date())
@@ -101,95 +104,102 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
   }, [celebrants, searchQuery])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Cake className="h-5 w-5" />
-            Birthday Manager
-          </DialogTitle>
-          <DialogDescription>All employees, sorted by their next upcoming birthday.</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cake className="h-5 w-5" />
+              Birthday Manager
+            </DialogTitle>
+            <DialogDescription>All employees, sorted by their next upcoming birthday.</DialogDescription>
+            <Button variant="outline" size="sm" className="mt-2 gap-2 self-start" onClick={() => setReminderOpen(true)}>
+              <BellRing className="h-4 w-4" />
+              Weekly reminder
+            </Button>
+          </DialogHeader>
 
-        {celebrants.length > 0 && (
-          <div className="relative mt-2">
-            <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
-            <Input
-              placeholder="Search by name or department..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-8 pl-9"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="text-muted-foreground hover:text-foreground absolute top-2.5 right-3"
-              >
-                <X className="h-4 w-4" />
-              </button>
+          {celebrants.length > 0 && (
+            <div className="relative mt-2">
+              <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
+              <Input
+                placeholder="Search by name or department..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-8 pl-9"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="text-muted-foreground hover:text-foreground absolute top-2.5 right-3"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+              </div>
+            ) : isError ? (
+              <p className="text-destructive py-8 text-center text-sm">
+                {error instanceof Error ? error.message : "Failed to load birthdays"}
+              </p>
+            ) : celebrants.length === 0 ? (
+              <EmptyState
+                title="No birthdays on file"
+                description="Employees haven't set their birthday yet."
+                icon={Cake}
+                className="border-0 py-8"
+              />
+            ) : filteredCelebrants.length === 0 ? (
+              <EmptyState
+                title="No matches found"
+                description={`No employee matches "${searchQuery}"`}
+                icon={Search}
+                className="border-0 py-8"
+              />
+            ) : (
+              <ul className="divide-y">
+                {filteredCelebrants.map((c, index) => (
+                  <li key={`${c.firstName}-${c.lastName}-${index}`} className="flex items-center gap-3 py-2.5">
+                    <Avatar className="h-9 w-9 shrink-0">
+                      {c.avatarUrl && <AvatarImage src={c.avatarUrl} alt={c.firstName} />}
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                        {c.firstName[0]}
+                        {c.lastName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {c.firstName} {c.lastName}
+                      </p>
+                      <p className="text-muted-foreground truncate text-xs">{c.department}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-medium">{formatMMDD(c.birthday)}</p>
+                      <Badge
+                        variant={c.daysUntil === 0 ? "default" : "outline"}
+                        className={cn(
+                          "mt-0.5 gap-1 px-1.5 py-0 text-xs",
+                          c.daysUntil === 0 && "bg-primary text-primary-foreground"
+                        )}
+                      >
+                        {c.daysUntil === 0 && <PartyPopper className="h-2.5 w-2.5" />}
+                        {daysUntilLabel(c.daysUntil)}
+                      </Badge>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-        )}
-
-        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-            </div>
-          ) : isError ? (
-            <p className="text-destructive py-8 text-center text-sm">
-              {error instanceof Error ? error.message : "Failed to load birthdays"}
-            </p>
-          ) : celebrants.length === 0 ? (
-            <EmptyState
-              title="No birthdays on file"
-              description="Employees haven't set their birthday yet."
-              icon={Cake}
-              className="border-0 py-8"
-            />
-          ) : filteredCelebrants.length === 0 ? (
-            <EmptyState
-              title="No matches found"
-              description={`No employee matches "${searchQuery}"`}
-              icon={Search}
-              className="border-0 py-8"
-            />
-          ) : (
-            <ul className="divide-y">
-              {filteredCelebrants.map((c, index) => (
-                <li key={`${c.firstName}-${c.lastName}-${index}`} className="flex items-center gap-3 py-2.5">
-                  <Avatar className="h-9 w-9 shrink-0">
-                    {c.avatarUrl && <AvatarImage src={c.avatarUrl} alt={c.firstName} />}
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                      {c.firstName[0]}
-                      {c.lastName[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {c.firstName} {c.lastName}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">{c.department}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-xs font-medium">{formatMMDD(c.birthday)}</p>
-                    <Badge
-                      variant={c.daysUntil === 0 ? "default" : "outline"}
-                      className={cn(
-                        "mt-0.5 gap-1 px-1.5 py-0 text-xs",
-                        c.daysUntil === 0 && "bg-primary text-primary-foreground"
-                      )}
-                    >
-                      {c.daysUntil === 0 && <PartyPopper className="h-2.5 w-2.5" />}
-                      {daysUntilLabel(c.daysUntil)}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <BirthdayReminderDialog open={reminderOpen} onOpenChange={setReminderOpen} />
+    </>
   )
 }
