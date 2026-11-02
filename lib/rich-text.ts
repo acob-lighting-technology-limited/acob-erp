@@ -119,6 +119,8 @@ export function convertMarkdownToHtml(text: string): string {
  * the editor never shows formatting the agenda deck cannot reproduce.
  */
 const SLIDE_TEXT_TAGS = ["p", "br", "h1", "h2", "h3", "h4", "ul", "ol", "li", "strong", "b", "em", "i"]
+/** `start` keeps a numbered list's first number when other paragraphs interrupt it. */
+const SLIDE_TEXT_ATTRS = ["start"]
 
 /**
  * Word writes list items as paragraphs that start with a bullet glyph or a
@@ -235,7 +237,7 @@ export function cleanSlideTextHtml(html: string): string {
   // Chrome's contentEditable writes each new line as <div>; keep them as paragraphs.
   const withParagraphs = html.replace(/<div(\s[^>]*)?>/gi, "<p>").replace(/<\/div>/gi, "</p>")
   const sanitized = structurePlainText(
-    DOMPurify.sanitize(withParagraphs, { ALLOWED_TAGS: SLIDE_TEXT_TAGS, ALLOWED_ATTR: [] })
+    DOMPurify.sanitize(withParagraphs, { ALLOWED_TAGS: SLIDE_TEXT_TAGS, ALLOWED_ATTR: SLIDE_TEXT_ATTRS })
   )
   const doc = new DOMParser().parseFromString(`<body>${sanitized}</body>`, "text/html")
 
@@ -258,8 +260,20 @@ export function cleanSlideTextHtml(html: string): string {
     }
     const kind = bullet ? "ul" : "ol"
     stripLeadingChars(child, marker[0].length)
+    // Word's own number, which a list broken up by paragraphs would otherwise restart at 1.
+    const wordNumber = number ? parseInt(number[0].trim(), 10) : 1
+    // A numbered all-caps line is a section title ("2. ADOPTION OF PREVIOUS MINUTES:"),
+    // not a list item: a heading that keeps its number.
+    if (number && isCapsHeading((child.textContent ?? "").trim())) {
+      const heading = doc.createElement("h3")
+      heading.innerHTML = `${wordNumber}. ${child.innerHTML.trim()}`
+      child.replaceWith(heading)
+      list = null
+      continue
+    }
     if (!list || list.tagName.toLowerCase() !== kind) {
       list = doc.createElement(kind)
+      if (kind === "ol" && wordNumber > 1) list.setAttribute("start", String(wordNumber))
       child.before(list)
     }
     const item = doc.createElement("li")
@@ -281,7 +295,7 @@ export function cleanSlideTextHtml(html: string): string {
  * were rebuilt on paste get their paragraphs here.
  */
 export function sanitizeSlideTextHtml(html: string): string {
-  return structurePlainText(DOMPurify.sanitize(html, { ALLOWED_TAGS: SLIDE_TEXT_TAGS, ALLOWED_ATTR: [] }))
+  return structurePlainText(DOMPurify.sanitize(html, { ALLOWED_TAGS: SLIDE_TEXT_TAGS, ALLOWED_ATTR: SLIDE_TEXT_ATTRS }))
 }
 
 export interface SlideTextRun {
@@ -353,9 +367,10 @@ export function htmlToSlideTextBlocks(html: string): SlideTextBlock[] {
     const tag = child.tagName.toLowerCase()
     if (/^h[1-4]$/.test(tag)) pushBlock("heading", child)
     else if (tag === "ul") child.querySelectorAll(":scope > li").forEach((li) => pushBlock("bullet", li))
-    else if (tag === "ol")
-      Array.from(child.querySelectorAll(":scope > li")).forEach((li, i) => pushBlock("number", li, i + 1))
-    else pushBlock("paragraph", child)
+    else if (tag === "ol") {
+      const start = Number(child.getAttribute("start")) || 1
+      Array.from(child.querySelectorAll(":scope > li")).forEach((li, i) => pushBlock("number", li, start + i))
+    } else pushBlock("paragraph", child)
   }
   return blocks
 }
