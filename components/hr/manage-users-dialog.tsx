@@ -6,15 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,7 +25,6 @@ import {
   ChevronRight,
   ShieldCheck,
   Hash,
-  Mail,
   AlertTriangle,
   Search,
 } from "lucide-react"
@@ -53,6 +43,8 @@ import { logger } from "@/lib/logger"
 import type { UserRole } from "@/types/database"
 import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import { apiFetch } from "@/lib/api-client"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
+import { ExitConfirmDialog } from "@/components/hr/exit-confirm-dialog"
 import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 const log = logger("manage-users-dialog")
@@ -407,7 +399,9 @@ export function ManageUsersDialog({
   }
 
   // ── EXIT EMPLOYEE ────────────────────────────────────────────────────────────
-  const activeEmployees = employees.filter((e) => e.employment_status === "active")
+  // Anyone not already exited can be exited — a suspended or on-leave person
+  // still needs offboarding, so filtering to "active" hid them from this tab.
+  const exitableEmployees = employees.filter((e) => e.employment_status !== "exited")
   const [exitSearch, setExitSearch] = useState("")
   const [selectedExitIds, setSelectedExitIds] = useState<Set<string>>(new Set())
   const [sharedExitDate, setSharedExitDate] = useState(today)
@@ -415,17 +409,14 @@ export function ManageUsersDialog({
   const [exitOverrides, setExitOverrides] = useState<Record<string, Partial<PerPersonEntry>>>({})
   const [isExiting, setIsExiting] = useState(false)
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
-  const [exitNotifyOpen, setExitNotifyOpen] = useState(false)
-  const [isSendingExitNotif, setIsSendingExitNotif] = useState(false)
-  const [succeededExitIds, setSucceededExitIds] = useState<string[]>([])
 
-  const filteredExitEmployees = activeEmployees.filter((e) => {
+  const filteredExitEmployees = exitableEmployees.filter((e) => {
     if (!exitSearch.trim()) return true
     const q = exitSearch.toLowerCase()
     return `${e.first_name} ${e.last_name} ${e.department} ${e.employee_number ?? ""}`.toLowerCase().includes(q)
   })
 
-  const selectedExitEmployees = activeEmployees.filter((e) => selectedExitIds.has(e.id))
+  const selectedExitEmployees = exitableEmployees.filter((e) => selectedExitIds.has(e.id))
 
   const getExitEntry = (id: string): PerPersonEntry => ({
     exitDate: exitOverrides[id]?.exitDate ?? sharedExitDate,
@@ -483,18 +474,15 @@ export function ManageUsersDialog({
       }
 
       if (succeeded > 0) {
-        setSucceededExitIds(results.filter((r) => r.success).map((r) => r.id))
         toast.success(
-          `${succeeded} employee${succeeded > 1 ? "s" : ""} exited${failed > 0 ? ` (${failed} skipped)` : ""}`
+          `${succeeded} employee${succeeded > 1 ? "s" : ""} exited${failed > 0 ? ` (${failed} failed)` : ""}` +
+            (sendNotification ? " · staff notified" : "")
         )
+        if (failed > 0) log.warn({ results }, "Some exits failed")
         onSuccess()
         setSelectedExitIds(new Set())
         setExitOverrides({})
         setExitConfirmOpen(false)
-        if (!sendNotification) {
-          setExitNotifyOpen(true)
-          return
-        }
       } else {
         toast.error("All exits failed — employees may have active blockers")
         setExitConfirmOpen(false)
@@ -504,31 +492,6 @@ export function ManageUsersDialog({
       setExitConfirmOpen(false)
     } finally {
       setIsExiting(false)
-    }
-  }
-
-  const handleSendExitNotif = async () => {
-    if (!succeededExitIds.length) return
-    setIsSendingExitNotif(true)
-    try {
-      const res = await apiFetch("/api/v1/hr/employees/bulk-exit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employees: succeededExitIds.map((id) => ({ employeeId: id, ...getExitEntry(id) })),
-          sendNotification: true,
-        }),
-      })
-      if (res.ok) toast.success("Exit notification sent to all staff")
-      else {
-        const e = await res.json()
-        toast.error(e.error || "Failed to send notification")
-      }
-    } catch {
-      toast.error("Failed to send notification")
-    } finally {
-      setIsSendingExitNotif(false)
-      setExitNotifyOpen(false)
     }
   }
 
@@ -1224,7 +1187,7 @@ export function ManageUsersDialog({
                   <ScrollArea className="flex-1">
                     <div className="divide-border divide-y">
                       {filteredExitEmployees.length === 0 ? (
-                        <p className="text-muted-foreground p-6 text-center text-sm">No active employees found</p>
+                        <p className="text-muted-foreground p-6 text-center text-sm">No employees found</p>
                       ) : (
                         filteredExitEmployees.map((emp) => (
                           <label
@@ -1245,6 +1208,13 @@ export function ManageUsersDialog({
                               </p>
                               <p className="text-muted-foreground truncate text-xs">{emp.department}</p>
                             </div>
+                            {emp.employment_status && emp.employment_status !== "active" && (
+                              <EmployeeStatusBadge
+                                status={emp.employment_status}
+                                size="sm"
+                                className="ml-auto shrink-0"
+                              />
+                            )}
                           </label>
                         ))
                       )}
@@ -1351,8 +1321,8 @@ export function ManageUsersDialog({
                           <div className="bg-destructive/10 border-destructive/20 flex items-start gap-2 rounded-lg border p-3">
                             <AlertTriangle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
                             <p className="text-destructive text-xs">
-                              This immediately revokes system access. Employees with active assets, tasks, or lead roles
-                              will be skipped.
+                              This immediately revokes system access. Assets, open tasks, project roles and lead roles
+                              assigned to them are released as part of the exit.
                             </p>
                           </div>
                         </div>
@@ -1386,70 +1356,13 @@ export function ManageUsersDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Exit confirm */}
-      <AlertDialog open={exitConfirmOpen} onOpenChange={setExitConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm exit</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will exit{" "}
-              <strong>
-                {selectedExitEmployees.length} employee{selectedExitEmployees.length > 1 ? "s" : ""}
-              </strong>{" "}
-              and immediately revoke their system access. Continue?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isExiting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              loading={isExiting}
-              onClick={async () => {
-                await handleExitSubmit(false)
-              }}
-            >
-              Confirm Exit
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Exit notification */}
-      <AlertDialog
-        open={exitNotifyOpen}
-        onOpenChange={(v) => {
-          if (!isSendingExitNotif) setExitNotifyOpen(v)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Send Exit Notification?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Send an all-staff email notifying everyone that{" "}
-              <strong>
-                {succeededExitIds.length === 1 ? "this employee has" : `${succeededExitIds.length} employees have`}
-              </strong>{" "}
-              exited the organisation?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSendingExitNotif} onClick={() => setExitNotifyOpen(false)}>
-              No, skip
-            </AlertDialogCancel>
-            <Button
-              loading={isSendingExitNotif}
-              onClick={async () => {
-                await handleSendExitNotif()
-              }}
-            >
-              Yes, send notification
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ExitConfirmDialog
+        open={exitConfirmOpen}
+        onOpenChange={setExitConfirmOpen}
+        employees={selectedExitEmployees}
+        isExiting={isExiting}
+        onConfirm={handleExitSubmit}
+      />
 
       {/* Reject — captures the reason that is recorded against the application */}
       <PromptDialog

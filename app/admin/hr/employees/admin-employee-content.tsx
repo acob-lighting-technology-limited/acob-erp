@@ -70,6 +70,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
+import { describeExitBlockers, type ExitBlockers } from "@/lib/hr/exit-blockers"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { EmployeeAvatar } from "./_components/employee-avatar"
@@ -599,8 +600,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
         const statusPayload = (await statusRes.json().catch(() => ({}))) as {
           error?: string
-          has_blockers?: boolean
-          blockers?: string[]
+          blockers?: ExitBlockers
           mailbox?: { done: string[]; errors: string[] } | null
         }
         if (statusRes.ok && statusPayload.mailbox) {
@@ -609,9 +609,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
 
         if (!statusRes.ok) {
-          if (statusPayload.has_blockers && statusPayload.blockers?.length) {
-            throw new Error(`Cannot change status due to active blockers: ${statusPayload.blockers.join(", ")}`)
-          }
+          const blockerSummary = statusPayload.blockers ? describeExitBlockers(statusPayload.blockers) : ""
+          if (blockerSummary) throw new Error(`Cannot exit yet — still has ${blockerSummary}. Clear these first.`)
           throw new Error(statusPayload.error || "Failed to update employee status")
         }
       }

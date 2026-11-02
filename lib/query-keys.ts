@@ -42,6 +42,7 @@ export const QUERY_KEYS = {
   myAttendanceDays: (yearMonth: string) => ["my-attendance-days", yearMonth],
   attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
   attendanceReportConfig: () => ["attendance-report-config"],
+  attendanceDeviceAlertConfig: () => ["attendance-device-alert-config"],
   employeeCycleAttendance: (userId: string, start: string, end: string) => [
     "employee-cycle-attendance",
     userId,
@@ -167,6 +168,7 @@ export const QUERY_KEYS = {
   adminLeaveSettings: () => ["admin-leave-settings"],
   adminOfficeLocations: () => ["admin-office-locations"],
   adminEmployeeDetail: (userId: string) => ["admin-employee-detail", userId],
+  exitBlockers: (userIds: string[]) => ["exit-blockers", userIds],
   adminJobDescriptions: (filters?: Record<string, unknown>) =>
     filters ? ["admin-job-descriptions", filters] : ["admin-job-descriptions"],
   adminAuditLogs: (filters?: Record<string, unknown>) =>

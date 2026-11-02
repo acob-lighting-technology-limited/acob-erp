@@ -73,7 +73,11 @@ async function countPunches(supabase: SupabaseClient, date: string, eventType: s
  * but the clock-outs never arrived. On a normal day the evening clock-outs all
  * come through, so the last punch day looks complete.
  */
-async function outageCarriedOver(supabase: SupabaseClient, lastPunchAt: string | null, today: string): Promise<boolean> {
+async function outageCarriedOver(
+  supabase: SupabaseClient,
+  lastPunchAt: string | null,
+  today: string
+): Promise<boolean> {
   if (!lastPunchAt) return false
   const lastDate = toLocalISODate(new Date(lastPunchAt))
   if (lastDate >= today) return false
@@ -132,4 +136,28 @@ export async function getDeviceHealth(supabase: SupabaseClient, now: Date = new 
  */
 export function deviceOutageStartDate(health: DeviceHealth): string {
   return health.lastPunchAt ? toLocalISODate(new Date(health.lastPunchAt)) : health.date
+}
+
+/** system_settings key holding { user_ids: string[] }: who hears when the device goes offline. */
+export const DEVICE_ALERT_RECIPIENTS_KEY = "attendance_device_alert"
+/**
+ * Until someone saves a device-alert list, the alert keeps going to the
+ * meeting-reminder watchdog's recipients, which is who it always went to.
+ */
+const LEGACY_RECIPIENTS_KEY = "reminder_failure_alert"
+
+function readUserIds(value: unknown): string[] {
+  const raw = (value as { user_ids?: unknown } | null)?.user_ids
+  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : []
+}
+
+/** User ids to alert when the clock-in device goes offline. The ICT mailbox is added by the sender. */
+export async function getDeviceAlertRecipientIds(supabase: SupabaseClient): Promise<string[]> {
+  const { data: rows } = await supabase
+    .from("system_settings")
+    .select("key, value")
+    .in("key", [DEVICE_ALERT_RECIPIENTS_KEY, LEGACY_RECIPIENTS_KEY])
+  const own = rows?.find((row) => row.key === DEVICE_ALERT_RECIPIENTS_KEY)
+  if (own) return readUserIds(own.value)
+  return readUserIds(rows?.find((row) => row.key === LEGACY_RECIPIENTS_KEY)?.value)
 }

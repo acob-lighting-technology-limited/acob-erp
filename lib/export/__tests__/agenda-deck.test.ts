@@ -173,7 +173,7 @@ test("text copied from a PDF gets its paragraphs, headings and lists back", () =
 
 test("a paragraph taller than a slide is split across slides without losing text", () => {
   const sentence = "Department heads reported steady progress on their targets for the week. "
-  const block = { kind: "bullet" as const, runs: [{ text: sentence.repeat(40).trim() }] }
+  const block = { kind: "bullet" as const, runs: [{ text: sentence.repeat(80).trim() }] }
   const pages = paginateSlideText([block])
   assert.ok(pages.length > 1)
   const pieces = pages.flat()

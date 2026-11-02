@@ -413,24 +413,26 @@ const addPresentationPageSlide = (pres: PptxPresentation, image: AgendaDeckImage
   return slide
 }
 
-// Summary text slides, in the area between the header bar and the footer. The
-// sizes set the hierarchy: section headings lead, labels are a small eyebrow,
-// body text is a step quieter, and replies sit indented under their point.
+// Summary text slides, in the area between the header bar and the footer. Sizes
+// follow the department slides (16pt header title, 12pt card titles, 14pt body),
+// so no line outranks the slide's own title. Hierarchy comes from colour, weight
+// and spacing: section headings lead, labels are a small eyebrow, replies sit
+// indented under their point.
 const SUMMARY_BOX = { x: 0.7, y: 0.8, w: SLIDE_W - 1.4, h: 6.05 }
 const SUMMARY_PT: Record<SlideTextBlock["kind"], number> = {
-  heading: 24,
+  heading: 16,
   label: 12,
-  paragraph: 17,
-  bullet: 17,
-  number: 17,
-  reply: 16,
+  paragraph: 14,
+  bullet: 14,
+  number: 14,
+  reply: 13,
 }
 /** Hanging indent for points and replies (points), and the matching estimate (inches). */
-const SUMMARY_LIST_INDENT_PT = 30
+const SUMMARY_LIST_INDENT_PT = 24
 const SUMMARY_LIST_INDENT_IN = SUMMARY_LIST_INDENT_PT / 72
-const SUMMARY_PARA_GAP_IN = 0.1
+const SUMMARY_PARA_GAP_IN = 0.08
 /** Space above a section heading or label, so each section reads as its own block. */
-const SUMMARY_SPACE_BEFORE_PT: Partial<Record<SlideTextBlock["kind"], number>> = { heading: 14, label: 8 }
+const SUMMARY_SPACE_BEFORE_PT: Partial<Record<SlideTextBlock["kind"], number>> = { heading: 12, label: 6 }
 
 /**
  * Estimated height of a block (pptxgenjs cannot measure text). 18pt Calibri
@@ -572,9 +574,9 @@ const addSummaryTextSlide = (
     const paragraph = {
       fontSize: SUMMARY_PT[block.kind],
       color: isHeading || isLabel ? headingColor : isReply ? colors.textMuted : bodyColor,
-      paraSpaceAfter: isHeading ? 4 : 6,
+      paraSpaceAfter: isHeading ? 3 : 5,
       ...(spaceBefore && { paraSpaceBefore: spaceBefore }),
-      ...(isLabel && { charSpacing: 3 }),
+      ...(isLabel && { charSpacing: 2 }),
       ...(isReply && { italic: true }),
     }
     // Points hang their number in the margin. A reply hangs an invisible

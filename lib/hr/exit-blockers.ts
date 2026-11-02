@@ -74,3 +74,19 @@ export async function getExitBlockers(supabase: SupabaseClient, employeeId: stri
 
   return blockers
 }
+
+const BLOCKER_LABELS: [keyof Omit<ExitBlockers, "total">, string, string][] = [
+  ["assets", "asset", "assets"],
+  ["tasks", "open task", "open tasks"],
+  ["task_assignments", "task assignment", "task assignments"],
+  ["managed_projects", "managed project", "managed projects"],
+  ["project_memberships", "project membership", "project memberships"],
+  ["lead_roles", "department lead role", "department lead roles"],
+]
+
+/** "2 assets, 1 open task" — what still stands in the way of an exit. */
+export function describeExitBlockers(blockers: ExitBlockers): string {
+  return BLOCKER_LABELS.filter(([key]) => blockers[key] > 0)
+    .map(([key, one, many]) => `${blockers[key]} ${blockers[key] === 1 ? one : many}`)
+    .join(", ")
+}
