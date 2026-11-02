@@ -1,8 +1,8 @@
 /**
  * General-meeting agenda deck: one PowerPoint that walks the standing agenda in
- * order — a section slide per item, the KSS and last week's minutes as page
- * images, the weekly department slides, and the two birthday slides under Any
- * Other Business. Everything is gathered client-side by the caller and passed
+ * order — a section slide per item, the KSS as page images, last week's
+ * summary of minutes as text slides, the weekly department slides, and the
+ * birthday slide under Any Other Business. Everything is gathered client-side by the caller and passed
  * in; this module only lays slides out (pptxgenjs, loaded on demand).
  */
 import { GENERAL_MEETING_AGENDA, type GeneralMeetingAgendaKey } from "@/lib/reports/general-meeting-agenda"
@@ -67,12 +67,9 @@ export interface AgendaDeckInput {
   taskSummaryOptions?: WeeklyTaskSummaryOptions
   reports: WeeklyReport[]
   kss: AgendaDeckKssEntry[]
-  /** `totalPages` is the whole document's length, when longer than the pages shown. */
+  /** Without a summary the item is its title slide alone, with `note` saying why. */
   minutes: {
-    /** The summary of minutes, when one was written; shown as text slides instead of `pages`. */
     summary?: SlideTextBlock[]
-    pages: AgendaDeckImage[]
-    totalPages?: number
     label: string
     note?: string
   }
@@ -555,56 +552,6 @@ const addSummaryTextSlide = (
   return slide
 }
 
-/** A minutes page: the A4 page centred under a header naming the document and page. */
-const addDocumentPageSlide = (
-  pres: PptxPresentation,
-  image: AgendaDeckImage,
-  title: string,
-  pageLabel: string,
-  pageNumber: number,
-  theme: WeeklyPptxTheme
-) => {
-  const colors = getWeeklyPptxThemeColors(theme)
-  const slide = pres.addSlide()
-  slide.background = { color: colors.canvas }
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: 0,
-    y: 0,
-    w: "100%",
-    h: 0.65,
-    fill: { color: colors.header },
-    line: { color: colors.header },
-  })
-  slide.addText(title, {
-    x: 0.3,
-    y: 0,
-    w: 10,
-    h: 0.65,
-    fontSize: 16,
-    bold: true,
-    color: colors.textInverse,
-    valign: "middle",
-    fontFace: "Calibri",
-  })
-  slide.addText(pageLabel, {
-    x: 10,
-    y: 0,
-    w: 3,
-    h: 0.65,
-    fontSize: 12,
-    color: colors.headerMuted,
-    valign: "middle",
-    align: "right",
-    fontFace: "Calibri",
-  })
-  slide.addImage({
-    data: toPptxImageData(image.dataUrl),
-    ...containBox(image, { x: 0.3, y: 0.8, w: SLIDE_W - 0.6, h: 6.9 - 0.8 - 0.1 }),
-  })
-  addFooterBand(pres, slide, pageNumber, colors)
-  return slide
-}
-
 /** Birthday slide: the /birthday screenshot full-bleed, or a plain note when it is missing. */
 const addBirthdaySlide = (pres: PptxPresentation, entry: AgendaDeckBirthdaySlide) => {
   const slide = pres.addSlide()
@@ -651,7 +598,7 @@ const contentSlideCount = (key: GeneralMeetingAgendaKey, input: AgendaDeckInput)
     case "kss":
       return input.kss.reduce((total, entry) => total + entry.pages.length, 0)
     case "minutes":
-      return input.minutes.summary ? paginateSlideText(input.minutes.summary).length : input.minutes.pages.length
+      return input.minutes.summary ? paginateSlideText(input.minutes.summary).length : 0
     case "departments":
       return input.reports.length > 0
         ? countWeeklyDepartmentSlides(input.reports, input.mode, input.taskSummaryOptions)
@@ -724,28 +671,11 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
         break
       }
       case "minutes": {
-        const { summary, pages, label, note } = input.minutes
-        if (summary) {
-          const summarySlides = paginateSlideText(summary)
-          addAgendaSectionSlide(pres, { ...section, lines: [label] })
-          summarySlides.forEach((blocks, n) =>
-            addSummaryTextSlide(pres, blocks, label, `${n + 1} of ${summarySlides.length}`, page + 1 + n, theme)
-          )
-          break
-        }
-        const totalPages = input.minutes.totalPages ?? pages.length
-        const lines =
-          pages.length === 0
-            ? [note ?? label]
-            : totalPages > pages.length
-              ? [
-                  label,
-                  `${pages.length} of ${totalPages} pages shown. Full minutes: Matrix → General Meeting → Minutes.`,
-                ]
-              : [label]
-        addAgendaSectionSlide(pres, { ...section, lines })
-        pages.forEach((image, n) =>
-          addDocumentPageSlide(pres, image, label, `Page ${n + 1} of ${totalPages}`, page + 1 + n, theme)
+        const { summary, label, note } = input.minutes
+        addAgendaSectionSlide(pres, { ...section, lines: summary ? [label] : [note ?? label] })
+        const summarySlides = summary ? paginateSlideText(summary) : []
+        summarySlides.forEach((blocks, n) =>
+          addSummaryTextSlide(pres, blocks, label, `${n + 1} of ${summarySlides.length}`, page + 1 + n, theme)
         )
         break
       }

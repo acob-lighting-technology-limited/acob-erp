@@ -127,27 +127,14 @@ async function loadMinutesSummary(week: number, year: number) {
 }
 
 /**
- * Last week's summary of minutes as text slides when one was written;
- * otherwise every page of the full minutes PDF.
+ * Last week's summary of minutes as text slides. Without one the item is its
+ * title slide alone — the full minutes PDF is not shown in the meeting.
  */
 export async function loadAgendaMinutes(meetingDate: string): Promise<AgendaDeckInput["minutes"]> {
   const previous = previousMeetingWeek(meetingDate)
-  // A failed summary lookup falls through to the full minutes rather than failing the export.
-  const summary = await loadMinutesSummary(previous.week, previous.year).catch(() => null)
-  if (summary) return { summary, pages: [], label: `Summary of Minutes — Week ${previous.week}, ${previous.year}` }
-
-  const label = `Minutes — Week ${previous.week}, ${previous.year}`
-  const rows = await listMeetingDocuments(previous.week, previous.year, "minutes")
-  const pdf = rows.find(isPdf)
-  if (!pdf) {
-    return { pages: [], label, note: `No minutes have been uploaded for week ${previous.week}.` }
-  }
-  try {
-    const { pages, totalPages } = await renderDocumentPages(pdf)
-    return { pages, totalPages, label }
-  } catch {
-    return { pages: [], label, note: `The week ${previous.week} minutes could not be read.` }
-  }
+  const label = `Summary of Minutes — Week ${previous.week}, ${previous.year}`
+  const summary = await loadMinutesSummary(previous.week, previous.year)
+  return summary ? { summary, label } : { label, note: `Week ${previous.week}, ${previous.year}` }
 }
 
 /**

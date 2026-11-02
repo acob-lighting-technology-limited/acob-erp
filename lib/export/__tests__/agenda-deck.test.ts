@@ -50,7 +50,10 @@ const baseInput = (overrides: Partial<AgendaDeckInput> = {}): AgendaDeckInput =>
   order: "default",
   reports: [report("Accounts"), report("IT and Communications")],
   kss: [{ presenterName: "Ada", department: "Accounts", pages: [image, image, image] }],
-  minutes: { pages: [image, image], label: "Minutes — Week 44, 2026" },
+  minutes: {
+    summary: [{ kind: "paragraph", runs: [{ text: "The meeting opened with prayers." }] }],
+    label: "Summary of Minutes — Week 44, 2026",
+  },
   birthdays: [{ title: "Birthdays — past week & coming up", image }],
   ...overrides,
 })
@@ -70,8 +73,8 @@ test("agenda slide points each item at the slide its section starts on", () => {
   buildAgendaDeck(pres, input)
   const { startPages } = planAgendaDeckPages(input)
 
-  // cover, agenda, prayer(3), KSS(4) + 3 pages, minutes(8) + 2 pages, departments(11) + index + 2×2, AOB(…)
-  assert.deepEqual(startPages.slice(0, 4), [3, 4, 8, 11])
+  // cover, agenda, prayer(3), KSS(4) + 3 pages, minutes(8) + 1 summary slide, departments(10) + index + 2×2, AOB(…)
+  assert.deepEqual(startPages.slice(0, 4), [3, 4, 8, 10])
   startPages.forEach((page, i) => {
     assert.ok(
       slides[page - 1].some((text) => text.startsWith(`AGENDA ${toRoman(i + 1)} OF VII`)),
@@ -85,27 +88,17 @@ test("missing pieces leave a note on the section slide instead of failing", () =
     reports: [],
     kss: [],
     birthdays: [{ title: "Birthdays — past week & coming up", image: null, note: "Oct 26 – Nov 1 — no access" }],
-    minutes: { pages: [], label: "Minutes — Week 44, 2026", note: "No minutes have been uploaded for week 44." },
+    minutes: { label: "Summary of Minutes — Week 44, 2026", note: "No summary of minutes for week 44." },
   })
   const { pres, slides } = fakePresentation()
   buildAgendaDeck(pres, input)
   const allText = slides.flat().join("\n")
   assert.match(allText, /No KSS file has been uploaded/)
-  assert.match(allText, /No minutes have been uploaded for week 44/)
+  assert.match(allText, /No summary of minutes for week 44/)
   assert.match(allText, /No weekly reports were submitted/)
   assert.match(allText, /no access/)
   // cover + agenda + 7 section slides + 1 birthday slide
   assert.equal(slides.length, 10)
-})
-
-test("a minutes PDF cut short says how many pages are shown", () => {
-  const input = baseInput({ minutes: { pages: [image], totalPages: 15, label: "Minutes — Week 22, 2026" } })
-  const { pres, slides } = fakePresentation()
-  buildAgendaDeck(pres, input)
-  const allText = slides.flat().join("\n")
-  assert.match(allText, /1 of 15 pages shown/)
-  assert.ok(slides.flat().includes("Page 1 of 15"))
-  assert.equal(slides.length, planAgendaDeckPages(input).totalSlides)
 })
 
 test("department headings stay at 54pt and wrap long names onto two lines", () => {
@@ -134,7 +127,7 @@ test("agenda items are numbered in Roman numerals", () => {
   assert.ok(allText.includes("IV"))
 })
 
-test("a summary of minutes replaces the PDF pages with text slides", () => {
+test("a summary of minutes is laid out as text slides", () => {
   const summary = [
     { kind: "heading" as const, runs: [{ text: "Unit Updates" }] },
     ...Array.from({ length: 40 }, (_, i) => ({
@@ -143,7 +136,7 @@ test("a summary of minutes replaces the PDF pages with text slides", () => {
     })),
   ]
   const input = baseInput({
-    minutes: { summary, pages: [image, image], label: "Summary of Minutes — Week 22, 2026" },
+    minutes: { summary, label: "Summary of Minutes — Week 22, 2026" },
   })
   const pages = paginateSlideText(summary)
   assert.ok(pages.length > 1, "40 bullets do not fit one slide")

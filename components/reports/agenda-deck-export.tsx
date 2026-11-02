@@ -29,6 +29,93 @@ function formatMeetingMonday(week: number, year: number) {
 }
 
 /**
+ * Builds and downloads the agenda deck for a meeting week, with progress and
+ * anything left out reported in a toast. Shared by the hub button and the
+ * weekly reports export's "Full meeting" option. Never throws.
+ */
+export async function runAgendaDeckExport({
+  week,
+  year,
+  mode,
+  theme,
+  order,
+}: {
+  week: number
+  year: number
+  mode: WeeklyPptxMode
+  theme: WeeklyPptxTheme
+  order: WeeklyDeptOrder
+}) {
+  const toastId = toast.loading("Preparing the meeting deck…")
+  const progress = (message: string) => toast.loading(message, { id: toastId })
+  const warnings: string[] = []
+
+  try {
+    const [{ exportAgendaDeckToPPTX }, data] = await Promise.all([
+      import("@/lib/export/agenda-deck"),
+      import("@/lib/reports/agenda-deck-data"),
+    ])
+
+    const lockState = await apiJson<WeeklyReportLockState>(
+      `/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`,
+      { cache: "no-store" }
+    ).catch(() => null)
+    const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(week, year)
+
+    progress("Loading weekly reports…")
+    const reports = await data.fetchAgendaWeeklyReports(week, year)
+    let taskSummaryOptions
+    if (mode === "full") {
+      taskSummaryOptions = await loadWeeklyTaskSummaryOptions(week, year).catch(() => {
+        warnings.push("task counts")
+        return undefined
+      })
+    }
+
+    progress("Rendering the Knowledge Sharing Session…")
+    const kss = await data.loadAgendaKss(week, year).catch(() => {
+      warnings.push("KSS")
+      return []
+    })
+
+    progress("Loading last week's summary of minutes…")
+    const minutes = await data.loadAgendaMinutes(meetingDate).catch(() => {
+      warnings.push("summary of minutes")
+      return { label: "Summary of Minutes", note: "The summary of minutes could not be loaded." }
+    })
+
+    progress("Capturing the birthday slide…")
+    const birthdays = await data.loadAgendaBirthdays(meetingDate)
+    if (birthdays.some((slide) => !slide.image)) warnings.push("birthdays")
+
+    progress("Building the PowerPoint…")
+    await exportAgendaDeckToPPTX({
+      week,
+      year,
+      meetingDate,
+      mode,
+      theme,
+      order,
+      taskSummaryOptions,
+      reports,
+      kss,
+      minutes,
+      birthdays,
+    })
+
+    if (warnings.length > 0) {
+      toast.warning(`Meeting deck exported without: ${warnings.join(", ")}. See the section slides for details.`, {
+        id: toastId,
+      })
+    } else {
+      toast.success("Meeting deck exported", { id: toastId })
+    }
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Could not export the meeting deck", { id: toastId })
+  }
+}
+
+/**
  * "Export Agenda Deck" on the General Meeting hub: picks the meeting week, then
  * reuses the weekly export's layout/theme/order steps, and builds one deck that
  * follows the standing agenda (see lib/export/agenda-deck.ts).
@@ -47,75 +134,8 @@ export function AgendaDeckExportButton() {
   const runExport = async (mode: WeeklyPptxMode, theme: WeeklyPptxTheme, order: WeeklyDeptOrder) => {
     setModeDialogOpen(false)
     setIsExporting(true)
-    const toastId = toast.loading("Preparing the agenda deck…")
-    const progress = (message: string) => toast.loading(message, { id: toastId })
-    const warnings: string[] = []
-
-    try {
-      const [{ exportAgendaDeckToPPTX }, data] = await Promise.all([
-        import("@/lib/export/agenda-deck"),
-        import("@/lib/reports/agenda-deck-data"),
-      ])
-
-      const lockState = await apiJson<WeeklyReportLockState>(
-        `/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`,
-        { cache: "no-store" }
-      ).catch(() => null)
-      const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(week, year)
-
-      progress("Loading weekly reports…")
-      const reports = await data.fetchAgendaWeeklyReports(week, year)
-      let taskSummaryOptions
-      if (mode === "full") {
-        taskSummaryOptions = await loadWeeklyTaskSummaryOptions(week, year).catch(() => {
-          warnings.push("task counts")
-          return undefined
-        })
-      }
-
-      progress("Rendering the Knowledge Sharing Session…")
-      const kss = await data.loadAgendaKss(week, year).catch(() => {
-        warnings.push("KSS")
-        return []
-      })
-
-      progress("Rendering last week's minutes…")
-      const minutes = await data.loadAgendaMinutes(meetingDate).catch(() => {
-        warnings.push("minutes")
-        return { pages: [], label: "Minutes of the Last Meeting", note: "The minutes could not be loaded." }
-      })
-
-      progress("Capturing the birthday slides…")
-      const birthdays = await data.loadAgendaBirthdays(meetingDate)
-      if (birthdays.some((slide) => !slide.image)) warnings.push("birthdays")
-
-      progress("Building the PowerPoint…")
-      await exportAgendaDeckToPPTX({
-        week,
-        year,
-        meetingDate,
-        mode,
-        theme,
-        order,
-        taskSummaryOptions,
-        reports,
-        kss,
-        minutes,
-        birthdays,
-      })
-
-      if (warnings.length > 0) {
-        toast.warning(`Agenda deck exported without: ${warnings.join(", ")}. See the section slides for details.`, {
-          id: toastId,
-        })
-      } else {
-        toast.success("Agenda deck exported", { id: toastId })
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not export the agenda deck", { id: toastId })
-    } finally {
-      setIsExporting(false)
-    }
+    await runAgendaDeckExport({ week, year, mode, theme, order })
+    setIsExporting(false)
   }
 
   return (
