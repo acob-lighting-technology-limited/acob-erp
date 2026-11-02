@@ -94,6 +94,7 @@ export function BirthdaySlideCapture({
           rangeLabel={label}
           highlightToday={false}
           upcoming={upcoming}
+          emptyLabel="No birthdays this past week"
         />
       </BirthdayShell>
     </div>

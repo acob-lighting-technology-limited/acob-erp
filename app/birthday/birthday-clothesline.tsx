@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
 import type { CSSProperties, ReactNode } from "react"
+import { Gift } from "lucide-react"
 import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
@@ -105,6 +106,7 @@ export function BirthdayClotheslineStage({
   error = null,
   highlightToday = true,
   upcoming = null,
+  emptyLabel = "No birthdays",
   children,
 }: {
   layout: "rope" | "cards"
@@ -114,6 +116,8 @@ export function BirthdayClotheslineStage({
   isLoading?: boolean
   error?: string | null
   highlightToday?: boolean
+  /** The quiet line shown when the period has no celebrants. */
+  emptyLabel?: string
   children?: ReactNode
 }) {
   const lines = toLines(celebrants)
@@ -170,11 +174,18 @@ export function BirthdayClotheslineStage({
             </div>
           ))}
         </div>
+      ) : isLoading ? (
+        <BirthdayEmpty isLoading />
       ) : (
-        isLoading && <BirthdayEmpty isLoading />
+        // Deliberately understated: no frame, no "Happy Birthday", the "Coming up"
+        // summary in the corner carries the screen.
+        <div className="bd4-none">
+          <Gift className="bd4-none-icon" strokeWidth={1.25} aria-hidden="true" />
+          <p className="bd4-none-label">{emptyLabel}</p>
+          <span className="bd4-range">{rangeLabel}</span>
+        </div>
       )}
 
-      {/* An empty period leaves the stage blank; only the "Coming up" summary shows. */}
       {celebrants.length > 0 && (
         <footer className="bd4-foot">
           <p className="bd4-happy">Happy Birthday</p>
