@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableDetailAction, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailAction, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
@@ -61,6 +61,8 @@ interface Props {
   readOnly?: boolean
   /** Server-resolved: may change weeks past their lock deadline (canOverrideReportsWeekLock). */
   canOverrideWeekLock?: boolean
+  /** Page-level tabs, when this table is one view of a tabbed page (Minutes: Full / Summary). */
+  pageTabs?: { tabs: DataTableTab[]; activeTab: string; onTabChange: (tab: string) => void }
 }
 
 function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: number): number {
@@ -83,6 +85,7 @@ export function MeetingDocumentTypeTable({
   backLabel,
   readOnly = false,
   canOverrideWeekLock = false,
+  pageTabs,
 }: Props) {
   const supabase = createClient()
   const officeWeek = getCurrentOfficeWeek()
@@ -442,6 +445,7 @@ export function MeetingDocumentTypeTable({
       description={description}
       icon={FileText}
       backLink={{ href: backHref, label: backLabel }}
+      {...pageTabs}
       spacing="tight"
       actionsPlacement="inline-always"
       actions={

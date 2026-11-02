@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
+import { isWeekend, toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { computeAttendanceDay } from "@/lib/hr/attendance-ssot"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { AttendanceRecord } from "./page"
@@ -109,6 +109,7 @@ export function EmployeeCalendarView() {
     const scorable = days.filter((d) => {
       const s = d.status
       if (s === "weekend" || s === "holiday" || s === "on_leave" || s === "exempted" || s === "waiver") return false
+      if (isWeekend(d.date)) return false
       // Exclude a day still in progress (clocked in today, not yet clocked out)
       if (d.date === todayIso && d.record?.clock_in && !d.record?.clock_out) return false
       return true
@@ -220,22 +221,27 @@ export function EmployeeCalendarView() {
                   >
                     {date.slice(8)}
                   </div>
-                  {!isFuture && day && status && status !== "weekend" && (
-                    <>
-                      <Badge
-                        className={`max-w-full truncate px-1 py-0 text-[9px] font-medium sm:text-[10px] ${
-                          ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-                          "bg-muted text-foreground"
-                        }`}
-                      >
-                        <span className="sm:hidden">{shortStatusLabel(status, fullLabel)}</span>
-                        <span className="hidden sm:inline">{fullLabel}</span>
-                      </Badge>
-                      {timeLabel && (
-                        <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">{timeLabel}</div>
-                      )}
-                    </>
-                  )}
+                  {!isFuture &&
+                    day &&
+                    status &&
+                    (status !== "weekend" || Boolean(day.record?.clock_in || day.record?.clock_out)) && (
+                      <>
+                        <Badge
+                          className={`max-w-full truncate px-1 py-0 text-[9px] font-medium sm:text-[10px] ${
+                            ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
+                            "bg-muted text-foreground"
+                          }`}
+                        >
+                          <span className="sm:hidden">{shortStatusLabel(status, fullLabel)}</span>
+                          <span className="hidden sm:inline">{fullLabel}</span>
+                        </Badge>
+                        {timeLabel && (
+                          <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">
+                            {timeLabel}
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
               )
             })}

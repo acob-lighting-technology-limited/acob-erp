@@ -1,6 +1,5 @@
-/** Weekly report and action-point PowerPoint exports (pptxgenjs, loaded on demand). Split out of lib/export-utils.ts (audit 5.10). */
+/** Weekly report PowerPoint exports (pptxgenjs, loaded on demand). Split out of lib/export-utils.ts (audit 5.10). */
 import { shuffle } from "@/lib/utils/random"
-import { Footer, Table } from "docx"
 import { normalizeDepartmentName } from "@/shared/departments"
 
 import type { WeeklyDeptTaskSummary, WeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
@@ -12,14 +11,10 @@ import {
   PptxConstructor,
   loadPptxGenJS,
   WeeklyReport,
-  inFlightActionPointFileExports,
   formatExportMeetingDateLabel,
   buildWeeklyReportFilename,
-  buildActionPointFilename,
   sortReportsByDepartment,
   autoNumberLines,
-  ActionItem,
-  groupActionItemsByDepartment,
   ACOB_GREEN,
   ACOB_GREEN_LIGHT,
   ACOB_GREEN_DEEP,
@@ -37,228 +32,7 @@ import {
   WeeklyDeptOrder,
 } from "./shared"
 
-export const exportActionPointToPPTX = async (
-  actions: ActionItem[],
-  week: number,
-  year: number,
-  meetingDate?: string,
-  department?: string
-): Promise<void> => {
-  const exportKey = ["pptx", week, year, meetingDate || "", department || "all", actions.length].join(":")
-  if (inFlightActionPointFileExports.has(exportKey)) return
-  inFlightActionPointFileExports.add(exportKey)
-
-  try {
-    const PptxConstructor = await loadPptxGenJS()
-    const pres = new PptxConstructor()
-    pres.layout = "LAYOUT_WIDE"
-
-    // Cover slide
-    addCoverSlide(pres, week, year, "Action Points")
-
-    // Group by department
-    const { grouped, departments } = groupActionItemsByDepartment(actions)
-
-    // TOC slide
-    addDeptIndexSlide(pres, departments, week, year)
-
-    departments.forEach((dept, idx) => {
-      const deptActions = grouped[dept] || []
-      const slide = pres.addSlide()
-      slide.background = { color: ACOB_OFFWHITE }
-
-      // Header
-      slide.addShape(pres.ShapeType?.rect ?? "rect", {
-        x: 0,
-        y: 0,
-        w: "100%",
-        h: 0.65,
-        fill: { color: ACOB_DARK },
-        line: { color: ACOB_DARK },
-      })
-      slide.addText(dept.toUpperCase(), {
-        x: 0.3,
-        y: 0,
-        w: 9,
-        h: 0.65,
-        fontSize: 14,
-        bold: true,
-        color: ACOB_WHITE,
-        valign: "middle",
-        fontFace: "Calibri",
-      })
-      try {
-        const markBox = logoBoxByHeight(EXPORT_LOGOS.matrixMarkInverse, 0.4)
-        slide.addImage({
-          path: EXPORT_LOGOS.matrixMarkInverse.path,
-          x: 13.33 - 0.3 - markBox.w,
-          y: (0.65 - markBox.h) / 2,
-          ...markBox,
-        })
-      } catch {
-        /* skip */
-      }
-
-      // Week badge
-      slide.addText(`Week ${week}, ${year}`, {
-        x: 9.5,
-        y: 0.7,
-        w: 3.5,
-        h: 0.35,
-        fontSize: 10,
-        bold: true,
-        color: ACOB_WHITE,
-        fill: { color: ACOB_GREEN },
-        align: "center",
-        valign: "middle",
-        fontFace: "Calibri",
-      })
-
-      // Table header: S/N | ACTION ITEM | STATUS
-      const tableY = 1.2
-      const colWidths = [0.8, 9.2, 2.8]
-      const headers = ["S/N", "ACTION ITEM", "STATUS"]
-      const colX = [0.25, 1.05, 10.25]
-
-      slide.addShape(pres.ShapeType?.rect ?? "rect", {
-        x: 0.25,
-        y: tableY,
-        w: 12.83,
-        h: 0.38,
-        fill: { color: ACOB_GREEN },
-        line: { color: ACOB_GREEN },
-      })
-      headers.forEach((h, i) => {
-        slide.addText(h, {
-          x: colX[i] + 0.1,
-          y: tableY,
-          w: colWidths[i] - 0.1,
-          h: 0.38,
-          fontSize: 9,
-          bold: true,
-          color: ACOB_WHITE,
-          valign: "middle",
-          fontFace: "Calibri",
-        })
-      })
-
-      const statusColors: Record<string, string> = {
-        completed: "166534",
-        in_progress: "1D4ED8",
-        not_started: "C2410C",
-        pending: "64748B",
-      }
-      const statusLabels: Record<string, string> = {
-        completed: "Completed",
-        in_progress: "In Progress",
-        not_started: "Not Started",
-        pending: "Pending",
-      }
-
-      let rowY = tableY + 0.38
-      const rowH = 0.38
-      deptActions.slice(0, 14).forEach((action, i) => {
-        const bg = i % 2 === 0 ? "F8FAFB" : ACOB_WHITE
-        slide.addShape(pres.ShapeType?.rect ?? "rect", {
-          x: 0.25,
-          y: rowY,
-          w: 12.83,
-          h: rowH,
-          fill: { color: bg },
-          line: { color: "E2E8F0", width: 0.5 },
-        })
-        // S/N
-        slide.addText(`${i + 1}`, {
-          x: colX[0] + 0.1,
-          y: rowY,
-          w: colWidths[0] - 0.1,
-          h: rowH,
-          fontSize: 10,
-          bold: true,
-          color: ACOB_SLATE,
-          valign: "middle",
-          fontFace: "Calibri",
-        })
-        // Action item — full width, no truncation
-        slide.addText(action.title, {
-          x: colX[1] + 0.1,
-          y: rowY,
-          w: colWidths[1] - 0.1,
-          h: rowH,
-          fontSize: 10,
-          color: ACOB_SLATE,
-          valign: "middle",
-          fontFace: "Calibri",
-        })
-        const sc = statusColors[action.status] || statusColors.pending
-        const sl = statusLabels[action.status] || action.status
-        slide.addText(sl, {
-          x: colX[2] + 0.1,
-          y: rowY + 0.05,
-          w: colWidths[2] - 0.2,
-          h: rowH - 0.1,
-          fontSize: 9,
-          bold: true,
-          color: ACOB_WHITE,
-          fill: { color: sc },
-          align: "center",
-          valign: "middle",
-          fontFace: "Calibri",
-        })
-        rowY += rowH
-      })
-
-      // Footer
-      slide.addShape(pres.ShapeType?.rect ?? "rect", {
-        x: 0,
-        y: 6.9,
-        w: "100%",
-        h: 0.6,
-        fill: { color: ACOB_GREEN },
-        line: { color: ACOB_GREEN },
-      })
-      const nextDept = departments[idx + 1]
-      if (nextDept) {
-        slide.addText(`NEXT: ${nextDept}`, {
-          x: 7,
-          y: 6.9,
-          w: 6.1,
-          h: 0.6,
-          fontSize: 10,
-          color: ACOB_WHITE,
-          align: "right",
-          valign: "middle",
-          fontFace: "Calibri",
-          bold: true,
-        })
-      }
-      slide.addText(String(idx + 3), {
-        x: 0,
-        y: 6.9,
-        w: "100%",
-        h: 0.6,
-        fontSize: 10,
-        color: ACOB_WHITE,
-        align: "center",
-        valign: "middle",
-        fontFace: "Calibri",
-        bold: true,
-      })
-    })
-
-    await pres.writeFile({
-      fileName: buildActionPointFilename({ week, year, meetingDate, extension: "pptx", department }),
-    })
-  } finally {
-    inFlightActionPointFileExports.delete(exportKey)
-  }
-}
-
-// ─── DOCX helpers ─────────────────────────────────────────────────────────────
-
-/** Returns a heading paragraph with coloured text + underline (no shaded background). */
-
-const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
+export const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
   if (theme === "dark") {
     return {
       canvas: "111111",
@@ -306,13 +80,14 @@ const getWeeklyPptxThemeColors = (theme: WeeklyPptxTheme = "light") => {
  * title stack, and the week number is set oversized and ghosted behind the right
  * half of the slide as a graphic element.
  */
-const addCoverSlide = (
+export const addCoverSlide = (
   pres: PptxPresentation,
   week: number,
   year: number,
   subtitle?: string,
   theme: WeeklyPptxTheme = "light",
-  meetingDate?: string
+  meetingDate?: string,
+  heading = "Weekly Report"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const isDark = theme === "dark"
@@ -402,7 +177,7 @@ const addCoverSlide = (
 
   // Optical alignment: large Calibri carries a little left side bearing, so the
   // hero is nudged left to line its glyph edge up with the eyebrow above it.
-  slide.addText("Weekly Report", {
+  slide.addText(heading, {
     x: contentX - 0.09,
     y: 2.95,
     w: 9,
@@ -500,6 +275,53 @@ const addCoverSlide = (
   return slide
 }
 
+/** Width of a title slide's heading: from the left margin to just short of the ghosted numeral. */
+export const TITLE_SLIDE_TEXT_W = 8.2
+
+/**
+ * Largest size (54pt down to 28pt) at which a mixed-case title slide heading
+ * fits on one line in TITLE_SLIDE_TEXT_W. Estimated from average bold Calibri
+ * glyph widths, since pptxgenjs cannot measure text and "shrink to fit" only
+ * applies once PowerPoint re-lays the box out.
+ */
+export const fitTitleSlideFontSize = (text: string) => {
+  const emPerChar = 0.52
+  const fitted = Math.floor((TITLE_SLIDE_TEXT_W * 72) / (Math.max(text.length, 1) * emPerChar))
+  return Math.max(28, Math.min(54, fitted))
+}
+
+/**
+ * Department title heading at the full 54pt where it fits, wrapping a long name
+ * onto a second line rather than shrinking it (only names too long for two
+ * lines get smaller). Lines are broken here, not left to PowerPoint, so the
+ * eyebrow above and the rule below can be placed around the real line count.
+ */
+export const planDepartmentHeading = (department: string) => {
+  const words = department.toUpperCase().split(/\s+/).filter(Boolean)
+  // Average bold Calibri capital, measured from rendered slides.
+  const emPerChar = 0.54
+  const wrap = (fontSize: number) => {
+    const maxChars = Math.floor((TITLE_SLIDE_TEXT_W * 72) / (emPerChar * fontSize))
+    const lines: string[] = []
+    for (const word of words) {
+      const last = lines[lines.length - 1]
+      if (last !== undefined && `${last} ${word}`.length <= maxChars) lines[lines.length - 1] = `${last} ${word}`
+      else lines.push(word)
+    }
+    return lines
+  }
+  let fontSize = 54
+  let lines = wrap(fontSize)
+  while (lines.length > 2 && fontSize > 36) {
+    fontSize -= 2
+    lines = wrap(fontSize)
+  }
+  // The rule under the heading stays at 4.57", so a two-line heading grows upwards.
+  const height = lines.length === 1 ? 1.25 : (lines.length * fontSize * 1.15) / 72 + 0.15
+  const y = 4.42 - height
+  return { text: lines.join("\n"), fontSize, y, height, eyebrowY: y - 0.42 }
+}
+
 /**
  * Adds a department title slide (full-bleed green).
  */
@@ -534,10 +356,12 @@ const addDeptTitleSlide = (
     })
   }
 
+  const heading = planDepartmentHeading(department)
+
   // ── Eyebrow ───────────────────────────────────────────────────────────────
   slide.addText(position ? `DEPARTMENT ${pad(position.index)} OF ${pad(position.total)}` : "DEPARTMENT", {
     x: contentX,
-    y: 2.75,
+    y: heading.eyebrowY,
     w: 8,
     h: 0.36,
     fontSize: 14,
@@ -548,12 +372,14 @@ const addDeptTitleSlide = (
     fontFace: "Calibri",
   })
 
-  slide.addText(department.toUpperCase(), {
+  // Kept clear of the ghosted numeral: a long name used to run into the number,
+  // or wrap below the rule underneath it.
+  slide.addText(heading.text, {
     x: contentX - 0.08,
-    y: 3.17,
-    w: 11,
-    h: 1.25,
-    fontSize: 54,
+    y: heading.y,
+    w: TITLE_SLIDE_TEXT_W,
+    h: heading.height,
+    fontSize: heading.fontSize,
     bold: true,
     color: colors.textInverse,
     valign: "middle",
@@ -569,13 +395,14 @@ const addDeptTitleSlide = (
     line: { color: colors.textInverse },
   })
 
-  // ── Footer band: wordmark and page number ─────────────────────────────────
-  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.34)
+  // ── Footer band: wordmark and page number, where the content slides put them ──
+  const { footerY, footerH } = WEEKLY_CONTENT_LAYOUT
+  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.28)
   try {
     slide.addImage({
       path: EXPORT_LOGOS.acobInverse.path,
-      x: 0.55,
-      y: 6.98,
+      x: 0.3,
+      y: footerY + (footerH - wordmarkBox.h) / 2,
       ...wordmarkBox,
     })
   } catch {
@@ -585,9 +412,9 @@ const addDeptTitleSlide = (
   if (typeof pageNumber === "number") {
     slide.addText(String(pageNumber), {
       x: 0,
-      y: 6.9,
+      y: footerY,
       w: "100%",
-      h: 0.5,
+      h: footerH,
       fontSize: 10,
       bold: true,
       color: colors.textInverse,
@@ -603,7 +430,7 @@ const addDeptTitleSlide = (
 /**
  * Adds a numbered department index slide (shown after the cover in bulk export).
  */
-const addDeptIndexSlide = (
+export const addDeptIndexSlide = (
   pres: PptxPresentation,
   departments: string[],
   week: number,
@@ -614,13 +441,14 @@ const addDeptIndexSlide = (
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
+  const { headerH, footerY, footerH } = WEEKLY_CONTENT_LAYOUT
 
   // Header
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
     y: 0,
     w: "100%",
-    h: 0.65,
+    h: headerH,
     fill: { color: colors.header },
     line: { color: colors.header },
   })
@@ -628,7 +456,7 @@ const addDeptIndexSlide = (
     x: 0.3,
     y: 0,
     w: 10,
-    h: 0.65,
+    h: headerH,
     fontSize: 16,
     bold: true,
     color: colors.textInverse,
@@ -639,7 +467,7 @@ const addDeptIndexSlide = (
     x: 10,
     y: 0,
     w: 3,
-    h: 0.65,
+    h: headerH,
     fontSize: 12,
     color: theme === "dark" ? colors.textMuted : ACOB_GREEN_LIGHT,
     valign: "middle",
@@ -710,9 +538,9 @@ const addDeptIndexSlide = (
   // Bottom strip
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
-    y: 6.9,
+    y: footerY,
     w: "100%",
-    h: 0.6,
+    h: footerH,
     fill: { color: colors.footer },
     line: { color: colors.footer },
   })
@@ -741,7 +569,7 @@ const PPTX_FIT_MAX_PARA_SPACE_RATIO = 0.75
 // Content slides keep their chrome slim: the header, footer and side margins
 // were trimmed so the report text gets the room (~0.5in more height, ~0.25in
 // more width). Cover, department title and index slides keep their own layout.
-const WEEKLY_CONTENT_LAYOUT = {
+export const WEEKLY_CONTENT_LAYOUT = {
   headerH: 0.5,
   marginX: 0.12,
   slideW: 13.33,
@@ -749,7 +577,7 @@ const WEEKLY_CONTENT_LAYOUT = {
   footerH: 0.42,
 }
 
-const applyWeeklySlideTransition = (slide: PptxSlide) => {
+export const applyWeeklySlideTransition = (slide: PptxSlide) => {
   // PptxGenJS transition support varies by viewer/version; keep this guarded.
   try {
     slide.transition = {
@@ -1900,20 +1728,51 @@ export const exportToPPTX = async (
   })
 }
 
-export const exportAllToPPTX = async (
-  reports: WeeklyReport[],
-  week: number,
-  year: number,
-  mode: WeeklyPptxMode = "full",
-  theme: WeeklyPptxTheme = "light",
-  meetingDate?: string,
-  order: WeeklyDeptOrder = "default",
+export interface WeeklyDepartmentSlidesOptions {
+  week: number
+  year: number
+  mode?: WeeklyPptxMode
+  theme?: WeeklyPptxTheme
+  order?: WeeklyDeptOrder
   taskSummaryOptions?: WeeklyTaskSummaryOptions
-) => {
-  const PptxConstructor = await loadPptxGenJS()
-  const pres = new PptxConstructor()
-  pres.layout = "LAYOUT_WIDE"
+  /** Page number of the department index slide; departments follow it. */
+  firstPage: number
+  /** What the last department's "NEXT:" points at (the agenda deck's next item). */
+  nextAfterLast?: string
+}
 
+/** How many slides addWeeklyDepartmentSlides will add, for numbering slides that come after. */
+export const countWeeklyDepartmentSlides = (
+  reports: WeeklyReport[],
+  mode: WeeklyPptxMode = "full",
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
+) =>
+  1 +
+  reports.reduce(
+    (total, report) =>
+      total + (mode === "compact" ? 2 : buildDepartmentPptxPlan(report, taskSummaryOptions).totalSlides),
+    0
+  )
+
+/**
+ * Appends the department index slide and every department's slides to `pres`,
+ * returning how many slides were added. Shared by the weekly export and the
+ * general-meeting agenda deck, which places them under "Departmental Updates".
+ */
+export const addWeeklyDepartmentSlides = (
+  pres: PptxPresentation,
+  reports: WeeklyReport[],
+  {
+    week,
+    year,
+    mode = "full",
+    theme = "light",
+    order = "default",
+    taskSummaryOptions,
+    firstPage,
+    nextAfterLast,
+  }: WeeklyDepartmentSlidesOptions
+) => {
   const sortedReports =
     order === "alpha"
       ? [...reports].sort((a, b) =>
@@ -1924,11 +1783,7 @@ export const exportAllToPPTX = async (
         : sortReportsByDepartment(reports)
   const departments = sortedReports.map((entry) => entry.department)
 
-  // Slide 1 — Cover
-  const coverSlide = addCoverSlide(pres, week, year, undefined, theme, meetingDate)
-  applyWeeklySlideTransition(coverSlide)
-
-  let pageCursor = 3
+  let pageCursor = firstPage + 1
   const departmentStartPages: number[] = []
   if (mode === "compact") {
     sortedReports.forEach((_report) => {
@@ -1944,13 +1799,12 @@ export const exportAllToPPTX = async (
     })
   }
 
-  // Slide 2 — Dept index
   const indexSlide = addDeptIndexSlide(
     pres,
     departments,
     week,
     year,
-    (index) => departmentStartPages[index] ?? 3 + index * 2,
+    (index) => departmentStartPages[index] ?? firstPage + 1 + index * 2,
     theme
   )
   applyWeeklySlideTransition(indexSlide)
@@ -1960,7 +1814,7 @@ export const exportAllToPPTX = async (
       renderDepartmentCompactSlides(
         pres,
         report,
-        sortedReports[idx + 1]?.department,
+        sortedReports[idx + 1]?.department ?? nextAfterLast,
         departmentStartPages[idx] + 1,
         theme,
         { index: idx + 1, total: sortedReports.length }
@@ -1976,13 +1830,37 @@ export const exportAllToPPTX = async (
       renderDepartmentWeeklySlides(
         pres,
         departmentPlan,
-        departmentPlans[idx + 1]?.report.department,
+        departmentPlans[idx + 1]?.report.department ?? nextAfterLast,
         departmentPlan.startPage,
         theme,
         { index: idx + 1, total: departmentPlans.length }
       )
     })
   }
+
+  return pageCursor - firstPage
+}
+
+export const exportAllToPPTX = async (
+  reports: WeeklyReport[],
+  week: number,
+  year: number,
+  mode: WeeklyPptxMode = "full",
+  theme: WeeklyPptxTheme = "light",
+  meetingDate?: string,
+  order: WeeklyDeptOrder = "default",
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
+) => {
+  const PptxConstructor = await loadPptxGenJS()
+  const pres = new PptxConstructor()
+  pres.layout = "LAYOUT_WIDE"
+
+  // Slide 1 — Cover
+  const coverSlide = addCoverSlide(pres, week, year, undefined, theme, meetingDate)
+  applyWeeklySlideTransition(coverSlide)
+
+  // Slide 2 — Dept index, then each department
+  addWeeklyDepartmentSlides(pres, reports, { week, year, mode, theme, order, taskSummaryOptions, firstPage: 2 })
 
   await pres.writeFile({
     fileName: buildWeeklyReportFilename({

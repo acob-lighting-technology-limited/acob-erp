@@ -77,6 +77,7 @@ export const RELEASES: Release[] = [
       {
         area: "Attendance",
         items: [
+          "Weekend clock-ins and clock-outs are displayed as Present with their punch times instead of showing only a generic weekend status, and are kept out of workday attendance calculations",
           "Attendance appeals display full audit history including initiator, lead endorsement, and admin approval with timestamps, with separation of duties enforcing department lead confirmation on manual alterations",
           "Attendance change log showing every edit to a record",
           "Staff are told when the clock-in device is offline",
@@ -107,6 +108,7 @@ export const RELEASES: Release[] = [
       {
         area: "Reports & Meetings",
         items: [
+          "Email recipients for general meeting attendance and transcripts can be managed directly from a dedicated button on the Records page",
           "Weekly PowerPoint export shows task and action point counts for every staff member",
           "Weekly KSS and General Meeting appear on the calendar with the Teams link",
         ],
@@ -131,6 +133,7 @@ export const RELEASES: Release[] = [
       {
         area: "Tasks",
         items: [
+          "Task tables give more space to task titles, with strategic goals and pillars moved into the expanded row view",
           "Completed task sheets are quieter, with activity kept read-only after closure",
           "Task sheets now show assignment, status changes, notes and review decisions in one timeline",
           "Task creation excludes closed and cancelled projects from new task assignments",

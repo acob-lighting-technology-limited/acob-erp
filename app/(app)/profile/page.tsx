@@ -478,7 +478,10 @@ async function getProfileData() {
 
   // Calculate the last 5 actual company workdays (Mon–Fri, excluding org holidays)
   const recentWorkDays: string[] = []
-  let workDayCursor = todayIso
+  if (isWeekend(todayIso) && todayRecord?.clock_in) {
+    recentWorkDays.push(todayIso)
+  }
+  let workDayCursor = isWeekend(todayIso) ? addIsoDays(todayIso, -1) : todayIso
   while (recentWorkDays.length < 5) {
     if (!isWeekend(workDayCursor) && !dayCtx.isHoliday(workDayCursor)) {
       recentWorkDays.push(workDayCursor)

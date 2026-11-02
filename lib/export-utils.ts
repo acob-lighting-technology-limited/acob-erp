@@ -13,5 +13,6 @@ export {
 } from "./export/pdf"
 export { exportToDocx, exportActionPointToDocx, exportAllToDocx } from "./export/docx"
 export { exportActionPointToXLSX, exportToXLSX, exportAllToXLSX } from "./export/xlsx"
-export { exportActionPointToPPTX, exportToPPTX, exportAllToPPTX } from "./export/pptx"
+export { exportToPPTX, exportAllToPPTX } from "./export/pptx"
+export { exportActionPointToPPTX } from "./export/action-points-pptx"
 export type { WeeklyPptxMode } from "./export/pptx"

@@ -2,11 +2,19 @@
 
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
-import type { CSSProperties } from "react"
+import type { CSSProperties, ReactNode } from "react"
+import { Gift } from "lucide-react"
 import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
-import { displayName, formatMMDDLabel, formatNamesList, isBirthdayToday, type Celebrant } from "./birthday-utils"
+import {
+  displayName,
+  formatMMDDLabel,
+  formatNamesList,
+  isBirthdayToday,
+  type Celebrant,
+  type UpcomingBirthdays,
+} from "./birthday-utils"
 import { useBirthdayCelebrants } from "./use-birthday-celebrants"
 import "./clothesline.css"
 
@@ -46,6 +54,72 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
     )
   }
 
+  return (
+    <BirthdayClotheslineStage
+      layout={layout}
+      celebrants={celebrants}
+      rangeLabel={rangeLabel}
+      isLoading={isLoading}
+      error={error}
+      upcoming={state.upcoming}
+    >
+      <BirthdayBackButton onClick={state.reset} />
+    </BirthdayClotheslineStage>
+  )
+}
+
+/** Bottom-right summary of the week after the spotlight period, so the next celebrants get a mention. */
+function BirthdayUpcoming({ upcoming }: { upcoming: UpcomingBirthdays }) {
+  return (
+    <aside className="bd4-upcoming" aria-label="Upcoming birthdays">
+      <p className="bd4-upcoming-title">Coming up</p>
+      <p className="bd4-upcoming-range">{upcoming.label}</p>
+      {upcoming.celebrants.length > 0 ? (
+        <ul className="bd4-upcoming-list">
+          {upcoming.celebrants.map((celebrant, i) => (
+            <li key={`${celebrant.firstName}-${i}`}>
+              <span className="bd4-upcoming-avatar">
+                <CelebrantPhoto celebrant={celebrant} />
+              </span>
+              <span className="bd4-upcoming-name">{displayName(celebrant.firstName)}</span>
+              <span className="bd4-upcoming-date">{formatMMDDLabel(celebrant.birthday)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="bd4-upcoming-empty">No birthdays this week</p>
+      )}
+    </aside>
+  )
+}
+
+/**
+ * The spotlight itself, without the period picker. Also rendered by
+ * /birthday/slide, which screenshots it for the general-meeting agenda deck —
+ * that copy passes highlightToday={false}, since "Today" would mean the export day.
+ */
+export function BirthdayClotheslineStage({
+  layout,
+  celebrants,
+  rangeLabel,
+  isLoading = false,
+  error = null,
+  highlightToday = true,
+  upcoming = null,
+  emptyLabel = "No birthdays",
+  children,
+}: {
+  layout: "rope" | "cards"
+  celebrants: Celebrant[]
+  rangeLabel: string
+  upcoming?: UpcomingBirthdays | null
+  isLoading?: boolean
+  error?: string | null
+  highlightToday?: boolean
+  /** The quiet line shown when the period has no celebrants. */
+  emptyLabel?: string
+  children?: ReactNode
+}) {
   const lines = toLines(celebrants)
 
   return (
@@ -70,7 +144,7 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
 
               {line.items.map((celebrant, i) => {
                 const t = (i + 1) / (line.items.length + 1)
-                const isToday = isBirthdayToday(celebrant)
+                const isToday = highlightToday && isBirthdayToday(celebrant)
                 const order = line.start + i
                 return (
                   <figure
@@ -100,22 +174,32 @@ export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
             </div>
           ))}
         </div>
+      ) : isLoading ? (
+        <BirthdayEmpty isLoading />
       ) : (
-        <BirthdayEmpty isLoading={isLoading} />
+        // Deliberately understated: no frame, no "Happy Birthday", the "Coming up"
+        // summary in the corner carries the screen.
+        <div className="bd4-none">
+          <Gift className="bd4-none-icon" strokeWidth={1.25} aria-hidden="true" />
+          <p className="bd4-none-label">{emptyLabel}</p>
+          <span className="bd4-range">{rangeLabel}</span>
+        </div>
       )}
 
-      <footer className="bd4-foot">
-        <p className="bd4-happy">Happy Birthday</p>
-        {celebrants.length > 0 && (
+      {celebrants.length > 0 && (
+        <footer className="bd4-foot">
+          <p className="bd4-happy">Happy Birthday</p>
           <h1 className="bd4-names">{formatNamesList(celebrants.map((c) => displayName(c.firstName)))}</h1>
-        )}
-        <p className="bd4-wish">
-          The ACOB Family celebrates you — wishing you joy, grace, peace, and a beautiful year ahead.
-        </p>
-        <span className="bd4-range">{rangeLabel}</span>
-      </footer>
+          <p className="bd4-wish">
+            The ACOB Family celebrates you — wishing you joy, grace, peace, and a beautiful year ahead.
+          </p>
+          <span className="bd4-range">{rangeLabel}</span>
+        </footer>
+      )}
 
-      <BirthdayBackButton onClick={state.reset} />
+      {upcoming && <BirthdayUpcoming upcoming={upcoming} />}
+
+      {children}
     </section>
   )
 }

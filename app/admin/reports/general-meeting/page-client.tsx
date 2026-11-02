@@ -13,6 +13,7 @@ import {
 import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { WeekSetupCard } from "./_components/week-setup-card"
+import { AgendaDeckExportButton } from "@/components/reports/agenda-deck-export"
 
 export default function AdminGeneralMeetingReportsPage() {
   const reportCards = [
@@ -103,6 +104,7 @@ export default function AdminGeneralMeetingReportsPage() {
         description="Manage the documents and trackers that support your weekly general meeting workflow."
         icon={Users}
         backLink={{ href: "/admin/reports", label: "Back to Reports" }}
+        actions={<AgendaDeckExportButton />}
       />
 
       <PageSection title="General Meeting" className="space-y-4">

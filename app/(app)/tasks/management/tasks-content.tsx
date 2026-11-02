@@ -295,7 +295,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       label: "Task Title",
       sortable: true,
       resizable: true,
-      initialWidth: 300,
+      initialWidth: 500,
       accessor: (t) => t.title,
       render: (t) => (
         <div className="flex flex-col gap-0.5">
@@ -304,7 +304,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               <button
                 type="button"
                 onClick={() => void openTaskDetails(t)}
-                className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+                className="line-clamp-2 text-left font-medium hover:underline focus-visible:outline-none"
               >
                 {t.title}
               </button>
@@ -316,24 +316,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           <RecurringTaskBadge task={t} onOpen={setOpenSeriesId} />
         </div>
       ),
-    },
-    {
-      key: "goal",
-      label: "Strategic Goal",
-      sortable: true,
-      accessor: (t) => t.goal_title || t.kpi_measure || "",
-      render: (t) =>
-        t.goal_title ? (
-          <div className="flex flex-col">
-            <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
-            {t.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-xs">{t.kpi_measure}</span>}
-          </div>
-        ) : t.kpi_measure ? (
-          <span className="text-foreground line-clamp-1 text-xs font-medium">{t.kpi_measure}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        ),
-      hideOnMobile: true,
     },
     {
       key: "weight",
@@ -749,13 +731,16 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                   <div className="space-y-3">
                     <h4 className="text-foreground text-xs font-semibold">Context & Details</h4>
                     <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
-                      <div>
+                      <div className="col-span-2">
                         <span className="text-muted-foreground block text-xs">Strategic Goal:</span>
                         <span className="font-medium">{t.goal_title || "—"}</span>
                       </div>
-                      <div>
+                      <div className="col-span-2">
                         <span className="text-muted-foreground block text-xs">Corporate KPI:</span>
-                        <span className="font-medium">{t.kpi_measure || "—"}</span>
+                        <span className="font-medium">
+                          {t.kpi_measure || "—"}
+                          {t.kpi_pillar ? ` · Pillar: ${t.kpi_pillar}` : ""}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-xs">Assigned By:</span>

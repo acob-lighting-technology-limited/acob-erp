@@ -1,5 +1,5 @@
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
-import { timeToMinutes } from "@/lib/hr/attendance-utils"
+import { isWeekend, timeToMinutes } from "@/lib/hr/attendance-utils"
 
 /**
  * SINGLE SOURCE OF TRUTH for attendance penalty maths.
@@ -152,6 +152,8 @@ export interface AttendanceDayInput {
   clockIn?: string | null
   clockOut?: string | null
   policy?: AttendancePolicy
+  recordDate?: string | null
+  isWeekend?: boolean
   /** Org-wide early-closure time (HH:MM); early departure is measured against it. */
   earlyCloseTime?: string | null
   /** Org-wide late-resumption time (HH:MM); late arrival is measured from it, no grace. */
@@ -290,7 +292,10 @@ export function computeAttendanceDay(input: AttendanceDayInput): AttendanceDayRe
   }
 
   // 2. Weekend non-working days.
-  if (status === "weekend") {
+  const isWeekendDay = Boolean(
+    status === "weekend" || input.isWeekend || (input.recordDate && isWeekend(input.recordDate))
+  )
+  if (isWeekendDay) {
     return {
       status,
       hoursLost: 0,

@@ -50,6 +50,36 @@
   text-transform: uppercase;
 }
 
+/* No celebrants in the period: a quiet line in the middle of the stage. */
+.bd4-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin: auto;
+  padding: 0 2rem;
+  text-align: center;
+  animation: bd4-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+.bd4-none-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: rgb(47 162 87 / 0.7);
+}
+
+.bd4-none-label {
+  margin: 0;
+  color: rgb(247 241 225 / 0.72);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  font-weight: 600;
+}
+
+.bd4-none .bd4-range {
+  animation: none;
+}
+
 .bd4-lines {
   display: flex;
   flex-direction: column;
@@ -377,10 +407,103 @@
   }
 }
 
+/* ── Coming up: next week's celebrants, bottom right ──────────── */
+
+.bd4-upcoming {
+  position: absolute;
+  right: 2.5rem;
+  bottom: 2.5rem;
+  z-index: 2;
+  width: min(17rem, 22vw);
+  border: 1px solid rgb(47 162 87 / 0.45);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem 1rem;
+  background: linear-gradient(180deg, rgb(12 26 17 / 0.92), rgb(5 8 6 / 0.92));
+  box-shadow: 0 24px 40px -24px rgb(0 0 0 / 0.9);
+  animation: bd4-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) 3s both;
+}
+
+.bd4-upcoming-title {
+  margin: 0;
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-script), cursive;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.bd4-upcoming-range {
+  margin: 0.3rem 0 0.7rem;
+  color: var(--bd-green-bright);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bd4-upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bd4-upcoming-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bd4-upcoming-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  overflow: hidden;
+  border: 1px solid rgb(47 162 87 / 0.55);
+  border-radius: 999px;
+}
+
+.bd4-upcoming-avatar .birthday-photo-placeholder {
+  font-size: 0.85rem;
+}
+
+.bd4-upcoming-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd4-upcoming-date,
+.bd4-upcoming-empty {
+  color: var(--bd-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bd4-upcoming-empty {
+  margin: 0;
+}
+
 /* On phones the rope geometry gets too tight — fall back to a simple pegged grid. */
 @media (max-width: 720px) {
   .bd4-head {
     padding: 0 1rem;
+  }
+
+  .bd4-upcoming {
+    position: static;
+    width: auto;
+    margin: 1.5rem 1rem 0;
   }
 
   .bd4-line {

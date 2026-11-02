@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
-import { toLocalISODate, toLocalYearMonth, isLate } from "@/lib/hr/attendance-utils"
+import { toLocalISODate, toLocalYearMonth, isLate, isWeekend } from "@/lib/hr/attendance-utils"
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
@@ -302,9 +302,9 @@ export function CalendarView({ employees }: CalendarViewProps) {
               const day = daysByDate.get(date)
               const status = day?.status
               const isFuture = date > today
-              const isWeekend = status === "weekend"
+              const isWeekendDay = isWeekend(date)
               const bg = !isFuture && status && CELL_BG[status] ? CELL_BG[status] : ""
-              const isClickable = !isFuture && !isWeekend && day
+              const isClickable = !isFuture && !isWeekendDay && day
 
               return (
                 <div
@@ -315,24 +315,27 @@ export function CalendarView({ employees }: CalendarViewProps) {
                   }}
                 >
                   <div className="text-muted-foreground mb-1 font-medium">{date.slice(8)}</div>
-                  {!isFuture && day && status && status !== "weekend" && (
-                    <>
-                      <Badge
-                        className={`max-w-full truncate px-1 py-0 text-[10px] font-medium ${
-                          ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-                          "bg-muted text-foreground"
-                        }`}
-                      >
-                        {ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status}
-                      </Badge>
-                      {day.record?.clock_in && (
-                        <div className="text-muted-foreground mt-0.5 leading-tight" style={{ fontSize: "10px" }}>
-                          {formatTime(day.record.clock_in)}
-                          {day.record.clock_out ? ` – ${formatTime(day.record.clock_out)}` : ""}
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {!isFuture &&
+                    day &&
+                    status &&
+                    (status !== "weekend" || Boolean(day.record?.clock_in || day.record?.clock_out)) && (
+                      <>
+                        <Badge
+                          className={`max-w-full truncate px-1 py-0 text-[10px] font-medium ${
+                            ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
+                            "bg-muted text-foreground"
+                          }`}
+                        >
+                          {ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status}
+                        </Badge>
+                        {day.record?.clock_in && (
+                          <div className="text-muted-foreground mt-0.5 leading-tight" style={{ fontSize: "10px" }}>
+                            {formatTime(day.record.clock_in)}
+                            {day.record.clock_out ? ` – ${formatTime(day.record.clock_out)}` : ""}
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
               )
             })}

@@ -297,10 +297,19 @@ export function deriveUnifiedAttendanceStatus(
   // 6. Automated NYSC CDS Day (Community Development Service)
   if (input.isCdsDay) return "cds"
 
+  const recordDate = input.recordDate ?? (rec as { date?: string } | null | undefined)?.date
+  const isWeekendDay = Boolean(recordDate && isWeekend(recordDate))
+
+  // 7. Weekend (Saturday / Sunday)
+  if (isWeekendDay) {
+    if (rec && (rec.clock_in || rec.clock_out)) {
+      return "present"
+    }
+    return "weekend"
+  }
+
   // If no record or empty punches:
   if (!rec || (!rec.clock_in && !rec.clock_out)) {
-    // 7. Weekend (Saturday / Sunday)
-    if (input.recordDate && isWeekend(input.recordDate)) return "weekend"
     // 8. Workday unrecorded default
     return "absent"
   }

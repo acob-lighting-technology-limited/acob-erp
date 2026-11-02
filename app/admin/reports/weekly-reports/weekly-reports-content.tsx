@@ -25,6 +25,7 @@ import {
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
+import { runAgendaDeckExport } from "@/components/reports/agenda-deck-export"
 import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { Button } from "@/components/ui/button"
@@ -190,9 +191,16 @@ export function WeeklyReportsContent({
   const runPptxExport = async (
     mode: WeeklyPptxMode,
     theme: WeeklyPptxTheme = "light",
-    order: WeeklyDeptOrder = "default"
+    order: WeeklyDeptOrder = "default",
+    fullMeeting = false
   ) => {
     if (!pendingPptxExport) return
+    if (pendingPptxExport.kind === "all" && fullMeeting) {
+      setPptxModeDialogOpen(false)
+      setPendingPptxExport(null)
+      await runAgendaDeckExport({ week: weekFilter, year: yearFilter, mode, theme, order })
+      return
+    }
     const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
     const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
     // The full layout always carries the task counts column. If the counts
@@ -758,6 +766,7 @@ export function WeeklyReportsContent({
         }}
         onSelect={runPptxExport}
         showOrderStep={pendingPptxExport?.kind === "all"}
+        showFullMeetingOption={pendingPptxExport?.kind === "all"}
       />
 
       <ExportOptionsDialog

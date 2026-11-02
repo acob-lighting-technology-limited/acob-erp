@@ -1,19 +1,16 @@
 "use client"
 
-import type { ClipboardEvent } from "react"
-import { escapeHtml } from "@/lib/email-templates/utils"
 import { useRef, useEffect, useCallback, useState } from "react"
 import DOMPurify from "dompurify"
 import { toast } from "sonner"
-import { Bold, Italic, Link2, List, ListOrdered, Mail, Paperclip, Redo2, Underline, Undo2 } from "lucide-react"
+import { Link2, Mail, Paperclip } from "lucide-react"
 import { logger } from "@/lib/logger"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { stripHtmlToText } from "./composer-utils"
+import { RichTextEditor, RichTextToolbarButton, type RichTextEditorHandle } from "@/components/ui/rich-text-editor"
 
 const log = logger("broadcast-form")
 
@@ -44,113 +41,6 @@ interface BroadcastFormProps {
   setAttachments: (files: File[]) => void
 }
 
-function parseInlineMarkdown(text: string): string {
-  let html = escapeHtml(text)
-
-  // 1. Inline code: `code` -> <code>code</code>
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>")
-
-  // 2. Bold: **bold** -> <strong>bold</strong>
-  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-
-  // 3. Italic: *italic* or _italic_ -> <em>italic</em>
-  html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>")
-  html = html.replace(/_([^_]+)_/g, "<em>$1</em>")
-
-  // 4. Links: [text](url) -> <a href="url" target="_blank" rel="noopener noreferrer">text</a>
-  // Only permit HTTP and HTTPS URLs for safety
-  html = html.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  )
-
-  return html
-}
-
-function convertMarkdownToHtml(text: string): string {
-  const lines = text.split(/\r?\n/)
-  const result: string[] = []
-
-  let currentListType: "ul" | "ol" | null = null
-  let currentParagraphLines: string[] = []
-
-  const closeList = () => {
-    if (currentListType === "ul") {
-      result.push("</ul>")
-    } else if (currentListType === "ol") {
-      result.push("</ol>")
-    }
-    currentListType = null
-  }
-
-  const closeParagraph = () => {
-    if (currentParagraphLines.length > 0) {
-      result.push(`<p>${currentParagraphLines.join("<br>")}</p>`)
-      currentParagraphLines = []
-    }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const trimmed = line.trim()
-
-    if (!trimmed) {
-      closeList()
-      closeParagraph()
-      continue
-    }
-
-    // Check for headers: #, ##, ###
-    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headerMatch) {
-      closeList()
-      closeParagraph()
-      const level = headerMatch[1].length
-      const headerText = parseInlineMarkdown(headerMatch[2])
-      result.push(`<h${level}>${headerText}</h${level}>`)
-      continue
-    }
-
-    // Check for unordered list item: * or - or •
-    const ulMatch = trimmed.match(/^([*-]|\u2022)\s+(.*)$/)
-    if (ulMatch) {
-      closeParagraph()
-      if (currentListType !== "ul") {
-        closeList()
-        result.push("<ul>")
-        currentListType = "ul"
-      }
-      const itemText = parseInlineMarkdown(ulMatch[2])
-      result.push(`<li>${itemText}</li>`)
-      continue
-    }
-
-    // Check for ordered list item: 1.
-    const olMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
-    if (olMatch) {
-      closeParagraph()
-      if (currentListType !== "ol") {
-        closeList()
-        result.push("<ol>")
-        currentListType = "ol"
-      }
-      const itemText = parseInlineMarkdown(olMatch[2])
-      result.push(`<li>${itemText}</li>`)
-      continue
-    }
-
-    // Standard paragraph line
-    closeList()
-    currentParagraphLines.push(parseInlineMarkdown(trimmed))
-  }
-
-  closeList()
-  closeParagraph()
-
-  const finalHtml = result.filter(Boolean).join("")
-  return finalHtml || "<p><br></p>"
-}
-
 function buildPreparedByMailto(email: string, subject: string) {
   const trimmedSubject = subject.trim()
   const replySubject = trimmedSubject ? `Re: ${trimmedSubject}` : "Re:"
@@ -174,10 +64,8 @@ export function BroadcastForm({
   attachments,
   setAttachments,
 }: BroadcastFormProps) {
-  const editorRef = useRef<HTMLDivElement | null>(null)
-  const savedRangeRef = useRef<Range | null>(null)
+  const editorRef = useRef<RichTextEditorHandle | null>(null)
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
-  const isBodyEmpty = !stripHtmlToText(broadcastBodyHtml)
 
   const selectedPreparedBy =
     broadcastPreparedById === "none"
@@ -187,7 +75,7 @@ export function BroadcastForm({
   const selectedPreparedByEmail = selectedPreparedBy?.company_email || selectedPreparedBy?.additional_email || null
 
   useEffect(() => {
-    const el = editorRef.current
+    const el = editorRef.current?.element()
     if (!el || !selectedPreparedByEmail) return
 
     const nextHref = buildPreparedByMailto(selectedPreparedByEmail, broadcastSubject)
@@ -205,40 +93,8 @@ export function BroadcastForm({
     }
   }, [broadcastSubject, selectedPreparedByEmail, setBroadcastBodyHtml])
 
-  useEffect(() => {
-    const el = editorRef.current
-    if (!el) return
-    const sanitized = DOMPurify.sanitize(broadcastBodyHtml)
-    if (el.innerHTML !== sanitized) {
-      el.innerHTML = sanitized
-    }
-  }, [broadcastBodyHtml])
-
-  const runEditorCommand = useCallback(
-    (command: string, value?: string) => {
-      if (!editorRef.current) return
-      editorRef.current.focus()
-
-      const selection = window.getSelection()
-      if (selection && savedRangeRef.current) {
-        selection.removeAllRanges()
-        selection.addRange(savedRangeRef.current)
-      }
-
-      document.execCommand(command, false, value)
-      setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current.innerHTML))
-    },
-    [setBroadcastBodyHtml]
-  )
-
-  const saveCurrentSelection = useCallback(() => {
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-
-    const range = selection.getRangeAt(0)
-    if (!editorRef.current?.contains(range.commonAncestorContainer)) return
-
-    savedRangeRef.current = range.cloneRange()
+  const runEditorCommand = useCallback((command: string, value?: string) => {
+    editorRef.current?.runCommand(command, value)
   }, [])
 
   const handleLinkConfirm = useCallback(
@@ -278,21 +134,10 @@ export function BroadcastForm({
     const selectionAnchor = window.getSelection()?.anchorNode?.parentElement?.closest("a")
     if (selectionAnchor instanceof HTMLAnchorElement) {
       selectionAnchor.setAttribute("data-link-type", "prepared-by-mail")
-      setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current?.innerHTML || ""))
+      setBroadcastBodyHtml(DOMPurify.sanitize(editorRef.current?.element()?.innerHTML || ""))
     }
     toast.success(`Linked selected text to ${selectedPreparedByEmail}`)
   }, [broadcastSubject, runEditorCommand, selectedPreparedBy, selectedPreparedByEmail, setBroadcastBodyHtml])
-
-  const handlePaste = useCallback(
-    (event: ClipboardEvent<HTMLDivElement>) => {
-      const pastedText = event.clipboardData.getData("text/plain")
-      if (!pastedText) return
-
-      event.preventDefault()
-      runEditorCommand("insertHTML", convertMarkdownToHtml(pastedText))
-    },
-    [runEditorCommand]
-  )
 
   void log
 
@@ -401,191 +246,31 @@ export function BroadcastForm({
           </div>
           <div className="space-y-2">
             <Label>Message Body (rich text)</Label>
-            <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 p-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("bold")}
-                    aria-label="Bold"
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Bold</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("italic")}
-                    aria-label="Italic"
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Italic</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("underline")}
-                    aria-label="Underline"
-                  >
-                    <Underline className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Underline</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("insertUnorderedList")}
-                    aria-label="Bulleted list"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Bulleted list</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("insertOrderedList")}
-                    aria-label="Numbered list"
-                  >
-                    <ListOrdered className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Numbered list</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
+            <RichTextEditor
+              ref={editorRef}
+              value={broadcastBodyHtml}
+              onChange={setBroadcastBodyHtml}
+              aria-label="Message body"
+              toolbarExtra={
+                <>
+                  <RichTextToolbarButton
+                    label="Insert web link"
                     onClick={() => {
-                      saveCurrentSelection()
+                      editorRef.current?.saveSelection()
                       setLinkDialogOpen(true)
                     }}
-                    aria-label="Insert web link"
                   >
                     <Link2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Insert web link</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
+                  </RichTextToolbarButton>
+                  <RichTextToolbarButton
+                    label="Link selected text to the Prepared by email"
                     onClick={handlePreparedByMailLink}
-                    aria-label="Link selected text to the Prepared by email"
                   >
                     <Mail className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Link selected text to the Prepared by email</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <div className="bg-border mx-1 h-5 w-px" />
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("undo")}
-                    aria-label="Undo"
-                  >
-                    <Undo2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Undo</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => runEditorCommand("redo")}
-                    aria-label="Redo"
-                  >
-                    <Redo2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Redo</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="relative">
-              {isBodyEmpty && (
-                <p className="text-muted-foreground pointer-events-none absolute top-4 left-4 text-[15px] leading-7">
-                  Type your message here...
-                </p>
-              )}
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                className="bg-background text-foreground min-h-[220px] rounded-b-lg border p-4 text-[15px] leading-7 break-words outline-none focus:ring-2 focus:ring-orange-500 [&_a]:font-medium [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-blue-700 [&_br]:content-[''] [&_div]:my-0 [&_div+div]:mt-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-0 [&_p+*]:mt-4 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-6"
-                onInput={(e) => setBroadcastBodyHtml(DOMPurify.sanitize((e.currentTarget as HTMLDivElement).innerHTML))}
-                onPaste={handlePaste}
-                onKeyUp={saveCurrentSelection}
-                onMouseUp={saveCurrentSelection}
-              />
-            </div>
+                  </RichTextToolbarButton>
+                </>
+              }
+            />
             <p className="text-muted-foreground text-xs">
               Paste text from Word or type directly. Use the chain icon for web links and the mail icon for reply links
               to the selected Prepared by person.

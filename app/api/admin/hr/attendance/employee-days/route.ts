@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
-import { getWorkdaysInMonth, monthBounds, toLocalISODate, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
+import {
+  getWorkdaysInMonth,
+  monthBounds,
+  toLocalISODate,
+  loadAttendancePolicy,
+  isWeekend,
+} from "@/lib/hr/attendance-utils"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadAttendanceStartDate } from "@/lib/hr/attendance-start"
@@ -217,42 +223,45 @@ export async function GET(request: NextRequest) {
   }
 
   const today = toLocalISODate()
-  const rows = getWorkdaysInMonth(yearMonth)
-    .filter((d) => d <= today)
-    .map((date) => {
-      const rec = recordsByDate.get(date) || null
-      const closeTime = ctx.earlyCloseTime(date)
-      const lateRes = ctx.lateResumptionTime(date)
-      let status = deriveUnifiedAttendanceStatus(
-        {
-          record: rec,
-          isHoliday: ctx.isHoliday(date),
-          isOnLeave: ctx.isOnLeave(userId, date),
-          isOnUnpaidLeave: ctx.isOnUnpaidLeave(userId, date),
-          isExempted: exemptHint || Boolean(profile?.attendance_exempt) || ctx.isExempt(userId, date),
-          isCdsDay: ctx.isCdsDay(userId, date),
-          recordDate: date,
-          earlyClosure: closeTime ? { closeTime } : null,
-          lateResumption: lateRes ? { resumptionTime: lateRes } : null,
-        },
-        policy
-      )
-
-      if (!rec && (!effectiveStartDate || date < effectiveStartDate)) {
-        if (!ctx.isHoliday(date) && !ctx.isOnLeave(userId, date) && !ctx.isOnUnpaidLeave(userId, date)) {
-          status = "no_record"
-        }
-      }
-
-      return {
-        date,
+  const workdays = getWorkdaysInMonth(yearMonth).filter((d) => d <= today)
+  const weekendDatesWithPunches = Array.from(recordsByDate.entries())
+    .filter(([date, rec]) => isWeekend(date) && date <= today && Boolean(rec.clock_in || rec.clock_out))
+    .map(([date]) => date)
+  const allDates = Array.from(new Set([...workdays, ...weekendDatesWithPunches])).sort()
+  const rows = allDates.map((date) => {
+    const rec = recordsByDate.get(date) || null
+    const closeTime = ctx.earlyCloseTime(date)
+    const lateRes = ctx.lateResumptionTime(date)
+    let status = deriveUnifiedAttendanceStatus(
+      {
         record: rec,
-        status,
-        manual_by: manualByDate(date) ?? rec?.editor_first_name ?? null,
-        early_closure_time: closeTime,
-        late_resumption_time: lateRes,
+        isHoliday: ctx.isHoliday(date),
+        isOnLeave: ctx.isOnLeave(userId, date),
+        isOnUnpaidLeave: ctx.isOnUnpaidLeave(userId, date),
+        isExempted: exemptHint || Boolean(profile?.attendance_exempt) || ctx.isExempt(userId, date),
+        isCdsDay: ctx.isCdsDay(userId, date),
+        recordDate: date,
+        earlyClosure: closeTime ? { closeTime } : null,
+        lateResumption: lateRes ? { resumptionTime: lateRes } : null,
+      },
+      policy
+    )
+
+    if (!rec && (!effectiveStartDate || date < effectiveStartDate)) {
+      if (!ctx.isHoliday(date) && !ctx.isOnLeave(userId, date) && !ctx.isOnUnpaidLeave(userId, date)) {
+        status = "no_record"
       }
-    })
+    }
+
+    return {
+      date,
+      record: rec,
+      status,
+      manual_by: manualByDate(date) ?? rec?.editor_first_name ?? null,
+      early_closure_time: closeTime,
+      late_resumption_time: lateRes,
+    }
+  })
 
   return NextResponse.json({ data: rows })
 }

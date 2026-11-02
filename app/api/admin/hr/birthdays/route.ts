@@ -4,14 +4,9 @@ import { canAccessAdminSection } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { isBirthdayInRange } from "@/lib/hr/birthdays"
 
 const MMDD_PATTERN = /^\d{2}-\d{2}$/
-
-/** Inclusive MM-DD range check that handles wraparound (e.g. Dec 28 – Jan 3). */
-function isInRange(mmdd: string, start: string, end: string): boolean {
-  if (start <= end) return mmdd >= start && mmdd <= end
-  return mmdd >= start || mmdd <= end
-}
 
 export async function GET(request: NextRequest) {
   const rl = await rateLimit(`admin-hr-birthdays:${getClientId(request)}`, { limit: 30, windowSec: 60 })
@@ -62,7 +57,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to load profiles" }, { status: 500 })
   }
 
-  const matches = (profiles || []).filter((p) => p.birthday && isInRange(p.birthday, start, end))
+  const matches = (profiles || []).filter((p) => p.birthday && isBirthdayInRange(p.birthday, start, end))
 
   const avatarPaths = matches.map((p) => p.avatar_path).filter((path): path is string => Boolean(path))
   const signedUrlsByPath = await getAvatarSignedUrls(dataClient, avatarPaths, photoSize)

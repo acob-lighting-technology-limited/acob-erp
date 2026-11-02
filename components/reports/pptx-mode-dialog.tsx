@@ -3,25 +3,42 @@
 import { useState } from "react"
 import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { WeeklyDeptOrder, WeeklyPptxMode, WeeklyPptxTheme } from "@/lib/export-utils"
 
 interface PptxModeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelect: (mode: WeeklyPptxMode, theme: WeeklyPptxTheme, order: WeeklyDeptOrder) => void
+  onSelect: (mode: WeeklyPptxMode, theme: WeeklyPptxTheme, order: WeeklyDeptOrder, fullMeeting: boolean) => void
   showOrderStep?: boolean
+  /**
+   * Shows a "Full meeting" tick (on by default) that turns the export into the
+   * whole agenda deck; unticked, the export is the department slides alone.
+   */
+  showFullMeetingOption?: boolean
 }
 
 type Step = 1 | 2 | 3
 
-export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = true }: PptxModeDialogProps) {
+export function PptxModeDialog({
+  open,
+  onOpenChange,
+  onSelect,
+  showOrderStep = true,
+  showFullMeetingOption = false,
+}: PptxModeDialogProps) {
   const [step, setStep] = useState<Step>(1)
   const [mode, setMode] = useState<WeeklyPptxMode>("full")
   const [theme, setTheme] = useState<WeeklyPptxTheme>("light")
+  const [fullMeeting, setFullMeeting] = useState(true)
+  const includeFullMeeting = showFullMeetingOption && fullMeeting
 
   const handleOpenChange = (o: boolean) => {
-    if (!o) setStep(1)
+    if (!o) {
+      setStep(1)
+      setFullMeeting(true)
+    }
     onOpenChange(o)
   }
 
@@ -35,12 +52,12 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
     if (showOrderStep) {
       setStep(3)
     } else {
-      onSelect(mode, t, "default")
+      onSelect(mode, t, "default", includeFullMeeting)
     }
   }
 
   const handleOrderSelect = (order: WeeklyDeptOrder) => {
-    onSelect(mode, theme, order)
+    onSelect(mode, theme, order, includeFullMeeting)
   }
 
   const totalSteps = showOrderStep ? 3 : 2
@@ -70,6 +87,29 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
 
         {step === 1 && (
           <div className="grid gap-3">
+            {/* Above the layout buttons: choosing a layout moves straight to the next step. */}
+            {showFullMeetingOption && (
+              <>
+                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Slides</p>
+                <label className="hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                  <Checkbox
+                    checked={fullMeeting}
+                    onCheckedChange={(checked) => setFullMeeting(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="grid gap-0.5">
+                    <span className="text-sm font-semibold">Include the meeting agenda</span>
+                    <span className="text-muted-foreground text-xs">
+                      Adds opening prayer, KSS, summary of minutes, birthdays and closing remarks around the department
+                      slides.
+                    </span>
+                  </span>
+                </label>
+                <p className="text-muted-foreground mt-2 text-xs font-semibold tracking-wide uppercase">
+                  Department slide layout
+                </p>
+              </>
+            )}
             <Button
               variant="outline"
               className="h-14 flex-col items-start justify-center gap-0.5 px-4"
