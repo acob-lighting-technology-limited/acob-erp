@@ -413,20 +413,33 @@ const addPresentationPageSlide = (pres: PptxPresentation, image: AgendaDeckImage
   return slide
 }
 
-// Summary text slides: 18pt body in the area between the header bar and the footer.
+// Summary text slides, in the area between the header bar and the footer. The
+// sizes set the hierarchy: section headings lead, labels are a small eyebrow,
+// body text is a step quieter, and replies sit indented under their point.
 const SUMMARY_BOX = { x: 0.7, y: 0.8, w: SLIDE_W - 1.4, h: 6.05 }
-const SUMMARY_BODY_PT = 18
-const SUMMARY_HEADING_PT = 20
-const SUMMARY_LIST_INDENT_IN = 0.4
+const SUMMARY_PT: Record<SlideTextBlock["kind"], number> = {
+  heading: 24,
+  label: 12,
+  paragraph: 17,
+  bullet: 17,
+  number: 17,
+  reply: 16,
+}
+/** Hanging indent for points and replies (points), and the matching estimate (inches). */
+const SUMMARY_LIST_INDENT_PT = 30
+const SUMMARY_LIST_INDENT_IN = SUMMARY_LIST_INDENT_PT / 72
 const SUMMARY_PARA_GAP_IN = 0.1
+/** Space above a section heading or label, so each section reads as its own block. */
+const SUMMARY_SPACE_BEFORE_PT: Partial<Record<SlideTextBlock["kind"], number>> = { heading: 14, label: 8 }
 
 /**
  * Estimated height of a block (pptxgenjs cannot measure text). 18pt Calibri
  * measured about 0.43 em per character in PowerPoint; 0.45 leaves a margin.
  */
 const slideTextMetrics = (block: SlideTextBlock) => {
-  const size = block.kind === "heading" ? SUMMARY_HEADING_PT : SUMMARY_BODY_PT
-  const width = SUMMARY_BOX.w - (block.kind === "bullet" || block.kind === "number" ? SUMMARY_LIST_INDENT_IN : 0)
+  const size = SUMMARY_PT[block.kind]
+  const indented = block.kind === "bullet" || block.kind === "number" || block.kind === "reply"
+  const width = SUMMARY_BOX.w - (indented ? SUMMARY_LIST_INDENT_IN : 0)
   return { lineHeight: (size * 1.2) / 72, charsPerLine: Math.max(10, Math.floor((width * 72) / (size * 0.45))) }
 }
 
@@ -434,7 +447,7 @@ const slideTextBlockHeight = (block: SlideTextBlock) => {
   const { lineHeight, charsPerLine } = slideTextMetrics(block)
   const text = block.runs.map((run) => run.text).join("")
   const lines = text.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0)
-  return lines * lineHeight + SUMMARY_PARA_GAP_IN
+  return lines * lineHeight + SUMMARY_PARA_GAP_IN + (SUMMARY_SPACE_BEFORE_PT[block.kind] ?? 0) / 72
 }
 
 /**
@@ -547,20 +560,39 @@ const addSummaryTextSlide = (
     fontFace: "Calibri",
   })
 
-  const paragraphs = blocks.flatMap((block) => {
+  // Body a step quieter than pure white/black, so headings lead.
+  const bodyColor = theme === "dark" ? "D4D4D4" : "334155"
+  // The agenda slides' green: brighter on dark so headings carry on black.
+  const headingColor = theme === "dark" ? AGENDA_COLORS.accent : AGENDA_COLORS.accentOnLight
+  const paragraphs = blocks.flatMap((block, index) => {
     const isHeading = block.kind === "heading"
+    const isLabel = block.kind === "label"
+    const isReply = block.kind === "reply"
+    const spaceBefore = index > 0 ? SUMMARY_SPACE_BEFORE_PT[block.kind] : undefined
     const paragraph = {
-      fontSize: isHeading ? SUMMARY_HEADING_PT : SUMMARY_BODY_PT,
-      color: isHeading ? colors.accent : colors.textPrimary,
-      paraSpaceAfter: 6,
+      fontSize: SUMMARY_PT[block.kind],
+      color: isHeading || isLabel ? headingColor : isReply ? colors.textMuted : bodyColor,
+      paraSpaceAfter: isHeading ? 4 : 6,
+      ...(spaceBefore && { paraSpaceBefore: spaceBefore }),
+      ...(isLabel && { charSpacing: 3 }),
+      ...(isReply && { italic: true }),
     }
+    // Points hang their number in the margin. A reply hangs an invisible
+    // character the same way, which is the only way pptxgenjs indents a paragraph.
     const bullet = block.continued
       ? null
       : block.kind === "bullet"
-        ? { indent: 18 }
+        ? { indent: SUMMARY_LIST_INDENT_PT }
         : block.kind === "number"
-          ? { type: "number", numberType: "arabicPeriod", numberStartAt: block.number ?? 1, indent: 22 }
-          : null
+          ? {
+              type: "number",
+              style: block.numberStyle ?? "arabicPeriod",
+              numberStartAt: block.number ?? 1,
+              indent: SUMMARY_LIST_INDENT_PT,
+            }
+          : isReply
+            ? { characterCode: "00A0", indent: SUMMARY_LIST_INDENT_PT }
+            : null
     const runs = block.runs.flatMap((run) =>
       run.text.split("\n").map((text, k) => ({ ...run, text, softBreak: k > 0 }))
     )
@@ -572,8 +604,8 @@ const addSummaryTextSlide = (
       text: run.text,
       options: {
         ...paragraph,
-        bold: isHeading || run.bold,
-        italic: run.italic,
+        bold: isHeading || isLabel || run.bold,
+        italic: isReply || run.italic,
         ...(k === 0 && bullet && { bullet }),
         ...(run.softBreak && { softBreakBefore: true }),
       },
