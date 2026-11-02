@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { parseJsonBody } from "@/lib/api/parse-body"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { sendExitNotificationEmail } from "@/lib/hr/exit-mailer"
 import type { ExitedEmployee } from "@/lib/hr/exit-mailer"
@@ -105,9 +105,20 @@ export async function POST(request: Request) {
 
       if (updateError) {
         results.push({ id: entry.employeeId, success: false, error: updateError.message })
-      } else {
-        results.push({ id: entry.employeeId, success: true })
+        continue
       }
+
+      // An exit ends any open suspension, and the JWT status must change too —
+      // the middleware reads it first, so without this an exited person keeps
+      // their old status (e.g. "suspended") until the token is refreshed.
+      await dataClient
+        .from("employee_suspensions")
+        .update({ is_active: false, lifted_by: user.id, lifted_at: now })
+        .eq("employee_id", entry.employeeId)
+        .eq("is_active", true)
+      await syncEmploymentStatusToAuth(entry.employeeId, "exited")
+
+      results.push({ id: entry.employeeId, success: true })
     }
 
     const succeededIds = results.filter((r) => r.success).map((r) => r.id)

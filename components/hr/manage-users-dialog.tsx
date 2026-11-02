@@ -53,6 +53,7 @@ import { logger } from "@/lib/logger"
 import type { UserRole } from "@/types/database"
 import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import { apiFetch } from "@/lib/api-client"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 const log = logger("manage-users-dialog")
@@ -407,7 +408,9 @@ export function ManageUsersDialog({
   }
 
   // ── EXIT EMPLOYEE ────────────────────────────────────────────────────────────
-  const activeEmployees = employees.filter((e) => e.employment_status === "active")
+  // Anyone not already exited can be exited — a suspended or on-leave person
+  // still needs offboarding, so filtering to "active" hid them from this tab.
+  const exitableEmployees = employees.filter((e) => e.employment_status !== "exited")
   const [exitSearch, setExitSearch] = useState("")
   const [selectedExitIds, setSelectedExitIds] = useState<Set<string>>(new Set())
   const [sharedExitDate, setSharedExitDate] = useState(today)
@@ -419,13 +422,13 @@ export function ManageUsersDialog({
   const [isSendingExitNotif, setIsSendingExitNotif] = useState(false)
   const [succeededExitIds, setSucceededExitIds] = useState<string[]>([])
 
-  const filteredExitEmployees = activeEmployees.filter((e) => {
+  const filteredExitEmployees = exitableEmployees.filter((e) => {
     if (!exitSearch.trim()) return true
     const q = exitSearch.toLowerCase()
     return `${e.first_name} ${e.last_name} ${e.department} ${e.employee_number ?? ""}`.toLowerCase().includes(q)
   })
 
-  const selectedExitEmployees = activeEmployees.filter((e) => selectedExitIds.has(e.id))
+  const selectedExitEmployees = exitableEmployees.filter((e) => selectedExitIds.has(e.id))
 
   const getExitEntry = (id: string): PerPersonEntry => ({
     exitDate: exitOverrides[id]?.exitDate ?? sharedExitDate,
@@ -1224,7 +1227,7 @@ export function ManageUsersDialog({
                   <ScrollArea className="flex-1">
                     <div className="divide-border divide-y">
                       {filteredExitEmployees.length === 0 ? (
-                        <p className="text-muted-foreground p-6 text-center text-sm">No active employees found</p>
+                        <p className="text-muted-foreground p-6 text-center text-sm">No employees found</p>
                       ) : (
                         filteredExitEmployees.map((emp) => (
                           <label
@@ -1245,6 +1248,13 @@ export function ManageUsersDialog({
                               </p>
                               <p className="text-muted-foreground truncate text-xs">{emp.department}</p>
                             </div>
+                            {emp.employment_status && emp.employment_status !== "active" && (
+                              <EmployeeStatusBadge
+                                status={emp.employment_status}
+                                size="sm"
+                                className="ml-auto shrink-0"
+                              />
+                            )}
                           </label>
                         ))
                       )}

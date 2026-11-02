@@ -152,8 +152,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       })
     }
 
-    // Lift active suspensions when reinstating
-    if (status === "active") {
+    // Lift active suspensions when reinstating or exiting — an exit ends the
+    // suspension too, otherwise the person still reads as suspended elsewhere.
+    if (status === "active" || status === "exited") {
       await ctx.dataClient
         .from("employee_suspensions")
         .update({ is_active: false, lifted_by: ctx.user.id, lifted_at: new Date().toISOString() })
