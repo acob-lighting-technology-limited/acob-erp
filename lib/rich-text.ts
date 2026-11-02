@@ -310,10 +310,131 @@ export interface SlideTextRun {
  * second bullet or number).
  */
 export interface SlideTextBlock {
-  kind: "heading" | "paragraph" | "bullet" | "number"
+  /**
+   * `label`: a bold all-caps line on its own ("KEY HIGHLIGHTS:"), shown as a
+   * small eyebrow. `reply`: a plain paragraph between two numbered points
+   * ("Peter Ayoola confirmed…"), shown indented under the point it answers.
+   */
+  kind: "heading" | "label" | "paragraph" | "bullet" | "number" | "reply"
   runs: SlideTextRun[]
   number?: number
+  /** PowerPoint numbering scheme for `number` blocks; arabicPeriod ("1.") when absent. */
+  numberStyle?: SlideNumberStyle
   continued?: boolean
+}
+
+export type SlideNumberStyle =
+  | "arabicPeriod"
+  | "arabicParenR"
+  | "romanLcPeriod"
+  | "romanLcParenR"
+  | "romanUcPeriod"
+  | "romanUcParenR"
+  | "alphaLcPeriod"
+  | "alphaLcParenR"
+  | "alphaUcPeriod"
+  | "alphaUcParenR"
+
+/** A typed marker at the start of a paragraph: "i.", "ii)", "a.", "B)", "3.". */
+const ITEM_MARKER = /^\s*([ivxlcdm]+|[a-z]|\d+)([.)])\s+/i
+
+const ROMAN_VALUES: Record<string, number> = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }
+
+function romanToNumber(roman: string): number {
+  let total = 0
+  const digits = roman.toLowerCase().split("")
+  digits.forEach((digit, i) => {
+    const value = ROMAN_VALUES[digit]
+    total += value < (ROMAN_VALUES[digits[i + 1]] ?? 0) ? -value : value
+  })
+  return total
+}
+
+/**
+ * Reads a paragraph's typed marker as a numbered point. Single letters are
+ * ambiguous ("i." is roman one or the letter i): they read as letters when
+ * they continue a lettered list, otherwise i/v/x read as roman.
+ */
+function parseItemMarker(
+  text: string,
+  previous: SlideTextBlock | undefined
+): { length: number; number: number; style: SlideNumberStyle } | null {
+  const match = text.match(ITEM_MARKER)
+  if (!match) return null
+  const [whole, token, punctuation] = match
+  const paren = punctuation === ")"
+  if (/^\d+$/.test(token)) {
+    return { length: whole.length, number: Number(token), style: paren ? "arabicParenR" : "arabicPeriod" }
+  }
+  const upper = token === token.toUpperCase()
+  const letterValue = token.toLowerCase().charCodeAt(0) - 96
+  const continuesLetters =
+    token.length === 1 &&
+    previous?.kind === "number" &&
+    previous.numberStyle?.startsWith("alpha") &&
+    previous.number === letterValue - 1
+  const roman = /^[ivxlcdm]+$/i.test(token) && !continuesLetters && (token.length > 1 || /[ivx]/i.test(token))
+  if (roman) {
+    const style = upper ? (paren ? "romanUcParenR" : "romanUcPeriod") : paren ? "romanLcParenR" : "romanLcPeriod"
+    return { length: whole.length, number: romanToNumber(token), style }
+  }
+  if (token.length !== 1) return null
+  const style = upper ? (paren ? "alphaUcParenR" : "alphaUcPeriod") : paren ? "alphaLcParenR" : "alphaLcPeriod"
+  return { length: whole.length, number: letterValue, style }
+}
+
+/** Drops the first `count` characters across runs, and any space left in front. */
+function dropLeadingChars(runs: SlideTextRun[], count: number): SlideTextRun[] {
+  let left = count
+  const out: SlideTextRun[] = []
+  for (const run of runs) {
+    if (left >= run.text.length) {
+      left -= run.text.length
+      continue
+    }
+    out.push({ ...run, text: run.text.slice(left) })
+    left = 0
+  }
+  return trimRuns(out)
+}
+
+/**
+ * Gives pasted paragraphs the roles a slide can show: labels, typed numbered
+ * points ("i. …") and the replies between them. Runs after parsing, so it also
+ * applies to summaries saved before these roles existed.
+ */
+function assignSlideTextRoles(blocks: SlideTextBlock[]): SlideTextBlock[] {
+  const out: SlideTextBlock[] = []
+  for (const block of blocks) {
+    if (block.kind !== "paragraph") {
+      out.push(block)
+      continue
+    }
+    const text = block.runs.map((run) => run.text).join("")
+    if (block.runs.every((run) => run.bold) && isCapsHeading(text.trim())) {
+      out.push({ kind: "label", runs: block.runs.map(({ text: runText }) => ({ text: runText })) })
+      continue
+    }
+    const marker = parseItemMarker(text, out[out.length - 1])
+    if (marker) {
+      const runs = dropLeadingChars(block.runs, marker.length)
+      if (runs.length > 0) {
+        out.push({ kind: "number", runs, number: marker.number, numberStyle: marker.style })
+        continue
+      }
+    }
+    out.push(block)
+  }
+  // A plain paragraph between two points answers the one before it.
+  const isPoint = (block?: SlideTextBlock) => block?.kind === "number" || block?.kind === "bullet"
+  return out.map((block, i) => {
+    if (block.kind !== "paragraph") return block
+    let before = i - 1
+    while (out[before]?.kind === "paragraph") before--
+    let after = i + 1
+    while (out[after]?.kind === "paragraph") after++
+    return isPoint(out[before]) && isPoint(out[after]) ? { ...block, kind: "reply" } : block
+  })
 }
 
 /** Inline content as runs, carrying bold/italic down from <strong>/<em>; <br> becomes a newline. */
@@ -372,5 +493,5 @@ export function htmlToSlideTextBlocks(html: string): SlideTextBlock[] {
       Array.from(child.querySelectorAll(":scope > li")).forEach((li, i) => pushBlock("number", li, start + i))
     } else pushBlock("paragraph", child)
   }
-  return blocks
+  return assignSlideTextRoles(blocks)
 }
