@@ -172,7 +172,7 @@ async function fetchWeeklyReports(
   }
 }
 
-export default function WeeklyReportsPortal({ canExportFullMeeting = false }: { canExportFullMeeting?: boolean }) {
+export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
   // The week people are reporting on, which from Friday is the next one — that
   // is when reports for the coming Monday's meeting start arriving. The table
@@ -952,7 +952,7 @@ export default function WeeklyReportsPortal({ canExportFullMeeting = false }: { 
         }}
         onSelect={runPptxExport}
         showOrderStep={pendingPptxExport?.kind === "all"}
-        showFullMeetingOption={canExportFullMeeting && pendingPptxExport?.kind === "all"}
+        showFullMeetingOption={pendingPptxExport?.kind === "all"}
       />
     </DataTablePage>
   )

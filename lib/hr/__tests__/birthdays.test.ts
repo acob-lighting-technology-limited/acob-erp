@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { birthdayWeekOf, isBirthdayInRange } from "../birthdays"
+import { birthdayRangeDays, birthdayWeekOf, isBirthdayInRange } from "../birthdays"
 import { parseBirthdayReminderConfig } from "../birthday-reminder"
 
 test("the birthday week runs Monday to Sunday around any day", () => {
@@ -35,4 +35,11 @@ test("a missing or malformed reminder setting reads as switched off", () => {
     recipientUserIds: ["a"],
     externalEmails: [],
   })
+})
+
+test("a birthday range counts its days inclusively, across New Year too", () => {
+  assert.equal(birthdayRangeDays("11-02", "11-08"), 7)
+  assert.equal(birthdayRangeDays("12-28", "01-03"), 7)
+  assert.equal(birthdayRangeDays("11-02", "11-02"), 1)
+  assert.equal(birthdayRangeDays("01-01", "12-31"), 366)
 })

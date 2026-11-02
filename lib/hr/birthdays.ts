@@ -3,10 +3,22 @@
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
+export const MMDD_PATTERN = /^\d{2}-\d{2}$/
+
 /** Inclusive MM-DD range check that handles wraparound (e.g. Dec 28 – Jan 3). */
 export function isBirthdayInRange(mmdd: string, start: string, end: string): boolean {
   if (start <= end) return mmdd >= start && mmdd <= end
   return mmdd >= start || mmdd <= end
+}
+
+/** Days covered by an inclusive MM-DD range, wrapping over New Year (counted on a leap year). */
+export function birthdayRangeDays(start: string, end: string): number {
+  const dayOfYear = (mmdd: string) => {
+    const [month, day] = mmdd.split("-").map(Number)
+    return (Date.UTC(2024, month - 1, day) - Date.UTC(2024, 0, 1)) / 86_400_000
+  }
+  const span = dayOfYear(end) - dayOfYear(start)
+  return (span < 0 ? span + 366 : span) + 1
 }
 
 export interface BirthdayWeekDay {

@@ -14,7 +14,7 @@ import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { AgendaDeckExportButton } from "@/components/reports/agenda-deck-export"
 
-export default function PortalGeneralMeetingPage({ canExportAgendaDeck = false }: { canExportAgendaDeck?: boolean }) {
+export default function PortalGeneralMeetingPage() {
   const reportCards = [
     {
       title: "Meeting Attendance",
@@ -97,7 +97,7 @@ export default function PortalGeneralMeetingPage({ canExportAgendaDeck = false }
         description="Access the documents and trackers that support your weekly general meeting."
         icon={FileBarChart}
         backLink={{ href: "/reports", label: "Back to Reports" }}
-        actions={canExportAgendaDeck ? <AgendaDeckExportButton /> : undefined}
+        actions={<AgendaDeckExportButton />}
       />
 
       <PageSection title="Available Trackers & Reports">

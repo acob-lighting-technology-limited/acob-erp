@@ -60,6 +60,22 @@ export async function fetchCelebrants(start: string, end: string, photo: "large"
   return (payload?.data as Celebrant[]) || []
 }
 
+/**
+ * Celebrants for the agenda deck's birthday slide, which any staff member may
+ * export: first name, day/month and photo only, at most a week at a time.
+ */
+export async function fetchMeetingCelebrants(
+  start: string,
+  end: string,
+  photo: "large" | "thumb"
+): Promise<Celebrant[]> {
+  const response = await apiFetch(`/api/reports/meeting-birthdays?start=${start}&end=${end}&photo=${photo}`)
+  const payload = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
+  const rows = (payload?.data as Array<Pick<Celebrant, "firstName" | "birthday" | "avatarUrl">>) || []
+  return rows.map((row) => ({ ...row, lastName: "", department: "" }))
+}
+
 export function formatMMDDLabel(mmdd: string): string {
   const [month, day] = mmdd.split("-").map(Number)
   return `${MONTHS[month - 1]?.slice(0, 3) ?? "?"} ${day}`
