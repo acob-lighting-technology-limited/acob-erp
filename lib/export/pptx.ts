@@ -621,13 +621,14 @@ const addDeptTitleSlide = (
     line: { color: colors.textInverse },
   })
 
-  // ── Footer band: wordmark and page number ─────────────────────────────────
-  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.34)
+  // ── Footer band: wordmark and page number, where the content slides put them ──
+  const { footerY, footerH } = WEEKLY_CONTENT_LAYOUT
+  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.28)
   try {
     slide.addImage({
       path: EXPORT_LOGOS.acobInverse.path,
-      x: 0.55,
-      y: 6.98,
+      x: 0.3,
+      y: footerY + (footerH - wordmarkBox.h) / 2,
       ...wordmarkBox,
     })
   } catch {
@@ -637,9 +638,9 @@ const addDeptTitleSlide = (
   if (typeof pageNumber === "number") {
     slide.addText(String(pageNumber), {
       x: 0,
-      y: 6.9,
+      y: footerY,
       w: "100%",
-      h: 0.5,
+      h: footerH,
       fontSize: 10,
       bold: true,
       color: colors.textInverse,
@@ -666,13 +667,14 @@ const addDeptIndexSlide = (
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
+  const { headerH, footerY, footerH } = WEEKLY_CONTENT_LAYOUT
 
   // Header
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
     y: 0,
     w: "100%",
-    h: 0.65,
+    h: headerH,
     fill: { color: colors.header },
     line: { color: colors.header },
   })
@@ -680,7 +682,7 @@ const addDeptIndexSlide = (
     x: 0.3,
     y: 0,
     w: 10,
-    h: 0.65,
+    h: headerH,
     fontSize: 16,
     bold: true,
     color: colors.textInverse,
@@ -691,7 +693,7 @@ const addDeptIndexSlide = (
     x: 10,
     y: 0,
     w: 3,
-    h: 0.65,
+    h: headerH,
     fontSize: 12,
     color: theme === "dark" ? colors.textMuted : ACOB_GREEN_LIGHT,
     valign: "middle",
@@ -762,9 +764,9 @@ const addDeptIndexSlide = (
   // Bottom strip
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
-    y: 6.9,
+    y: footerY,
     w: "100%",
-    h: 0.6,
+    h: footerH,
     fill: { color: colors.footer },
     line: { color: colors.footer },
   })
@@ -793,7 +795,7 @@ const PPTX_FIT_MAX_PARA_SPACE_RATIO = 0.75
 // Content slides keep their chrome slim: the header, footer and side margins
 // were trimmed so the report text gets the room (~0.5in more height, ~0.25in
 // more width). Cover, department title and index slides keep their own layout.
-const WEEKLY_CONTENT_LAYOUT = {
+export const WEEKLY_CONTENT_LAYOUT = {
   headerH: 0.5,
   marginX: 0.12,
   slideW: 13.33,
@@ -1961,6 +1963,8 @@ export interface WeeklyDepartmentSlidesOptions {
   taskSummaryOptions?: WeeklyTaskSummaryOptions
   /** Page number of the department index slide; departments follow it. */
   firstPage: number
+  /** What the last department's "NEXT:" points at (the agenda deck's next item). */
+  nextAfterLast?: string
 }
 
 /** How many slides addWeeklyDepartmentSlides will add, for numbering slides that come after. */
@@ -1992,6 +1996,7 @@ export const addWeeklyDepartmentSlides = (
     order = "default",
     taskSummaryOptions,
     firstPage,
+    nextAfterLast,
   }: WeeklyDepartmentSlidesOptions
 ) => {
   const sortedReports =
@@ -2035,7 +2040,7 @@ export const addWeeklyDepartmentSlides = (
       renderDepartmentCompactSlides(
         pres,
         report,
-        sortedReports[idx + 1]?.department,
+        sortedReports[idx + 1]?.department ?? nextAfterLast,
         departmentStartPages[idx] + 1,
         theme,
         { index: idx + 1, total: sortedReports.length }
@@ -2051,7 +2056,7 @@ export const addWeeklyDepartmentSlides = (
       renderDepartmentWeeklySlides(
         pres,
         departmentPlan,
-        departmentPlans[idx + 1]?.report.department,
+        departmentPlans[idx + 1]?.report.department ?? nextAfterLast,
         departmentPlan.startPage,
         theme,
         { index: idx + 1, total: departmentPlans.length }

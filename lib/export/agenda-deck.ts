@@ -16,6 +16,7 @@ import {
   fitTitleSlideFontSize,
   getWeeklyPptxThemeColors,
   TITLE_SLIDE_TEXT_W,
+  WEEKLY_CONTENT_LAYOUT,
   type WeeklyPptxMode,
 } from "./pptx"
 import {
@@ -131,32 +132,56 @@ const AGENDA_COLORS = {
   muted: "A3A3A3",
 }
 
+// Header and footer bars match the department slides', so the deck reads as one.
+const { headerH: HEADER_H, footerY: FOOTER_Y, footerH: FOOTER_H } = WEEKLY_CONTENT_LAYOUT
+
+/** Footer strip: wordmark, page number and, like the department slides, "NEXT:" on the right. */
 const addFooterBand = (
   pres: PptxPresentation,
   slide: PptxSlide,
   pageNumber: number,
   colors: ReturnType<typeof getWeeklyPptxThemeColors>,
-  band: { fill: string; text: string } = { fill: colors.footer, text: colors.textInverse }
+  band: { fill: string; text: string } = { fill: colors.footer, text: colors.textInverse },
+  next?: string
 ) => {
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
-    y: 6.9,
+    y: FOOTER_Y,
     w: "100%",
-    h: 0.6,
+    h: FOOTER_H,
     fill: { color: band.fill },
     line: { color: band.fill },
   })
-  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.34)
+  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.28)
   try {
-    slide.addImage({ path: EXPORT_LOGOS.acobInverse.path, x: 0.55, y: 6.98, ...wordmarkBox })
+    slide.addImage({
+      path: EXPORT_LOGOS.acobInverse.path,
+      x: 0.3,
+      y: FOOTER_Y + (FOOTER_H - wordmarkBox.h) / 2,
+      ...wordmarkBox,
+    })
   } catch {
     /* skip */
   }
+  if (next) {
+    slide.addText(`NEXT: ${next.toUpperCase()}`, {
+      x: 7,
+      y: FOOTER_Y,
+      w: 6.1,
+      h: FOOTER_H,
+      fontSize: 10,
+      bold: true,
+      color: band.text,
+      align: "right",
+      valign: "middle",
+      fontFace: "Calibri",
+    })
+  }
   slide.addText(String(pageNumber), {
     x: 0,
-    y: 6.9,
+    y: FOOTER_Y,
     w: "100%",
-    h: 0.6,
+    h: FOOTER_H,
     fontSize: 10,
     bold: true,
     color: band.text,
@@ -174,7 +199,8 @@ const addAgendaListSlide = (
   items: { title: string; detail?: string; page: number }[],
   week: number,
   year: number,
-  theme: WeeklyPptxTheme
+  theme: WeeklyPptxTheme,
+  next?: string
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const accent = theme === "dark" ? AGENDA_COLORS.accent : AGENDA_COLORS.accentOnLight
@@ -185,13 +211,13 @@ const addAgendaListSlide = (
     x: 0,
     y: 0,
     w: "100%",
-    h: 0.65,
+    h: HEADER_H,
     fill: { color: AGENDA_COLORS.ink },
     line: { color: AGENDA_COLORS.ink },
   })
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: 0,
-    y: 0.65,
+    y: HEADER_H,
     w: "100%",
     h: 0.05,
     fill: { color: AGENDA_COLORS.accent },
@@ -201,7 +227,7 @@ const addAgendaListSlide = (
     x: 0.3,
     y: 0,
     w: 10,
-    h: 0.65,
+    h: HEADER_H,
     fontSize: 16,
     bold: true,
     color: AGENDA_COLORS.accent,
@@ -213,7 +239,7 @@ const addAgendaListSlide = (
     x: 10,
     y: 0,
     w: 3,
-    h: 0.65,
+    h: HEADER_H,
     fontSize: 12,
     color: AGENDA_COLORS.muted,
     valign: "middle",
@@ -277,7 +303,7 @@ const addAgendaListSlide = (
     }
   })
 
-  addFooterBand(pres, slide, 2, colors, AGENDA_FOOTER)
+  addFooterBand(pres, slide, 2, colors, AGENDA_FOOTER, next)
   return slide
 }
 
@@ -295,7 +321,16 @@ const addAgendaSectionSlide = (
     lines = [],
     pageNumber,
     theme,
-  }: { index: number; total: number; title: string; lines?: string[]; pageNumber: number; theme: WeeklyPptxTheme }
+    next,
+  }: {
+    index: number
+    total: number
+    title: string
+    lines?: string[]
+    pageNumber: number
+    theme: WeeklyPptxTheme
+    next?: string
+  }
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -365,7 +400,7 @@ const addAgendaSectionSlide = (
     })
   }
 
-  addFooterBand(pres, slide, pageNumber, colors, AGENDA_FOOTER)
+  addFooterBand(pres, slide, pageNumber, colors, AGENDA_FOOTER, next)
   applyWeeklySlideTransition(slide)
   return slide
 }
@@ -379,7 +414,7 @@ const addPresentationPageSlide = (pres: PptxPresentation, image: AgendaDeckImage
 }
 
 // Summary text slides: 18pt body in the area between the header bar and the footer.
-const SUMMARY_BOX = { x: 0.7, y: 0.95, w: SLIDE_W - 1.4, h: 5.75 }
+const SUMMARY_BOX = { x: 0.7, y: 0.8, w: SLIDE_W - 1.4, h: 6.05 }
 const SUMMARY_BODY_PT = 18
 const SUMMARY_HEADING_PT = 20
 const SUMMARY_LIST_INDENT_IN = 0.4
@@ -475,7 +510,8 @@ const addSummaryTextSlide = (
   title: string,
   pageLabel: string,
   pageNumber: number,
-  theme: WeeklyPptxTheme
+  theme: WeeklyPptxTheme,
+  next?: string
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -484,7 +520,7 @@ const addSummaryTextSlide = (
     x: 0,
     y: 0,
     w: "100%",
-    h: 0.65,
+    h: HEADER_H,
     fill: { color: colors.header },
     line: { color: colors.header },
   })
@@ -492,7 +528,7 @@ const addSummaryTextSlide = (
     x: 0.3,
     y: 0,
     w: 10,
-    h: 0.65,
+    h: HEADER_H,
     fontSize: 16,
     bold: true,
     color: colors.textInverse,
@@ -503,7 +539,7 @@ const addSummaryTextSlide = (
     x: 10,
     y: 0,
     w: 3,
-    h: 0.65,
+    h: HEADER_H,
     fontSize: 12,
     color: colors.headerMuted,
     valign: "middle",
@@ -548,7 +584,7 @@ const addSummaryTextSlide = (
   })
   slide.addText(paragraphs, { ...SUMMARY_BOX, valign: "top", fontFace: "Calibri", margin: 0 })
 
-  addFooterBand(pres, slide, pageNumber, colors)
+  addFooterBand(pres, slide, pageNumber, colors, undefined, next)
   return slide
 }
 
@@ -656,13 +692,15 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
       })),
       week,
       year,
-      theme
+      theme,
+      GENERAL_MEETING_AGENDA[0]?.title
     )
   )
 
   GENERAL_MEETING_AGENDA.forEach((item, i) => {
     const page = startPages[i]
-    const section = { index: i + 1, total, title: item.title, pageNumber: page, theme }
+    const next = GENERAL_MEETING_AGENDA[i + 1]?.title
+    const section = { index: i + 1, total, title: item.title, pageNumber: page, theme, next }
 
     switch (item.key) {
       case "kss": {
@@ -675,7 +713,7 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
         addAgendaSectionSlide(pres, { ...section, lines: summary ? [label] : [note ?? label] })
         const summarySlides = summary ? paginateSlideText(summary) : []
         summarySlides.forEach((blocks, n) =>
-          addSummaryTextSlide(pres, blocks, label, `${n + 1} of ${summarySlides.length}`, page + 1 + n, theme)
+          addSummaryTextSlide(pres, blocks, label, `${n + 1} of ${summarySlides.length}`, page + 1 + n, theme, next)
         )
         break
       }
@@ -696,6 +734,7 @@ export const buildAgendaDeck = (pres: PptxPresentation, input: AgendaDeckInput) 
           order: input.order,
           taskSummaryOptions: input.taskSummaryOptions,
           firstPage: page + 1,
+          nextAfterLast: next,
         })
         break
       }
