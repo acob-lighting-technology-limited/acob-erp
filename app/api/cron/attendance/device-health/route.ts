@@ -6,7 +6,7 @@ import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gatewa
 import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
-import { getDeviceHealth } from "@/lib/hr/device-health"
+import { getDeviceAlertRecipientIds, getDeviceHealth } from "@/lib/hr/device-health"
 
 const log = logger("cron-attendance-device-health")
 
@@ -22,12 +22,10 @@ const log = logger("cron-attendance-device-health")
  *
  * The offline rules live in getDeviceHealth (lib/hr/device-health), shared
  * with the banner staff see on /hr/attendance. Each alert fires at most once
- * per day.
+ * per day. Recipients are set from the admin attendance page (Device alerts).
  */
 /** system_settings key holding { "<yyyy-mm-dd>:<kind>": "<alerted at>" } so each alert fires once. */
 const STATE_SETTING_KEY = "attendance_device_health"
-/** Same recipients as the meeting-reminder watchdog: the people who fix integrations. */
-const RECIPIENTS_SETTING_KEY = "reminder_failure_alert"
 
 function serviceClient(url: string, key: string) {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -36,14 +34,7 @@ function serviceClient(url: string, key: string) {
 type Supabase = ReturnType<typeof serviceClient>
 
 async function resolveRecipients(supabase: Supabase): Promise<{ userIds: string[]; emails: string[] }> {
-  const { data: setting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("key", RECIPIENTS_SETTING_KEY)
-    .maybeSingle()
-
-  const rawIds = (setting?.value as { user_ids?: unknown } | null)?.user_ids
-  const userIds = Array.isArray(rawIds) ? rawIds.filter((id): id is string => typeof id === "string") : []
+  const userIds = await getDeviceAlertRecipientIds(supabase)
 
   const emails: string[] = []
   for (const userId of userIds) {

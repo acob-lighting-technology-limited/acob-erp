@@ -15,6 +15,7 @@ import { LeaderboardView } from "./_components/leaderboard-view"
 import { AttendanceManagerDialog } from "./_components/attendance-manager-dialog"
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
+import { DeviceAlertDialog } from "./_components/device-alert-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
 import { Select } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
@@ -22,7 +23,19 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Dialog } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { BarChart3, Download, FileText, Users, Clock, AlertCircle, Pencil, Info, Settings2, Mail } from "lucide-react"
+import {
+  BarChart3,
+  Download,
+  FileText,
+  Users,
+  Clock,
+  AlertCircle,
+  Pencil,
+  Info,
+  Settings2,
+  Mail,
+  Fingerprint,
+} from "lucide-react"
 import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
@@ -736,6 +749,7 @@ export function AttendanceReportsPage({
   // Unified Attendance Manager dialog
   const [managerOpen, setManagerOpen] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [deviceAlertOpen, setDeviceAlertOpen] = useState(false)
 
   const queryClient = useQueryClient()
   const reportsKey = QUERY_KEYS.attendanceReports({ periodMode, yearMonth, quarter, quarterYear, reportDepartment })
@@ -1006,6 +1020,7 @@ export function AttendanceReportsPage({
           <HeaderMoreMenu
             items={[
               { label: "Attendance reports", icon: Mail, onSelect: () => setReportDialogOpen(true) },
+              { label: "Device alerts", icon: Fingerprint, onSelect: () => setDeviceAlertOpen(true) },
               {
                 label: "Attendance manager",
                 icon: Settings2,
@@ -1196,6 +1211,7 @@ export function AttendanceReportsPage({
       )}
 
       <AttendanceReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} />
+      <DeviceAlertDialog open={deviceAlertOpen} onOpenChange={setDeviceAlertOpen} />
     </DataTablePage>
   )
 }

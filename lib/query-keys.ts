@@ -42,6 +42,7 @@ export const QUERY_KEYS = {
   myAttendanceDays: (yearMonth: string) => ["my-attendance-days", yearMonth],
   attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
   attendanceReportConfig: () => ["attendance-report-config"],
+  attendanceDeviceAlertConfig: () => ["attendance-device-alert-config"],
   employeeCycleAttendance: (userId: string, start: string, end: string) => [
     "employee-cycle-attendance",
     userId,
