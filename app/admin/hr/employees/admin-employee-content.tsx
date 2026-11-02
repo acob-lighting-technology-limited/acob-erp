@@ -610,9 +610,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
         if (!statusRes.ok) {
           const blockerSummary = statusPayload.blockers ? describeExitBlockers(statusPayload.blockers) : ""
-          if (blockerSummary) {
-            throw new Error(`Cannot exit yet — still has ${blockerSummary}. Clear these first.`)
-          }
+          if (blockerSummary) throw new Error(`Cannot exit yet — still has ${blockerSummary}. Clear these first.`)
           throw new Error(statusPayload.error || "Failed to update employee status")
         }
       }

@@ -168,6 +168,7 @@ export const QUERY_KEYS = {
   adminLeaveSettings: () => ["admin-leave-settings"],
   adminOfficeLocations: () => ["admin-office-locations"],
   adminEmployeeDetail: (userId: string) => ["admin-employee-detail", userId],
+  exitBlockers: (userIds: string[]) => ["exit-blockers", userIds],
   adminJobDescriptions: (filters?: Record<string, unknown>) =>
     filters ? ["admin-job-descriptions", filters] : ["admin-job-descriptions"],
   adminAuditLogs: (filters?: Record<string, unknown>) =>
