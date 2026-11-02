@@ -50,6 +50,35 @@
   text-transform: uppercase;
 }
 
+.bd4-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.bd4-range--quiet {
+  border-color: var(--bd-glass-border);
+  color: var(--bd-muted);
+}
+
+/* Nobody in the period or the week after: one calm, centred message. */
+.bd4-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin: auto;
+  padding: 0 2rem;
+  text-align: center;
+}
+
+.bd4-none-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--bd-green-bright);
+}
+
 .bd4-lines {
   display: flex;
   flex-direction: column;

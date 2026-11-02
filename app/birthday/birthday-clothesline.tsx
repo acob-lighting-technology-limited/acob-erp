@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
 import type { CSSProperties, ReactNode } from "react"
+import { Gift } from "lucide-react"
 import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
@@ -116,7 +117,12 @@ export function BirthdayClotheslineStage({
   highlightToday?: boolean
   children?: ReactNode
 }) {
-  const lines = toLines(celebrants)
+  // An empty period with birthdays in the week after puts those on the rope
+  // instead, so the screen (and the agenda deck's slide) is never a bare
+  // "Happy Birthday" with no one to address.
+  const promoted = !isLoading && !error && celebrants.length === 0 && (upcoming?.celebrants.length ?? 0) > 0
+  const shown = promoted && upcoming ? upcoming.celebrants : celebrants
+  const lines = toLines(shown)
 
   return (
     <section className={cn("bd4", layout === "cards" && "bd4--static")}>
@@ -126,7 +132,7 @@ export function BirthdayClotheslineStage({
 
       {error ? (
         <p className="birthday-error">{error}</p>
-      ) : celebrants.length > 0 ? (
+      ) : shown.length > 0 ? (
         <div className="bd4-lines" style={{ "--lines": lines.length } as CSSProperties}>
           {lines.map((line, lineIndex) => (
             <div
@@ -170,22 +176,37 @@ export function BirthdayClotheslineStage({
             </div>
           ))}
         </div>
+      ) : isLoading ? (
+        <BirthdayEmpty isLoading />
       ) : (
-        <BirthdayEmpty isLoading={isLoading} />
+        <div className="bd4-none">
+          <Gift className="bd4-none-icon" aria-hidden="true" />
+          <p className="bd4-happy">No birthdays this time</p>
+          <p className="bd4-wish">We&apos;ll be celebrating again soon.</p>
+          <div className="bd4-ranges">
+            <span className="bd4-range">{rangeLabel}</span>
+            {upcoming && <span className="bd4-range bd4-range--quiet">Coming up · {upcoming.label}</span>}
+          </div>
+        </div>
       )}
 
-      <footer className="bd4-foot">
-        <p className="bd4-happy">Happy Birthday</p>
-        {celebrants.length > 0 && (
-          <h1 className="bd4-names">{formatNamesList(celebrants.map((c) => displayName(c.firstName)))}</h1>
-        )}
-        <p className="bd4-wish">
-          The ACOB Family celebrates you — wishing you joy, grace, peace, and a beautiful year ahead.
-        </p>
-        <span className="bd4-range">{rangeLabel}</span>
-      </footer>
+      {shown.length > 0 && (
+        <footer className="bd4-foot">
+          <p className="bd4-happy">{promoted ? "Coming up" : "Happy Birthday"}</p>
+          <h1 className="bd4-names">{formatNamesList(shown.map((c) => displayName(c.firstName)))}</h1>
+          <p className="bd4-wish">
+            {promoted
+              ? "Join the ACOB Family in wishing them joy, grace, peace, and a beautiful year ahead."
+              : "The ACOB Family celebrates you — wishing you joy, grace, peace, and a beautiful year ahead."}
+          </p>
+          <div className="bd4-ranges">
+            <span className="bd4-range">{promoted && upcoming ? upcoming.label : rangeLabel}</span>
+            {promoted && <span className="bd4-range bd4-range--quiet">No birthdays · {rangeLabel}</span>}
+          </div>
+        </footer>
+      )}
 
-      {upcoming && <BirthdayUpcoming upcoming={upcoming} />}
+      {upcoming && celebrants.length > 0 && <BirthdayUpcoming upcoming={upcoming} />}
 
       {children}
     </section>
