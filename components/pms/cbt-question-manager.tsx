@@ -12,6 +12,7 @@ import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/u
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { pickCurrentCycle } from "@/lib/pms/cadence"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -98,9 +99,7 @@ function QuestionCard({
           <p className="text-muted-foreground text-xs">{audience}</p>
           <p className="text-muted-foreground text-xs">Correct answer: Option {question.correct_option}</p>
         </div>
-        <Badge variant={question.is_active === false ? "secondary" : "default"}>
-          {question.is_active === false ? "Inactive" : "Active"}
-        </Badge>
+        <StatusBadge status={question.is_active === false ? "inactive" : "active"} className="text-xs" />
       </div>
 
       <div className="grid gap-2 text-sm">
@@ -342,11 +341,7 @@ export function CbtQuestionManager({
       label: "Status",
       sortable: true,
       accessor: (row) => (row.is_active === false ? "Inactive" : "Active"),
-      render: (row) => (
-        <Badge variant={row.is_active === false ? "secondary" : "default"}>
-          {row.is_active === false ? "Inactive" : "Active"}
-        </Badge>
-      ),
+      render: (row) => <StatusBadge status={row.is_active === false ? "inactive" : "active"} className="text-xs" />,
     },
     {
       key: "created_at",
@@ -526,9 +521,7 @@ export function CbtQuestionManager({
           subtitle: (question) =>
             `${question.department || "General"} · ${cycleNameById.get(question.review_cycle_id || "") || "Unassigned"}`,
           trailing: (question) => (
-            <Badge variant={question.is_active === false ? "secondary" : "default"}>
-              {question.is_active === false ? "Inactive" : "Active"}
-            </Badge>
+            <StatusBadge status={question.is_active === false ? "inactive" : "active"} className="text-xs" />
           ),
           onSelect: openEditModal,
         }}

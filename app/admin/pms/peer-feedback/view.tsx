@@ -6,6 +6,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -63,7 +64,9 @@ function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: Pee
           <p className="font-semibold">{personName(row.subject)}</p>
           <p className="text-muted-foreground text-xs">{row.subject?.department || "No department"}</p>
         </div>
-        <Badge variant={row.score >= 70 ? "default" : "secondary"}>{row.score}%</Badge>
+        <Badge className={row.score >= 70 ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}>
+          {row.score}%
+        </Badge>
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
@@ -198,14 +201,18 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         label: "Score",
         sortable: true,
         accessor: (row) => row.score,
-        render: (row) => <Badge variant={row.score >= 70 ? "default" : "secondary"}>{row.score}%</Badge>,
+        render: (row) => (
+          <Badge className={row.score >= 70 ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}>
+            {row.score}%
+          </Badge>
+        ),
       },
       {
         key: "status",
         label: "Status",
         sortable: true,
         accessor: (row) => row.status,
-        render: (row) => <Badge variant={row.status === "submitted" ? "default" : "secondary"}>{row.status}</Badge>,
+        render: (row) => <StatusBadge status={row.status} className="text-xs capitalize" />,
       },
       {
         key: "created_at",
@@ -368,7 +375,9 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
           subtitle: (row) =>
             `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,
           trailing: (row) => (
-            <Badge variant={row.score >= 70 ? "default" : "secondary"} className="text-xs">
+            <Badge
+              className={row.score >= 70 ? "bg-success/15 text-success text-xs" : "bg-warning/15 text-warning text-xs"}
+            >
               {row.score}%
             </Badge>
           ),
