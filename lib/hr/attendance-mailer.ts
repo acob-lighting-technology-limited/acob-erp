@@ -17,6 +17,7 @@ export interface AttendanceMailPayload {
   /** Extra cards after `details`, one per group (a summary email lists one per employee). */
   sections?: AttendanceMailSection[]
   ctaPath?: string
+  ctaLabel?: string
 }
 
 export interface AttendanceMailSection {
@@ -84,7 +85,7 @@ function buildEmailHtml(payload: Omit<AttendanceMailPayload, "to" | "subject">) 
     buildDetailsCard(payload.detailsTitle ?? "Details", payload.details ?? []) +
     (payload.sections ?? []).map((section) => buildDetailsCard(section.title, section.details)).join("") +
     '<div class="cta">' +
-    `<a href="${ctaUrl}" class="button" style="color:#fff;">Open Attendance Portal</a>` +
+    `<a href="${ctaUrl}" class="button" style="color:#fff;">${escapeHtml(payload.ctaLabel ?? "Open Attendance Portal")}</a>` +
     "</div>" +
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
@@ -116,6 +117,7 @@ export async function sendAttendanceMail(payload: AttendanceMailPayload) {
       details: payload.details,
       sections: payload.sections,
       ctaPath: payload.ctaPath,
+      ctaLabel: payload.ctaLabel,
     }),
   })
 }

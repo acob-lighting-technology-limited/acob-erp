@@ -5,6 +5,8 @@ import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { ATTENDANCE_STATUS_LABELS, type UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { sendAttendanceMail, type AttendanceMailDetail } from "@/lib/hr/attendance-mailer"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
+import { loadDepartmentLeads } from "@/lib/hr/attendance-appeals"
+import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("attendance-notify")
 
@@ -164,9 +166,8 @@ function groupByEmployee(appeals: DecidedAppealRow[]): Map<string, DecidedAppeal
 }
 
 /**
- * Emails decided attendance appeals as summaries, never one email per appeal: each employee gets
- * one email listing every day decided for them, and the Admin & HR lead gets one email covering
- * everyone. A Department Lead whose step an override skipped gets a summary of those overrides.
+ * Emails each employee one summary of their decided attendance appeals, never one email per
+ * appeal. Leads hear about decisions only in their daily summary (sendAppealLeadDailySummary).
  *
  * Run by /api/cron/attendance/appeal-digest. Each appeal is claimed (decision_emailed_at stamped)
  * before anything is sent, so a rerun or an overlapping run never mails it twice; a failed send
@@ -239,57 +240,6 @@ export async function sendAppealDecisionDigest(client: NotifyClient): Promise<{ 
     emails += 1
   }
 
-  // ── One email per lead, one card per employee ──
-  const appealsByLeadEmail = new Map<string, DecidedAppealRow[]>()
-  for (const email of await resolveAdminHrLeadEmails(client)) appealsByLeadEmail.set(email, appeals)
-
-  const skippedByDepartment = new Map<string, DecidedAppealRow[]>()
-  for (const appeal of appeals) {
-    const department = profileMap.get(appeal.user_id)?.department
-    if (!appeal.overridden_by || appeal.overridden_stage !== "pending_lead" || !department) continue
-    skippedByDepartment.set(department, [...(skippedByDepartment.get(department) ?? []), appeal])
-  }
-  for (const [department, skipped] of skippedByDepartment) {
-    for (const email of await departmentLeadEmails(client, department)) {
-      const key = email.toLowerCase()
-      if (!appealsByLeadEmail.has(key)) appealsByLeadEmail.set(key, skipped)
-    }
-  }
-
-  for (const [email, decided] of appealsByLeadEmail) {
-    const byEmployee = groupByEmployee(decided)
-    const only = decided.length === 1 ? decided[0] : null
-    await sendAttendanceMail({
-      to: [email],
-      subject: only
-        ? `Attendance Appeal ${appealVerb(only)} — ${only.appeal_date} (${nameOf(only.user_id)})`
-        : `Attendance Appeals Decided — ${countLabel(decided.length, "day")}, ${countLabel(byEmployee.size, "employee")}`,
-      title: "Attendance Appeals Decided",
-      message: `${countLabel(decided.length, "attendance appeal")} for ${countLabel(byEmployee.size, "employee")} ${decided.length === 1 ? "was" : "were"} decided since the last summary (sent ${formatTimestamp(new Date().toISOString())} WAT).`,
-      sections: [...byEmployee].map(([userId, rows]) => ({
-        title: `${nameOf(userId)} — ${countLabel(rows.length, "day")}`,
-        details: rows.map((appeal) => {
-          const actorId = appealActorId(appeal)
-          const comment = appealComment(appeal)
-          return {
-            label: appeal.appeal_date,
-            value: [
-              appealVerb(appeal),
-              appealTransition(appeal),
-              actorId ? `by ${nameOf(actorId)}` : null,
-              appeal.appeal_reason?.trim() ? `Reason: ${appeal.appeal_reason.trim()}` : null,
-              comment ? `Comment: ${comment}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          }
-        }),
-      })),
-      ctaPath: "/admin/hr/attendance?tab=appeals",
-    })
-    emails += 1
-  }
-
   return { appeals: appeals.length, emails }
 }
 
@@ -334,67 +284,234 @@ export async function notifyAttendanceInApp(client: NotifyClient, params: Notify
   }
 }
 
-export interface NotifyAppealSubmittedParams {
-  /** Employee who raised the appeal. */
-  appellantId: string
-  /** Day appealed, YYYY-MM-DD. */
-  date: string
-  fromStatus: string
-  requestedStatus: string
-  reason: string
+/** An appeal as the leads' daily summary reads it: any status. */
+type SummaryAppealRow = Omit<DecidedAppealRow, "status"> & {
+  status: string
+  stage: string | null
+  created_at: string
+}
+
+/** system_settings key holding { lastSentDate, lastSentAt } so the summary goes once a day. */
+const LEAD_SUMMARY_SETTING_KEY = "attendance_appeal_lead_summary"
+
+/** A missed run picks up from the last summary, but never reaches back further than this. */
+const LEAD_SUMMARY_MAX_LOOKBACK_DAYS = 3
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** "2026-10-26, 2026-10-27", or "2026-10-06 to 2026-10-29 (18 days)" for a long run. */
+function datesLabel(dates: string[]): string {
+  const sorted = [...new Set(dates)].sort()
+  if (sorted.length <= 4) return sorted.join(", ")
+  return `${sorted[0]} to ${sorted[sorted.length - 1]} (${sorted.length} days)`
 }
 
 /**
- * Emails the appellant's department lead and the Admin & HR lead when an appeal is raised.
- * Until this, a new appeal only produced an in-app notification for the department lead, so an
- * appeal could sit unseen by anyone who did not open the app, and HR heard nothing until it was
- * decided. Same two gates as every other attendance email. Best-effort: never throws.
+ * One row per employee (per outcome, for decided appeals), so a range appeal reads as one line.
  */
-export async function notifyAppealSubmittedMail(
+function summaryDetails(
+  rows: SummaryAppealRow[],
+  nameOf: (id: string) => string,
+  outcome?: (row: SummaryAppealRow) => string
+): AttendanceMailDetail[] {
+  const groups = new Map<string, SummaryAppealRow[]>()
+  for (const row of rows) {
+    const key = `${row.user_id}|${outcome ? outcome(row) : ""}`
+    groups.set(key, [...(groups.get(key) ?? []), row])
+  }
+  return [...groups.values()].map((group) => {
+    const first = group[0]
+    const requested = [...new Set(group.map((row) => statusLabel(row.requested_status)))].join(" / ")
+    return {
+      label: nameOf(first.user_id),
+      value: [
+        datesLabel(group.map((row) => row.appeal_date)),
+        outcome ? outcome(first) : `${statusLabel(first.current_status)} → ${requested}`,
+        first.appeal_reason?.trim() ? `Reason: ${first.appeal_reason.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    }
+  })
+}
+
+function decidedOutcome(row: SummaryAppealRow): string {
+  return appealVerb(row as DecidedAppealRow)
+}
+
+/**
+ * The once-a-day appeal email for leads, sent by /api/cron/attendance/appeal-lead-summary at
+ * 08:30 WAT. Leads get no other appeal email: it replaces the email per submitted appeal and the
+ * lead copy of every decision.
+ *
+ * - Each Department Lead, per department they lead: appeals waiting for them, appeals raised
+ *   since the last summary, and appeals decided since then (overrides that skipped them
+ *   included), with a button to that department's Appeals tab.
+ * - The Admin & HR lead: appeals waiting at the admin stages, plus everything raised and
+ *   decided since the last summary across the company, with a button to the admin Appeals tab.
+ *
+ * A lead with nothing in any section gets no email. Once a day: the WAT date it went out is
+ * recorded, so a rerun the same day sends nothing.
+ */
+export async function sendAppealLeadDailySummary(
   client: NotifyClient,
-  params: NotifyAppealSubmittedParams
-): Promise<void> {
-  try {
-    if (!(await isSystemNotificationChannelEnabled(client, "attendance", "email"))) return
-    const policy = await loadAttendancePolicy(client)
-    if (policy.emailNotificationsEnabled === false) return
+  now: Date = new Date()
+): Promise<{ emails: number; skipped?: string }> {
+  const today = toLocalISODate(now)
+  const { data: setting, error: settingError } = await client
+    .from("system_settings")
+    .select("value")
+    .eq("key", LEAD_SUMMARY_SETTING_KEY)
+    .maybeSingle<{ value: { lastSentDate?: string; lastSentAt?: string } | null }>()
+  if (settingError) throw new Error(`Failed to read ${LEAD_SUMMARY_SETTING_KEY}: ${settingError.message}`)
+  const state = setting?.value ?? {}
+  if (state.lastSentDate === today) return { emails: 0, skipped: "already_sent" }
 
-    const { data: appellant } = await client
+  const floor = now.getTime() - LEAD_SUMMARY_MAX_LOOKBACK_DAYS * DAY_MS
+  const lastSent = state.lastSentAt ? new Date(state.lastSentAt).getTime() : NaN
+  const since = new Date(Number.isNaN(lastSent) ? now.getTime() - DAY_MS : Math.max(lastSent, floor)).toISOString()
+
+  const recordSent = async () => {
+    const { error } = await client.from("system_settings").upsert(
+      {
+        key: LEAD_SUMMARY_SETTING_KEY,
+        value: { lastSentDate: today, lastSentAt: now.toISOString() },
+        description: "Last daily attendance appeal summary sent to leads.",
+      },
+      { onConflict: "key" }
+    )
+    if (error) log.error({ err: error.message }, "Could not record the appeal lead summary date")
+  }
+
+  if (!(await isSystemNotificationChannelEnabled(client, "attendance", "email"))) {
+    await recordSent()
+    return { emails: 0, skipped: "email_disabled" }
+  }
+  const policy = await loadAttendancePolicy(client)
+  if (policy.emailNotificationsEnabled === false) {
+    await recordSent()
+    return { emails: 0, skipped: "email_disabled" }
+  }
+
+  const { data: rows, error } = await client
+    .from("attendance_appeals")
+    .select(`${DECIDED_APPEAL_COLUMNS}, stage, created_at`)
+    .or(`status.eq.pending,created_at.gte.${since},updated_at.gte.${since}`)
+    .order("appeal_date", { ascending: true })
+    .returns<SummaryAppealRow[]>()
+  if (error) throw new Error(`Failed to load appeals for the lead summary: ${error.message}`)
+  const appeals = rows ?? []
+
+  const personIds = new Set<string>()
+  for (const appeal of appeals) {
+    personIds.add(appeal.user_id)
+    const actorId = appealActorId(appeal as DecidedAppealRow)
+    if (actorId) personIds.add(actorId)
+  }
+  const leads = await loadDepartmentLeads(client)
+  for (const ids of leads.idsByDepartment.values()) for (const id of ids) personIds.add(id)
+
+  const [{ data: people }, { data: departments }] = await Promise.all([
+    client
       .from("profiles")
-      .select("id, full_name, first_name, last_name, department")
-      .eq("id", params.appellantId)
-      .maybeSingle<
-        Pick<ProfileNameEmailRow, "id" | "full_name" | "first_name" | "last_name"> & {
-          department: string | null
-        }
-      >()
+      .select("id, full_name, first_name, last_name, company_email, additional_email, department")
+      .in("id", [...personIds])
+      .returns<Array<ProfileNameEmailRow & { department: string | null }>>(),
+    client.from("departments").select("id, name").returns<Array<{ id: string; name: string }>>(),
+  ])
+  const profileMap = new Map((people ?? []).map((row) => [row.id, row]))
+  const nameOf = (id: string) => formatName(profileMap.get(id))
+  const departmentIdByName = new Map(
+    (departments ?? []).map((dept) => [normalizeDepartmentName(dept.name), dept.id] as const)
+  )
+  const departmentOf = (appeal: SummaryAppealRow) =>
+    normalizeDepartmentName(profileMap.get(appeal.user_id)?.department ?? "")
 
-    const appellantName = formatName(appellant)
-    const department = appellant?.department ?? null
-    const [deptLeadEmails, hrLeadEmails] = await Promise.all([
-      department ? departmentLeadEmails(client, department) : Promise.resolve([] as string[]),
-      resolveAdminHrLeadEmails(client),
-    ])
-    const recipients = Array.from(new Set([...deptLeadEmails, ...hrLeadEmails].map((email) => email.toLowerCase())))
-    if (recipients.length === 0) return
+  const isRaised = (appeal: SummaryAppealRow) => appeal.created_at >= since
+  const isDecided = (appeal: SummaryAppealRow) => appeal.status !== "pending" && appeal.updated_at >= since
+  const adminHr = normalizeDepartmentName(ADMIN_HR_DEPARTMENT)
+
+  const sendSummary = async (params: {
+    to: string[]
+    scopeLabel: string
+    waiting: SummaryAppealRow[]
+    pool: SummaryAppealRow[]
+    note?: string
+    ctaPath: string
+  }) => {
+    const raised = params.pool.filter(isRaised)
+    const decided = params.pool.filter(isDecided)
+    if (params.waiting.length + raised.length + decided.length === 0 || params.to.length === 0) return 0
+
+    const sections = [
+      { title: `Waiting for you (${params.waiting.length})`, rows: params.waiting, outcome: undefined },
+      { title: `Raised since the last summary (${raised.length})`, rows: raised, outcome: undefined },
+      { title: `Decided since the last summary (${decided.length})`, rows: decided, outcome: decidedOutcome },
+    ]
+      .filter((section) => section.rows.length > 0)
+      .map((section) => ({ title: section.title, details: summaryDetails(section.rows, nameOf, section.outcome) }))
 
     await sendAttendanceMail({
-      to: recipients,
-      subject: `Attendance Appeal Submitted — ${params.date} (${appellantName})`,
-      title: "Attendance Appeal Submitted",
-      message: `${appellantName} has appealed their attendance for ${params.date}. It is waiting for review on the Appeals tab of Attendance.`,
-      detailsTitle: "Appeal Details",
-      ctaPath: "/admin/hr/attendance?tab=appeals",
-      details: [
-        { label: "Employee", value: appellantName },
-        { label: "Department", value: department || "N/A" },
-        { label: "Date", value: params.date },
-        { label: "Status", value: `${statusLabel(params.fromStatus)} → ${statusLabel(params.requestedStatus)}` },
-        { label: "Reason", value: params.reason.trim() || "N/A" },
-        { label: "Submitted", value: formatTimestamp(new Date().toISOString()) },
-      ],
+      to: params.to,
+      subject:
+        params.waiting.length > 0
+          ? `Attendance Appeals — ${countLabel(params.waiting.length, "day")} waiting for you (${params.scopeLabel})`
+          : `Attendance Appeals Summary (${params.scopeLabel})`,
+      title: "Attendance Appeals Summary",
+      message:
+        (params.waiting.length > 0
+          ? `${countLabel(params.waiting.length, "appealed day")} ${params.waiting.length === 1 ? "is" : "are"} waiting for your review.`
+          : "Nothing is waiting for your review.") +
+        ` Below is what was raised and decided since the last summary (${formatTimestamp(since)} WAT).` +
+        (params.note ? ` ${params.note}` : ""),
+      sections,
+      ctaPath: params.ctaPath,
+      ctaLabel: "Review Appeals",
     })
-  } catch (err) {
-    log.error({ err: String(err) }, "Failed to send appeal submitted email")
+    return 1
   }
+
+  let emails = 0
+
+  // ── Department Leads, one email per department they lead ──
+  for (const [department, leadIds] of leads.idsByDepartment) {
+    const key = normalizeDepartmentName(department)
+    if (key === adminHr) continue // Admin & HR's own appeals are in the Admin & HR lead's email.
+    const pool = appeals.filter((appeal) => departmentOf(appeal) === key)
+    const waiting = pool.filter((appeal) => appeal.status === "pending" && appeal.stage === "pending_lead")
+    const departmentId = departmentIdByName.get(key)
+    const to = [...new Set(leadIds)].flatMap((id) => collectEmails(profileMap.get(id)))
+    emails += await sendSummary({
+      to,
+      scopeLabel: department,
+      waiting,
+      pool,
+      ctaPath: departmentId ? `/dept/${departmentId}/hr/attendance?tab=appeals` : "/hr/attendance",
+    })
+  }
+
+  // ── Admin & HR lead, one email covering the company ──
+  const withLeads = appeals.filter(
+    (appeal) => appeal.status === "pending" && appeal.stage === "pending_lead" && departmentOf(appeal) !== adminHr
+  )
+  emails += await sendSummary({
+    to: await resolveAdminHrLeadEmails(client),
+    scopeLabel: "all departments",
+    waiting: appeals.filter(
+      (appeal) =>
+        appeal.status === "pending" &&
+        (appeal.stage === "pending_admin" ||
+          appeal.stage === "pending_hr_lead" ||
+          (appeal.stage === "pending_lead" && departmentOf(appeal) === adminHr))
+    ),
+    pool: appeals,
+    note:
+      withLeads.length > 0
+        ? `${countLabel(withLeads.length, "more day")} ${withLeads.length === 1 ? "is" : "are"} still with Department Leads.`
+        : undefined,
+    ctaPath: "/admin/hr/attendance?tab=appeals",
+  })
+
+  await recordSent()
+  return { emails }
 }

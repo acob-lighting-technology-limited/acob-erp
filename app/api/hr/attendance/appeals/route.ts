@@ -10,7 +10,6 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { addIsoDays } from "@/lib/hr/leave-days"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import {
   departmentHasLead,
@@ -502,15 +501,7 @@ export async function POST(request: NextRequest) {
       message: `${employeeName} has ${isAdvance ? "requested advance permission" : "submitted an appeal"} for ${appealDate} (${requestedStatus}).`,
     })
 
-    if (!isAdvance) {
-      await notifyAppealSubmittedMail(dataClient, {
-        appellantId: effectiveUserId,
-        date: appealDate,
-        fromStatus: currentStatus,
-        requestedStatus,
-        reason: appealReason,
-      })
-    }
+    // No email here: leads get new appeals in their 08:30 daily summary (sendAppealLeadDailySummary).
 
     return NextResponse.json({ data: appeal }, { status: 201 })
   } catch (err) {
