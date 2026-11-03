@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Receipt } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { STATUS_LABELS, formatNaira } from "@/lib/requisitions/format"
@@ -73,9 +73,7 @@ export function TicketRequisitionsCard({
                   {FORM_LABELS[r.form_type]} · {formatNaira(r.amount)} · {r.requester?.full_name}
                 </span>
               </span>
-              <Badge variant="secondary" className="shrink-0">
-                {STATUS_LABELS[r.status]}
-              </Badge>
+              <StatusBadge status={r.status} label={STATUS_LABELS[r.status]} className="shrink-0 text-xs" />
             </Link>
           ))
         ) : (

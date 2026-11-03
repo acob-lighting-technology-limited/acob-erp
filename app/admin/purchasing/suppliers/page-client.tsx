@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -161,11 +162,7 @@ export default function SuppliersPage() {
         key: "status",
         label: "Status",
         accessor: (supplier) => (supplier.is_active ? "Active" : "Inactive"),
-        render: (supplier) => (
-          <Badge variant={supplier.is_active ? "default" : "secondary"}>
-            {supplier.is_active ? "Active" : "Inactive"}
-          </Badge>
-        ),
+        render: (supplier) => <StatusBadge status={supplier.is_active ? "active" : "inactive"} className="text-xs" />,
       },
     ],
     []
@@ -309,9 +306,7 @@ export default function SuppliersPage() {
           title: (supplier) => supplier.name,
           subtitle: (supplier) => `${supplier.code} · ${supplier.contact_person || supplier.email || "No contact"}`,
           trailing: (supplier) => (
-            <Badge variant={supplier.is_active ? "default" : "secondary"} className="text-xs">
-              {supplier.is_active ? "Active" : "Inactive"}
-            </Badge>
+            <StatusBadge status={supplier.is_active ? "active" : "inactive"} className="text-xs" />
           ),
           onSelect: (supplier) => openEdit(supplier),
         }}
@@ -322,9 +317,7 @@ export default function SuppliersPage() {
                 <p className="font-medium">{supplier.name}</p>
                 <p className="text-muted-foreground text-sm">{supplier.code}</p>
               </div>
-              <Badge variant={supplier.is_active ? "default" : "secondary"}>
-                {supplier.is_active ? "Active" : "Inactive"}
-              </Badge>
+              <StatusBadge status={supplier.is_active ? "active" : "inactive"} className="text-xs" />
             </div>
             <div className="grid gap-1 text-sm">
               <div className="flex items-center justify-between">

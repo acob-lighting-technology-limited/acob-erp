@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Plus, Wallet } from "lucide-react"
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import type { ExtraTab } from "@/components/requisitions/requisitions-list-page"
 import { apiFetch } from "@/lib/api-client"
@@ -115,7 +116,7 @@ export function useFundingCategoriesTab(): ExtraTab {
       label: "Status",
       sortable: true,
       accessor: (c) => String(c.is_active),
-      render: (c) => <Badge variant={c.is_active ? "default" : "outline"}>{c.is_active ? "Active" : "Inactive"}</Badge>,
+      render: (c) => <StatusBadge status={c.is_active ? "active" : "inactive"} className="text-xs" />,
       initialWidth: 110,
     },
     {
@@ -173,11 +174,7 @@ export function useFundingCategoriesTab(): ExtraTab {
           mobileRow={{
             title: (c) => c.name,
             subtitle: (c) => `${c.code} · ${c.description || "No description"}`,
-            trailing: (c) => (
-              <Badge variant={c.is_active ? "default" : "outline"} className="text-xs">
-                {c.is_active ? "Active" : "Inactive"}
-              </Badge>
-            ),
+            trailing: (c) => <StatusBadge status={c.is_active ? "active" : "inactive"} className="text-xs" />,
             onSelect: (c) => openEditor(c),
           }}
           cardRenderer={(c) => (
@@ -187,7 +184,7 @@ export function useFundingCategoriesTab(): ExtraTab {
                   <p className="text-sm font-semibold">{c.name}</p>
                   <span className="text-muted-foreground font-mono text-xs">{c.code}</span>
                 </div>
-                <Badge variant={c.is_active ? "default" : "outline"}>{c.is_active ? "Active" : "Inactive"}</Badge>
+                <StatusBadge status={c.is_active ? "active" : "inactive"} className="text-xs" />
               </div>
               <p className="text-muted-foreground text-xs">{c.description || "No description"}</p>
             </div>
