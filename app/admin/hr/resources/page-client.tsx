@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -208,21 +209,7 @@ export default function AdminFleetPage() {
         key: "status",
         label: "Status",
         accessor: (r) => r.status,
-        render: (r) => (
-          <Badge
-            variant={
-              r.status === "approved"
-                ? "default"
-                : r.status === "pending"
-                  ? "secondary"
-                  : r.status === "rejected"
-                    ? "destructive"
-                    : "outline"
-            }
-          >
-            {r.status}
-          </Badge>
-        ),
+        render: (r) => <StatusBadge status={r.status} className="text-xs" />,
       },
       {
         key: "attachments",
@@ -320,9 +307,7 @@ export default function AdminFleetPage() {
         key: "status",
         label: "Status",
         accessor: (r) => String(r.is_active),
-        render: (r) => (
-          <Badge variant={r.is_active ? "default" : "outline"}>{r.is_active ? "Active" : "Inactive"}</Badge>
-        ),
+        render: (r) => <StatusBadge status={r.is_active ? "active" : "inactive"} className="text-xs" />,
       },
     ],
     []
@@ -458,22 +443,7 @@ export default function AdminFleetPage() {
           mobileRow={{
             title: (r) => `${r.resource?.name || "Resource"} · ${r.requester?.full_name || "Employee"}`,
             subtitle: (r) => `${formatDateTime(r.start_at)} - ${formatDateTime(r.end_at)} · ${r.reason || "No reason"}`,
-            trailing: (r) => (
-              <Badge
-                variant={
-                  r.status === "approved"
-                    ? "default"
-                    : r.status === "pending"
-                      ? "secondary"
-                      : r.status === "rejected"
-                        ? "destructive"
-                        : "outline"
-                }
-                className="text-xs"
-              >
-                {r.status}
-              </Badge>
-            ),
+            trailing: (r) => <StatusBadge status={r.status} className="text-xs" />,
             onSelect: (r) => openReview(r),
           }}
           cardRenderer={(r) => (
@@ -483,19 +453,7 @@ export default function AdminFleetPage() {
                   <p className="text-sm font-semibold">{r.resource?.name || "Resource"}</p>
                   <p className="text-muted-foreground text-xs">{r.requester?.full_name || "Employee"}</p>
                 </div>
-                <Badge
-                  variant={
-                    r.status === "approved"
-                      ? "default"
-                      : r.status === "pending"
-                        ? "secondary"
-                        : r.status === "rejected"
-                          ? "destructive"
-                          : "outline"
-                  }
-                >
-                  {r.status}
-                </Badge>
+                <StatusBadge status={r.status} className="text-xs" />
               </div>
               <p className="text-muted-foreground line-clamp-2 text-xs">{r.reason}</p>
               <div className="text-muted-foreground border-t pt-2 text-xs">
@@ -527,11 +485,7 @@ export default function AdminFleetPage() {
           mobileRow={{
             title: (r) => r.name,
             subtitle: (r) => `${r.resource_type} · ${r.description || "No description"}`,
-            trailing: (r) => (
-              <Badge variant={r.is_active ? "default" : "outline"} className="text-xs">
-                {r.is_active ? "Active" : "Inactive"}
-              </Badge>
-            ),
+            trailing: (r) => <StatusBadge status={r.is_active ? "active" : "inactive"} className="text-xs" />,
           }}
           cardRenderer={(r) => (
             <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
@@ -540,7 +494,7 @@ export default function AdminFleetPage() {
                   <p className="text-sm font-semibold">{r.name}</p>
                   <p className="text-muted-foreground text-xs capitalize">{r.resource_type}</p>
                 </div>
-                <Badge variant={r.is_active ? "default" : "outline"}>{r.is_active ? "Active" : "Inactive"}</Badge>
+                <StatusBadge status={r.is_active ? "active" : "inactive"} className="text-xs" />
               </div>
               <p className="text-muted-foreground text-xs">{r.description || "No description"}</p>
             </div>

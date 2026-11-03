@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
@@ -837,18 +838,7 @@ export function LeaveApprovePage({
               subtitle: (r) => `${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
               trailing: (r) => (
                 <div className="flex items-center gap-1.5">
-                  <Badge
-                    variant={
-                      r.status === "approved" || r.status === "completed"
-                        ? "default"
-                        : r.status === "rejected" || r.status === "cancelled"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                    className="text-xs"
-                  >
-                    {r.status}
-                  </Badge>
+                  <StatusBadge status={r.status} className="text-xs" />
                 </div>
               ),
               detail: {
@@ -863,19 +853,7 @@ export function LeaveApprovePage({
                     className="text-xl"
                   />
                 ),
-                badges: (r) => (
-                  <Badge
-                    variant={
-                      r.status === "approved" || r.status === "completed"
-                        ? "default"
-                        : r.status === "rejected" || r.status === "cancelled"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {r.status}
-                  </Badge>
-                ),
+                badges: (r) => <StatusBadge status={r.status} className="text-xs" />,
                 fields: (r) => [
                   {
                     icon: User,
@@ -935,9 +913,7 @@ export function LeaveApprovePage({
                     <h4 className="text-lg font-semibold">{r.user?.full_name}</h4>
                     <p className="text-muted-foreground text-xs">{r.leave_type?.name}</p>
                   </div>
-                  <Badge variant={r.status === "approved" || r.status === "completed" ? "default" : "secondary"}>
-                    {r.status}
-                  </Badge>
+                  <StatusBadge status={r.status} className="text-xs" />
                 </div>
 
                 <div className="text-muted-foreground space-y-2 text-sm">

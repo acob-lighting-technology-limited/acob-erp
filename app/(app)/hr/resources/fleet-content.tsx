@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -343,20 +344,7 @@ export function FleetContent() {
   )
 
   const statusPill = (row: FleetBookingRow) => (
-    <Badge
-      variant={
-        row.status === "approved"
-          ? "default"
-          : row.status === "pending"
-            ? "secondary"
-            : row.status === "rejected"
-              ? "destructive"
-              : "outline"
-      }
-      className="text-xs whitespace-nowrap capitalize"
-    >
-      {row.status}
-    </Badge>
+    <StatusBadge status={row.status} className="text-xs whitespace-nowrap capitalize" />
   )
 
   const columns = useMemo<DataTableColumn<FleetBookingRow>[]>(

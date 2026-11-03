@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Dialog } from "@/components/ui/dialog"
 import { ManageGrossSalaryDialog } from "@/components/hr/manage-gross-salary-dialog"
 import { FileText, DollarSign, Calendar, ClipboardList, Calculator } from "lucide-react"
@@ -229,16 +230,11 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "status",
       label: "Run Status",
       render: (row: DbPayrollEntry) => (
-        <Badge
-          variant={row.payroll_periods?.status === "completed" ? "default" : "outline"}
-          className={
-            row.payroll_periods?.status === "completed"
-              ? "text-success bg-success/10"
-              : "border-amber-500/30 text-amber-600"
-          }
-        >
-          {row.payroll_periods?.status === "completed" ? "Published" : "Draft Run"}
-        </Badge>
+        <StatusBadge
+          status={row.payroll_periods?.status === "completed" ? "completed" : "draft"}
+          label={row.payroll_periods?.status === "completed" ? "Published" : "Draft Run"}
+          className="text-xs"
+        />
       ),
     },
   ]
@@ -371,11 +367,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           mobileRow={{
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
-            trailing: (row) => (
-              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-xs">
-                {row.status === "completed" ? "Completed" : "Draft"}
-              </Badge>
-            ),
+            trailing: (row) => <StatusBadge status={row.status} className="text-xs" />,
             onSelect: (row) => router.push(`/admin/payroll/${row.id}`),
           }}
           cardRenderer={(row) => (
@@ -388,9 +380,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   <p className="text-sm font-semibold">{row.name}</p>
                   <p className="text-muted-foreground text-xs">Pay date: {row.pay_date || "N/A"}</p>
                 </div>
-                <Badge variant={row.status === "completed" ? "default" : "outline"}>
-                  {row.status === "completed" ? "Completed" : "Draft"}
-                </Badge>
+                <StatusBadge status={row.status} className="text-xs" />
               </div>
               <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
                 <span>Start: {row.start_date}</span>

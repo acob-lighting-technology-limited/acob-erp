@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Copy, UserRoundCog, Users, Building2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -178,11 +179,7 @@ export function DevImpersonationContent() {
         label: "Status",
         accessor: (row) => row.employment_status,
         sortable: true,
-        render: (row) => (
-          <Badge variant={String(row.employment_status).toLowerCase() === "active" ? "default" : "secondary"}>
-            {row.employment_status}
-          </Badge>
-        ),
+        render: (row) => <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />,
       },
       {
         key: "action",
@@ -307,9 +304,7 @@ export function DevImpersonationContent() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{row.department}</Badge>
               <Badge variant="outline">{row.role}</Badge>
-              <Badge variant={String(row.employment_status).toLowerCase() === "active" ? "default" : "secondary"}>
-                {row.employment_status}
-              </Badge>
+              <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />
             </div>
             <Button
               size="sm"

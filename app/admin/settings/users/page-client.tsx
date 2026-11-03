@@ -19,6 +19,7 @@ import { getAssignableRolesForActor } from "@/lib/role-management"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api-client"
 
@@ -144,9 +145,10 @@ export default function UsersPage() {
         label: "Status",
         accessor: (u) => (u.employment_status === "exited" ? "Exited" : u.is_active ? "Active" : "Inactive"),
         render: (u) => (
-          <Badge variant={u.is_active ? "default" : "secondary"}>
-            {u.employment_status === "exited" ? "Exited" : u.is_active ? "Active" : "Inactive"}
-          </Badge>
+          <StatusBadge
+            status={u.employment_status === "exited" ? "exited" : u.is_active ? "active" : "inactive"}
+            className="text-xs"
+          />
         ),
       },
       {
@@ -326,9 +328,10 @@ export default function UsersPage() {
           title: (u) => (u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email || "User"),
           subtitle: (u) => `${u.role.replace(/_/g, " ")} · ${u.department || "No department"} · ${u.email}`,
           trailing: (u) => (
-            <Badge variant={u.is_active ? "default" : "secondary"} className="text-xs">
-              {u.employment_status === "exited" ? "Exited" : u.is_active ? "Active" : "Inactive"}
-            </Badge>
+            <StatusBadge
+              status={u.employment_status === "exited" ? "exited" : u.is_active ? "active" : "inactive"}
+              className="text-xs"
+            />
           ),
           onSelect: (u) => openEdit(u),
         }}
@@ -342,9 +345,10 @@ export default function UsersPage() {
                   </p>
                   <p className="text-muted-foreground mt-0.5 text-xs">{u.email}</p>
                 </div>
-                <Badge variant={u.is_active ? "default" : "secondary"}>
-                  {u.employment_status === "exited" ? "Exited" : u.is_active ? "Active" : "Inactive"}
-                </Badge>
+                <StatusBadge
+                  status={u.employment_status === "exited" ? "exited" : u.is_active ? "active" : "inactive"}
+                  className="text-xs"
+                />
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs">
