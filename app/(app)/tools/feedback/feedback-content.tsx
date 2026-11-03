@@ -6,6 +6,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Edit2, FileText, MessageSquare, Plus, Star, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -305,9 +306,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <Badge variant="outline" className="text-xs font-semibold capitalize">
                 {row.feedback_type.replaceAll("_", " ")}
               </Badge>
-              <Badge variant={row.status === "resolved" ? "default" : "outline"} className="capitalize">
-                {row.status}
-              </Badge>
+              <StatusBadge status={row.status} className="text-xs capitalize" />
             </div>
             <div>
               <h4 className="line-clamp-2 text-sm font-semibold">{row.title}</h4>

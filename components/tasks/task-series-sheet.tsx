@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Loader2, Pause, Play, Repeat, StopCircle, UserCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DetailSheet } from "@/components/ui/detail-sheet"
@@ -132,9 +133,12 @@ export function TaskSeriesSheet({
         description={detail ? detail.schedule_label : undefined}
         badges={
           series ? (
-            <Badge variant={series.status === "active" ? "default" : "outline"} className="text-xs">
-              {STATUS_LABELS[series.status]}
-            </Badge>
+            <StatusBadge
+              status={series.status}
+              label={STATUS_LABELS[series.status]}
+              tone={series.status === "active" ? "success" : series.status === "paused" ? "warning" : "neutral"}
+              className="text-xs"
+            />
           ) : null
         }
         footer={

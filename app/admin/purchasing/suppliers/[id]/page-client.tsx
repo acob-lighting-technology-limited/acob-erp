@@ -8,6 +8,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pencil, Phone, Mail, MapPin, ShoppingCart } from "lucide-react"
 import Link from "next/link"
@@ -75,9 +76,7 @@ export default function SupplierDetailPage() {
         backLink={{ href: "/admin/purchasing/suppliers", label: "Back to Suppliers" }}
         actions={
           <>
-            <Badge variant={supplier.is_active ? "default" : "secondary"}>
-              {supplier.is_active ? "Active" : "Inactive"}
-            </Badge>
+            <StatusBadge status={supplier.is_active ? "active" : "inactive"} className="text-xs" />
             <Button onClick={() => setIsEditOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit Supplier
@@ -174,9 +173,7 @@ export default function SupplierDetailPage() {
                         </TableCell>
                         <TableCell>{formatDate(order.order_date)}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="capitalize">
-                            {order.status}
-                          </Badge>
+                          <StatusBadge status={order.status} className="text-xs capitalize" />
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(order.total_amount)}</TableCell>
                       </TableRow>

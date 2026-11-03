@@ -24,13 +24,11 @@ interface StockMovement {
   created_by_name?: string
 }
 
-type BadgeVariant = "default" | "destructive" | "secondary" | "outline"
-
-const typeColors: Record<StockMovement["movement_type"], BadgeVariant> = {
-  in: "default",
-  out: "destructive",
-  adjustment: "secondary",
-  transfer: "outline",
+const movementTypeTones: Record<StockMovement["movement_type"], string> = {
+  in: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  out: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+  adjustment: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  transfer: "bg-blue-500/10 text-blue-600 border-blue-500/20",
 }
 
 const typeIcons = {
@@ -139,7 +137,7 @@ export default function MovementsPage() {
         render: (movement) => {
           const Icon = typeIcons[movement.movement_type]
           return (
-            <Badge variant={typeColors[movement.movement_type]} className="capitalize">
+            <Badge variant="outline" className={`capitalize ${movementTypeTones[movement.movement_type]}`}>
               <Icon className="mr-1 h-3 w-3" />
               {movement.movement_type}
             </Badge>
@@ -329,6 +327,30 @@ export default function MovementsPage() {
               {getQuantityLabel(movement)}
             </span>
           ),
+          detail: {
+            title: (movement) => movement.product_name || "Unknown product",
+            subtitle: (movement) => formatDate(movement.created_at),
+            badges: (movement) => {
+              const Icon = typeIcons[movement.movement_type]
+              return (
+                <Badge variant="outline" className={`capitalize ${movementTypeTones[movement.movement_type]}`}>
+                  <Icon className="mr-1 h-3 w-3" />
+                  {movement.movement_type}
+                </Badge>
+              )
+            },
+            fields: (movement) => [
+              { label: "Quantity", value: getQuantityLabel(movement) },
+              { label: "Movement Type", value: movement.movement_type.toUpperCase() },
+              {
+                label: "Reference Number",
+                value: movement.reference_number || "None",
+                copyable: Boolean(movement.reference_number),
+              },
+              { label: "Operator", value: movement.created_by_name || "System" },
+              { label: "Notes", value: movement.notes || "No notes added" },
+            ],
+          },
         }}
         cardRenderer={(movement) => {
           const Icon = typeIcons[movement.movement_type]
@@ -339,7 +361,7 @@ export default function MovementsPage() {
                   <p className="font-medium">{movement.product_name || "Unknown product"}</p>
                   <p className="text-muted-foreground text-sm">{formatDate(movement.created_at)}</p>
                 </div>
-                <Badge variant={typeColors[movement.movement_type]} className="capitalize">
+                <Badge variant="outline" className={`capitalize ${movementTypeTones[movement.movement_type]}`}>
                   <Icon className="mr-1 h-3 w-3" />
                   {movement.movement_type}
                 </Badge>

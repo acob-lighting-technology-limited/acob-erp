@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   Dialog,
@@ -65,7 +66,7 @@ function formatDate(date: string) {
 }
 
 function CompetencyStatusBadge({ isActive }: { isActive: boolean }) {
-  return <Badge variant={isActive ? "default" : "outline"}>{isActive ? "Active" : "Inactive"}</Badge>
+  return <StatusBadge status={isActive ? "active" : "inactive"} className="text-xs" />
 }
 
 function CompetencyCard({
@@ -486,11 +487,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
         mobileRow={{
           title: (c) => c.label,
           subtitle: (c) => `${CATEGORY_LABELS[c.category] || c.category} · ${c.key}`,
-          trailing: (c) => (
-            <Badge variant={c.is_active ? "default" : "secondary"} className="text-xs">
-              {c.is_active ? "Active" : "Inactive"}
-            </Badge>
-          ),
+          trailing: (c) => <StatusBadge status={c.is_active ? "active" : "inactive"} className="text-xs" />,
           onSelect: (c) => openEdit(c),
         }}
         cardRenderer={(competency) => (

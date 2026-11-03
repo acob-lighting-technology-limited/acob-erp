@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   FileText,
@@ -136,9 +137,11 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
       label: "Status",
       accessor: (r) => r.status,
       render: (r) => (
-        <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">
-          {formatName(r.status || "draft")}
-        </Badge>
+        <StatusBadge
+          status={r.status || "draft"}
+          label={formatName(r.status || "draft")}
+          className="text-xs capitalize"
+        />
       ),
     },
   ]
@@ -344,12 +347,11 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
                 ? `${r.reviewer.first_name || ""} ${r.reviewer.last_name || ""}`.trim() || "—"
                 : "—",
           trailing: (r) => (
-            <Badge
-              variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
+            <StatusBadge
+              status={r.acknowledged_at ? "acknowledged" : r.status || "draft"}
+              label={r.acknowledged_at ? "Acknowledged" : formatName(r.status || "draft")}
               className="text-xs capitalize"
-            >
-              {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
-            </Badge>
+            />
           ),
           onSelect: (r) => setDetailsReview(r),
           detail: {
@@ -364,12 +366,11 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
               </span>
             ),
             badges: (r) => (
-              <Badge
-                variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
+              <StatusBadge
+                status={r.acknowledged_at ? "acknowledged" : r.status || "draft"}
+                label={r.acknowledged_at ? "Acknowledged" : formatName(r.status || "draft")}
                 className="text-xs capitalize"
-              >
-                {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
-              </Badge>
+              />
             ),
             fields: (r) => [
               { icon: BarChart2, label: "Final score", value: `${formatMetric(r.final_score)}%` },
@@ -411,9 +412,11 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold">{getQuarterLabel(r)}</span>
-              <Badge variant={r.acknowledged_at ? "default" : "outline"} className="capitalize">
-                {r.acknowledged_at ? "Acknowledged" : r.status}
-              </Badge>
+              <StatusBadge
+                status={r.acknowledged_at ? "acknowledged" : r.status || "draft"}
+                label={r.acknowledged_at ? "Acknowledged" : formatName(r.status || "draft")}
+                className="text-xs capitalize"
+              />
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Reviewer:</span>

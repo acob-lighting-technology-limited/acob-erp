@@ -11,6 +11,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
@@ -259,9 +260,7 @@ export function TaskReviewDecisionDialog({
                   <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{task.description}</p>
                 )}
               </div>
-              <Badge variant="outline" className="shrink-0 capitalize">
-                {task.status.replaceAll("_", " ")}
-              </Badge>
+              <StatusBadge status={task.status} className="shrink-0 text-xs capitalize" />
             </div>
 
             <div className="text-muted-foreground grid grid-cols-2 gap-2 pt-1 text-xs">

@@ -32,6 +32,27 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.11",
+    title: "UI refinement and workflow enhancements",
+    summary: "Visual contrast improvements across status banners and approval workflows.",
+    areas: [
+      {
+        area: "UI & Badges",
+        items: [
+          "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
+          "Enhanced list views and side sheets across Impersonation, Payroll, Attendance, Stock Movements, Challenges, and Tasks with one-click actions, expandable details, and full record properties",
+          "Adopted standardized department short codes in list views and card subtitles across Impersonation, User Settings, Challenges, CBT logs, and Leave Management to eliminate text truncation on mobile while retaining full department names in side sheets and search filters",
+        ],
+      },
+      {
+        area: "Leave Management",
+        items: [
+          "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
+        ],
+      },
+    ],
+  },
+  {
     version: "2026.10",
     title: "Security, mailboxes and requisitions",
     summary:

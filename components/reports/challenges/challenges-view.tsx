@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -89,6 +90,7 @@ export function ChallengesView({
   leadDepartments = [],
   departments = [],
 }: ChallengesViewProps) {
+  const deptCode = useDepartmentCodes()
   const currentOfficeWeek = getCurrentOfficeWeek()
   const queryClient = useQueryClient()
   const queryKey = ["general-meeting-challenges"]
@@ -375,6 +377,7 @@ export function ChallengesView({
           return (
             row.title.toLowerCase().includes(q) ||
             row.department.toLowerCase().includes(q) ||
+            deptCode(row.department).toLowerCase().includes(q) ||
             (row.resolution_note || "").toLowerCase().includes(q)
           )
         }}
@@ -388,9 +391,17 @@ export function ChallengesView({
         viewToggle
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        rowActions={[
+          {
+            label: "Update",
+            icon: Pencil,
+            onClick: (row: ChallengeItem) => handleOpenEdit(row),
+            hidden: (row: ChallengeItem) => !canEditChallenge(row),
+          },
+        ]}
         mobileRow={{
           title: (row) => row.title,
-          subtitle: (row) => `${row.department} · Week ${row.week_number}, ${row.year}`,
+          subtitle: (row) => `${deptCode(row.department)} · Week ${row.week_number}, ${row.year}`,
           snippet: (row) =>
             row.resolution_note
               ? `Resolution: ${row.resolution_note}`
@@ -398,18 +409,24 @@ export function ChallengesView({
                 ? `Details: ${row.description}`
                 : null,
           trailing: (row) => getStatusBadge(row.status),
+          onSelect: (row) => {
+            if (canEditChallenge(row)) handleOpenEdit(row)
+          },
           detail: {
             title: (row) => row.title,
             subtitle: (row) => row.department,
             badges: (row) => getStatusBadge(row.status),
             fields: (row) => [
-              { label: "Department", value: row.department },
+              {
+                label: "Department",
+                value: row.department ? `${row.department} (${deptCode(row.department)})` : "—",
+              },
               { label: "Week", value: `Week ${row.week_number}, ${row.year}` },
               ...(row.description ? [{ label: "Description", value: row.description, fullWidth: true }] : []),
               { label: "Resolution / Mitigation", value: row.resolution_note || "No note yet", fullWidth: true },
             ],
             actions: (row) =>
-              isAdminContext && canEditChallenge(row)
+              canEditChallenge(row)
                 ? [{ label: "Update Challenge", icon: Pencil, onClick: () => handleOpenEdit(row) }]
                 : [],
           },
@@ -421,7 +438,7 @@ export function ChallengesView({
               {getStatusBadge(row.status)}
             </div>
             <p className="text-muted-foreground text-xs">
-              {row.department} · Week {row.week_number}, {row.year}
+              {deptCode(row.department)} · Week {row.week_number}, {row.year}
             </p>
             {row.resolution_note && (
               <p className="text-muted-foreground bg-muted/30 border-border/40 rounded border p-1.5 text-xs">

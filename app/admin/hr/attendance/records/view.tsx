@@ -434,7 +434,15 @@ export function AdminAttendanceRecordsPage({
           contactsView
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          rowActions={[
+            {
+              label: "Edit Record",
+              icon: Pencil,
+              onClick: (r) => openEdit(r),
+            },
+          ]}
           mobileRow={{
+            onSelect: (r) => openEdit(r),
             title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
             subtitle: (r) => (
               <>

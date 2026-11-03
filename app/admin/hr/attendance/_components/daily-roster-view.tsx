@@ -715,7 +715,15 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        rowActions={[
+          {
+            label: "Edit Record",
+            icon: Pencil,
+            onClick: (r) => openEdit(r),
+          },
+        ]}
         mobileRow={{
+          onSelect: (r) => openEdit(r),
           leading: (r) => (
             <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
           ),

@@ -40,6 +40,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
@@ -479,20 +480,7 @@ export function LeaveContent({
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => (
-          <Badge
-            variant={
-              r.status === "approved"
-                ? "default"
-                : ["rejected", "cancelled"].includes(r.status)
-                  ? "destructive"
-                  : "outline"
-            }
-            className="text-xs capitalize"
-          >
-            {formatName(r.status)}
-          </Badge>
-        ),
+        render: (r) => <StatusBadge status={r.status} label={formatName(r.status)} className="text-xs capitalize" />,
       },
       {
         key: "stage",
@@ -904,18 +892,7 @@ export function LeaveContent({
               ? `${leaveTypeMap.get(r.leave_type_id)?.name || "Leave"} · ${r.start_date} to ${r.end_date}`
               : `${r.start_date} to ${r.end_date} · ${r.days_count} day${Number(r.days_count) > 1 ? "s" : ""}`,
           trailing: (r) => (
-            <Badge
-              variant={
-                r.status === "approved"
-                  ? "default"
-                  : ["rejected", "cancelled"].includes(r.status)
-                    ? "destructive"
-                    : "outline"
-              }
-              className="text-xs capitalize"
-            >
-              {formatName(r.status)}
-            </Badge>
+            <StatusBadge status={r.status} label={formatName(r.status)} className="text-xs capitalize" />
           ),
           detail: {
             title: (r) =>
@@ -936,18 +913,7 @@ export function LeaveContent({
               </div>
             ),
             badges: (r) => (
-              <Badge
-                variant={
-                  r.status === "approved"
-                    ? "default"
-                    : ["rejected", "cancelled"].includes(r.status)
-                      ? "destructive"
-                      : "outline"
-                }
-                className="text-xs capitalize"
-              >
-                {formatName(r.status)}
-              </Badge>
+              <StatusBadge status={r.status} label={formatName(r.status)} className="text-xs capitalize" />
             ),
             fields: (r) => [
               ...(r.isIncomingReview && r.user?.department
@@ -1063,12 +1029,12 @@ export function LeaveContent({
           render: (r) => (
             <div className="space-y-4 text-xs">
               {r.department_overlaps && r.department_overlaps.length > 0 && (
-                <div className="border-warning/80 bg-warning/70 text-warning space-y-1 rounded-md border p-3 text-xs">
-                  <div className="text-warning flex items-center gap-1.5 font-semibold">
-                    <AlertCircle className="text-warning h-4 w-4 shrink-0" />
+                <div className="border-warning/30 bg-warning/15 text-warning space-y-1 rounded-md border p-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>Concurrent Department Leave Notice</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
+                  <p className="text-muted-foreground leading-relaxed">
                     The following colleague(s) in this department also have scheduled or pending leave during these
                     dates:
                   </p>
@@ -1151,18 +1117,7 @@ export function LeaveContent({
                   {row.start_date} to {row.end_date} ({row.days_count} day{Number(row.days_count) > 1 ? "s" : ""})
                 </span>
               </div>
-              <Badge
-                variant={
-                  row.status === "approved"
-                    ? "default"
-                    : ["rejected", "cancelled"].includes(row.status)
-                      ? "destructive"
-                      : "outline"
-                }
-                className="text-xs capitalize"
-              >
-                {formatName(row.status)}
-              </Badge>
+              <StatusBadge status={row.status} label={formatName(row.status)} className="text-xs capitalize" />
             </div>
             <div className="text-muted-foreground grid gap-1 text-xs">
               {row.isIncomingReview && row.user?.department && (

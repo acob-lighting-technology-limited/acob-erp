@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -211,11 +212,7 @@ export default function WarehousesPage() {
         key: "status",
         label: "Status",
         accessor: (warehouse) => (warehouse.is_active ? "Active" : "Inactive"),
-        render: (warehouse) => (
-          <Badge variant={warehouse.is_active ? "default" : "secondary"}>
-            {warehouse.is_active ? "Active" : "Inactive"}
-          </Badge>
-        ),
+        render: (warehouse) => <StatusBadge status={warehouse.is_active ? "active" : "inactive"} className="text-xs" />,
       },
     ],
     []
@@ -354,9 +351,7 @@ export default function WarehousesPage() {
           subtitle: (warehouse) =>
             `${warehouse.code} · ${getRegionFromAddress(warehouse.address)} · ${warehouse.address || "No address"}`,
           trailing: (warehouse) => (
-            <Badge variant={warehouse.is_active ? "default" : "secondary"} className="text-xs">
-              {warehouse.is_active ? "Active" : "Inactive"}
-            </Badge>
+            <StatusBadge status={warehouse.is_active ? "active" : "inactive"} className="text-xs" />
           ),
           onSelect: (warehouse) => openEdit(warehouse),
         }}
@@ -367,9 +362,7 @@ export default function WarehousesPage() {
                 <p className="font-medium">{warehouse.name}</p>
                 <p className="text-muted-foreground text-sm">{warehouse.code}</p>
               </div>
-              <Badge variant={warehouse.is_active ? "default" : "secondary"}>
-                {warehouse.is_active ? "Active" : "Inactive"}
-              </Badge>
+              <StatusBadge status={warehouse.is_active ? "active" : "inactive"} className="text-xs" />
             </div>
             <div className="space-y-1 text-sm">
               <p className="text-muted-foreground">{warehouse.address || "No address provided"}</p>

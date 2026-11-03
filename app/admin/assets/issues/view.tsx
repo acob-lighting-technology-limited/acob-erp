@@ -11,6 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { AlertCircle, CheckCircle2, Package, Trash2 } from "lucide-react"
 import {
   AlertDialog,
@@ -106,7 +107,11 @@ function IssueCard({
             {ASSET_TYPE_MAP[issue.asset?.asset_type || ""]?.label || issue.asset?.asset_type || "-"}
           </p>
         </div>
-        <Badge variant={issue.resolved ? "default" : "secondary"}>{issue.resolved ? "Resolved" : "Unresolved"}</Badge>
+        <StatusBadge
+          status={issue.resolved ? "resolved" : "unresolved"}
+          label={issue.resolved ? "Resolved" : "Unresolved"}
+          className="text-xs"
+        />
       </div>
       <p className={`text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}>{issue.description}</p>
       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -196,7 +201,11 @@ export function AssetIssuesPage({
       sortable: true,
       accessor: (issue) => (issue.resolved ? "resolved" : "unresolved"),
       render: (issue) => (
-        <Badge variant={issue.resolved ? "default" : "secondary"}>{issue.resolved ? "Resolved" : "Unresolved"}</Badge>
+        <StatusBadge
+          status={issue.resolved ? "resolved" : "unresolved"}
+          label={issue.resolved ? "Resolved" : "Unresolved"}
+          className="text-xs"
+        />
       ),
     },
     {
@@ -394,9 +403,11 @@ export function AssetIssuesPage({
           title: (issue) => `${issue.asset?.unique_code || "Asset"} · ${issue.description}`,
           subtitle: (issue) => `Assigned: ${assignedTo(issue)} · Reported: ${formatWATDate(issue.created_at)}`,
           trailing: (issue) => (
-            <Badge variant={issue.resolved ? "default" : "secondary"} className="text-xs">
-              {issue.resolved ? "Resolved" : "Unresolved"}
-            </Badge>
+            <StatusBadge
+              status={issue.resolved ? "resolved" : "unresolved"}
+              label={issue.resolved ? "Resolved" : "Unresolved"}
+              className="text-xs"
+            />
           ),
           onSelect: (issue) => void handleToggleResolved(issue),
         }}

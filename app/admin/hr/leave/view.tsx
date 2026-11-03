@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,7 @@ import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName, cn } from "@/lib/utils"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 export { resolveLeaveRouteStages }
 export type { RouteSnapshotStage }
@@ -325,6 +327,7 @@ export function LeaveApprovePage({
   apiBasePath = "/api/hr/leave",
 }: { backLinkHref?: string; apiBasePath?: string } = {}) {
   const normalizedApiBasePath = apiBasePath.replace(/\/$/, "")
+  const deptCode = useDepartmentCodes()
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
   const [activeTab, setActiveTab] = useState("all")
@@ -751,8 +754,12 @@ export function LeaveApprovePage({
             isLoading={isLoading}
             error={error instanceof Error ? error.message : null}
             onRetry={refetch}
-            searchPlaceholder="Search employee name or leave type..."
-            searchFn={(r, q) => `${r.user?.full_name} ${r.leave_type?.name} ${r.status}`.toLowerCase().includes(q)}
+            searchPlaceholder="Search employee name, department, or leave type..."
+            searchFn={(r, q) =>
+              `${r.user?.full_name} ${r.user?.department} ${deptCode(r.user?.department)} ${r.leave_type?.name} ${r.status}`
+                .toLowerCase()
+                .includes(q)
+            }
             filters={filters}
             rowActions={[
               {
@@ -834,21 +841,11 @@ export function LeaveApprovePage({
                 />
               ),
               title: (r) => r.user?.full_name || "Employee",
-              subtitle: (r) => `${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
+              subtitle: (r) =>
+                `${deptCode(r.user?.department) ? `${deptCode(r.user?.department)} · ` : ""}${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
               trailing: (r) => (
                 <div className="flex items-center gap-1.5">
-                  <Badge
-                    variant={
-                      r.status === "approved" || r.status === "completed"
-                        ? "default"
-                        : r.status === "rejected" || r.status === "cancelled"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                    className="text-xs"
-                  >
-                    {r.status}
-                  </Badge>
+                  <StatusBadge status={r.status} className="text-xs" />
                 </div>
               ),
               detail: {
@@ -863,19 +860,7 @@ export function LeaveApprovePage({
                     className="text-xl"
                   />
                 ),
-                badges: (r) => (
-                  <Badge
-                    variant={
-                      r.status === "approved" || r.status === "completed"
-                        ? "default"
-                        : r.status === "rejected" || r.status === "cancelled"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {r.status}
-                  </Badge>
-                ),
+                badges: (r) => <StatusBadge status={r.status} className="text-xs" />,
                 fields: (r) => [
                   {
                     icon: User,
@@ -893,7 +878,7 @@ export function LeaveApprovePage({
                   {
                     icon: Building2,
                     label: "Department",
-                    value: r.user?.department || "—",
+                    value: r.user?.department ? `${r.user.department} (${deptCode(r.user.department)})` : "—",
                   },
                   {
                     icon: CalendarDays,
@@ -935,9 +920,7 @@ export function LeaveApprovePage({
                     <h4 className="text-lg font-semibold">{r.user?.full_name}</h4>
                     <p className="text-muted-foreground text-xs">{r.leave_type?.name}</p>
                   </div>
-                  <Badge variant={r.status === "approved" || r.status === "completed" ? "default" : "secondary"}>
-                    {r.status}
-                  </Badge>
+                  <StatusBadge status={r.status} className="text-xs" />
                 </div>
 
                 <div className="text-muted-foreground space-y-2 text-sm">
@@ -947,7 +930,12 @@ export function LeaveApprovePage({
                       {r.start_date} to {r.end_date} ({r.days_count} days)
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.user?.department && (
+                      <Badge variant="outline" className="text-xs">
+                        {deptCode(r.user.department)}
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-xs">
                       {STAGE_LABELS[r.current_stage_code || r.approval_stage] || r.current_stage_code}
                     </Badge>

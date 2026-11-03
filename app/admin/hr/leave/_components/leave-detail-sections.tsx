@@ -92,12 +92,12 @@ export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
       className={cn(
         "flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs",
         isApproved
-          ? "border-success/30 bg-success/50 text-success"
+          ? "border-success/30 bg-success/15 text-success"
           : isRejected
-            ? "border-danger/30 bg-danger/60 text-danger"
+            ? "border-danger/30 bg-danger/15 text-danger"
             : isCancelled
               ? "border-muted bg-muted/40 text-muted-foreground"
-              : "border-warning/30 bg-warning/50 text-warning"
+              : "border-warning/30 bg-warning/15 text-warning"
       )}
     >
       {isApproved ? (
@@ -124,7 +124,7 @@ export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
 export function LeaveOverlapNotice({ leave }: { leave: LeaveItem }) {
   if (!leave.department_overlaps || leave.department_overlaps.length === 0) return null
   return (
-    <div className="border-warning/80 bg-warning/70 text-warning space-y-1.5 rounded-md border px-3 py-2 text-xs">
+    <div className="border-warning/30 bg-warning/15 text-warning space-y-1.5 rounded-md border px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5 font-medium">
         <AlertCircle className="text-warning h-3.5 w-3.5 shrink-0" />
         <span>Also off in this department during these dates</span>
@@ -267,16 +267,18 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
 
                     {item ? (
                       <Badge
-                        variant={isStageRejected ? "destructive" : "outline"}
+                        variant="outline"
                         className={cn(
                           "text-xs font-medium capitalize",
-                          !isStageRejected && "text-success border-success/30 bg-success/10"
+                          isStageRejected
+                            ? "border-danger/30 bg-danger/15 text-danger"
+                            : "border-success/30 bg-success/15 text-success"
                         )}
                       >
                         {item.status || "Approved"}
                       </Badge>
                     ) : isCurrent && isOpen ? (
-                      <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">
+                      <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning text-xs">
                         Awaiting action
                       </Badge>
                     ) : (
@@ -297,7 +299,7 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                     <div
                       className={cn(
                         "mt-1.5 flex items-start gap-1.5 rounded-md border px-2.5 py-1.5",
-                        isStageRejected ? "border-danger/30 bg-danger/70 text-danger" : "bg-muted/40 text-foreground/90"
+                        isStageRejected ? "border-danger/30 bg-danger/15 text-danger" : "bg-muted/40 text-foreground/90"
                       )}
                     >
                       <MessageSquare

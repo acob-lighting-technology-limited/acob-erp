@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { apiFetch } from "@/lib/api-client"
@@ -139,8 +140,8 @@ export function TicketDetailContent({
       <PageHeader title={ticket.title} backLink={{ href: "/help-desk", label: "Back to Help Desk" }} />
       <div className="flex flex-wrap items-center gap-2">
         <div className="font-mono text-sm font-semibold">{ticket.ticket_number}</div>
-        <Badge>{ticket.status.replaceAll("_", " ")}</Badge>
-        <Badge variant="outline">{ticket.priority}</Badge>
+        <TicketStatusBadge status={ticket.status} />
+        <PriorityBadge priority={ticket.priority} />
         {slaRemaining !== null ? (
           <span className={`text-sm ${slaRemaining < 0 ? "text-danger" : "text-muted-foreground"}`}>
             SLA {slaRemaining < 0 ? "breached" : "remaining"} {Math.abs(Math.round(slaRemaining / (1000 * 60 * 60)))}h
