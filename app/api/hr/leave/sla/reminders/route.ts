@@ -8,7 +8,7 @@ import { formatLeaveReference, leaveStageLabel, notifyUsers } from "@/lib/hr/lea
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope } from "@/lib/admin/api-scope"
-import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { toLocalISODate } from "@/lib/utils/date"
 import { isSameDepartment, DEPT_ADMIN_HR } from "@/shared/departments"
 
 const log = logger("hr-leave-sla-reminders")
@@ -44,6 +44,19 @@ type LapseProfileRow = {
   last_name?: string | null
   company_email?: string | null
   department?: string | null
+}
+
+/** One overdue request, as listed in the Admin & HR lead's daily summary. */
+type OverdueLeave = {
+  reference: string
+  requesterName: string
+  department: string
+  leaveTypeName: string
+  period: string
+  duration: string
+  pendingStage: string
+  currentApprover: string
+  overdueBy: string
 }
 
 function displayName(profile: LapseProfileRow | undefined, fallback: string) {
@@ -196,6 +209,11 @@ export async function PATCH() {
     const today = toLocalISODate()
     const hrLeadUserIds = await resolveAdminHrLeadUserIds(db)
     let remindersSent = 0
+    // Reminders and breaches are collected and sent as one summary per recipient after the
+    // loop. One email per request sent the Admin & HR lead a burst of near-identical
+    // "overdue leave approval" emails every morning.
+    const dueSoonByApprover = new Map<string, PendingLeaveRequestRow[]>()
+    const breaches: OverdueLeave[] = []
 
     const pendingRows = (pendingRequests || []) as PendingLeaveRequestRow[]
     const stageStartedAt = await loadStageStartTimes(
@@ -307,15 +325,8 @@ export async function PATCH() {
       const reminderAt = dueAt - policy.reminder_hours_before * 60 * 60 * 1000
 
       if (now >= reminderAt && now < dueAt) {
-        await notifyUsers(db, {
-          userIds: [request.current_approver_user_id],
-          title: "Leave approval SLA reminder",
-          message: `Leave request ${formatLeaveReference(request.id)} is due soon. Please review before SLA breach.`,
-          linkUrl: "/hr/leave",
-          entityId: request.id,
-          emailEvent: "sla_reminder",
-        })
-        remindersSent += 1
+        const approverId = request.current_approver_user_id
+        dueSoonByApprover.set(approverId, [...(dueSoonByApprover.get(approverId) ?? []), request])
       }
 
       // Leave approval SLA breaches escalate exclusively to the Admin & HR Lead.
@@ -346,34 +357,77 @@ export async function PATCH() {
             : "Not specified"
           const duration = request.days_count ? `${request.days_count} day(s)` : "Not specified"
 
-          await notifyUsers(db, {
-            userIds: hrLeadUserIds,
-            title: "Action needed: leave approval SLA breached",
-            message: `${requesterName}'s ${leaveTypeName} request is overdue at the ${pendingStage} stage. Review it now and ensure it is approved, rejected, or reassigned so the employee is not left waiting.`,
-            linkUrl: "/admin/hr/leave",
-            entityId: request.id,
-            emailEvent: "sla_breached",
-            emailSubject: `Action required: overdue leave approval — ${leaveReference}`,
-            badgeText: "Escalation Required",
-            badgeVariant: "warning",
-            detailsTitle: "Overdue Leave Approval",
-            details: [
-              { label: "Leave Reference", value: leaveReference },
-              { label: "Employee", value: requesterName },
-              { label: "Department", value: requester?.department || "Not specified" },
-              { label: "Leave Type", value: leaveTypeName },
-              { label: "Leave Period", value: period },
-              { label: "Duration", value: duration },
-              { label: "Pending Stage", value: pendingStage },
-              { label: "Awaiting Action From", value: currentApprover },
-              { label: "SLA Deadline", value: formatWATDateTime(new Date(dueAt)) },
-              { label: "Overdue By", value: formatOverdueDuration(now - dueAt) },
-            ],
-            ctaLabel: "Review Overdue Approval",
+          breaches.push({
+            reference: leaveReference,
+            requesterName,
+            department: requester?.department || "Not specified",
+            leaveTypeName,
+            period,
+            duration,
+            pendingStage,
+            currentApprover,
+            overdueBy: formatOverdueDuration(now - dueAt),
           })
-          remindersSent += hrLeadUserIds.length
         }
       }
+    }
+
+    for (const [approverId, requests] of dueSoonByApprover) {
+      const single = requests.length === 1 ? requests[0] : null
+      await notifyUsers(db, {
+        userIds: [approverId],
+        title: "Leave approval SLA reminder",
+        message: single
+          ? `Leave request ${formatLeaveReference(single.id)} is due soon. Please review before SLA breach.`
+          : `${requests.length} leave requests waiting on you are due soon. Please review them before SLA breach.`,
+        linkUrl: "/hr/leave",
+        entityId: single?.id,
+        emailEvent: "sla_reminder",
+        ...(single
+          ? {}
+          : {
+              emailSubject: `Leave approval SLA reminder — ${requests.length} requests due soon`,
+              detailsTitle: "Due Soon",
+              details: requests.map((request) => ({
+                label: formatLeaveReference(request.id) ?? "Leave request",
+                value: request.start_date
+                  ? `Starts ${request.start_date} · ${leaveStageLabel(request.current_stage_code || "")}`
+                  : leaveStageLabel(request.current_stage_code || ""),
+              })),
+            }),
+      })
+      remindersSent += 1
+    }
+
+    if (breaches.length > 0 && hrLeadUserIds.length > 0) {
+      await notifyUsers(db, {
+        userIds: hrLeadUserIds,
+        title: "Action needed: leave approval SLA breached",
+        message:
+          breaches.length === 1
+            ? `${breaches[0].requesterName}'s ${breaches[0].leaveTypeName} request is overdue at the ${breaches[0].pendingStage} stage. Review it now and ensure it is approved, rejected, or reassigned so the employee is not left waiting.`
+            : `${breaches.length} leave requests are overdue for approval. Review each one and ensure it is approved, rejected, or reassigned so no employee is left waiting.`,
+        linkUrl: "/admin/hr/leave",
+        emailEvent: "sla_breached",
+        emailSubject:
+          breaches.length === 1
+            ? `Action required: overdue leave approval — ${breaches[0].reference}`
+            : `Action required: ${breaches.length} overdue leave approvals`,
+        badgeText: "Escalation Required",
+        badgeVariant: "warning",
+        detailsTitle: `Overdue Leave Approvals (${breaches.length})`,
+        details: breaches.map((breach) => ({
+          label: `${breach.requesterName} · ${breach.reference}`,
+          value: [
+            `${breach.leaveTypeName}, ${breach.period} (${breach.duration})`,
+            breach.department,
+            `Waiting on ${breach.currentApprover} at ${breach.pendingStage}`,
+            `Overdue by ${breach.overdueBy}`,
+          ].join(" · "),
+        })),
+        ctaLabel: "Review Overdue Approvals",
+      })
+      remindersSent += hrLeadUserIds.length
     }
 
     return NextResponse.json({ message: "SLA reminders processed", reminders_sent: remindersSent })
