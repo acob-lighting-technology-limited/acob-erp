@@ -14,6 +14,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
+import type { EmploymentStatus } from "@/types/database"
 import { ManualLinkDialog } from "./_components/manual-link-dialog"
 
 type ImpersonationRow = {
@@ -22,7 +23,7 @@ type ImpersonationRow = {
   company_email: string
   department: string
   role: string
-  employment_status: string
+  employment_status: EmploymentStatus
 }
 
 type ImpersonationResponse = {
@@ -198,7 +199,7 @@ export function DevImpersonationContent() {
         label: "Status",
         accessor: (row) => row.employment_status,
         sortable: true,
-        render: (row) => <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />,
+        render: (row) => <EmployeeStatusBadge status={row.employment_status} size="sm" showIcon={false} />,
       },
       {
         key: "action",
@@ -316,7 +317,7 @@ export function DevImpersonationContent() {
           detail: {
             title: (row) => row.full_name,
             subtitle: (row) => `${row.department} · ${row.role}`,
-            badges: (row) => <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />,
+            badges: (row) => <EmployeeStatusBadge status={row.employment_status} size="sm" showIcon={false} />,
             fields: (row) => [
               { label: "Email", value: row.company_email, copyable: true },
               {
@@ -344,7 +345,7 @@ export function DevImpersonationContent() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{deptCode(row.department)}</Badge>
               <Badge variant="outline">{row.role}</Badge>
-              <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />
+              <EmployeeStatusBadge status={row.employment_status} size="sm" showIcon={false} />
             </div>
             <Button
               size="sm"
