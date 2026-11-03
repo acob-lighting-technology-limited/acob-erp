@@ -200,12 +200,20 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
         stickyToolbar
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        rowActions={[
+          {
+            label: "View Payslip",
+            icon: Eye,
+            onClick: (e) => setSelectedEntry(e),
+          },
+        ]}
         mobileRow={{
           title: (e) => e.payroll_periods?.name || "—",
           subtitle: (e) => (e.payroll_periods?.pay_date ? `Paid ${e.payroll_periods.pay_date}` : "—"),
           trailing: (e) => (
             <span className="font-mono text-sm font-semibold text-emerald-600">{fmt(Number(e.net_salary))}</span>
           ),
+          onSelect: (e) => setSelectedEntry(e),
           detail: {
             title: (e) => e.payroll_periods?.name || "Payslip",
             subtitle: (e) => (
