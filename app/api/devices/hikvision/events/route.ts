@@ -35,18 +35,73 @@ class PunchNotStoredError extends Error {}
 
 /** A stalled database must fail fast so the device retries, not hang the request for minutes. */
 const DB_REQUEST_TIMEOUT_MS = 15_000
+/** The push log is diagnostics only; it must never hold up the answer to the device. */
+const PUSH_LOG_TIMEOUT_MS = 3_000
 
-async function processHikvisionEvent(event: ParsedEvent) {
+type PunchOutcome = { outcome: "stored" } | { outcome: "skipped"; reason: string }
+
+function serviceClient(timeoutMs: number) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new PunchNotStoredError("Missing Supabase env vars")
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  if (!supabaseUrl || !supabaseServiceKey) return null
+  return createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS) }) },
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) }) },
   })
+}
+
+interface PushLogEntry {
+  status: number
+  outcome: "stored" | "skipped" | "not_stored" | "bad_request" | "unauthorized" | "rate_limited"
+  reason?: string
+  /** The event_log JSON as parsed, for the fields worth indexing by eye. */
+  event?: unknown
+  /** The raw event_log, kept only for pushes we refused. */
+  raw?: string | null
+  startedAt: number
+}
+
+/**
+ * Records what the device sent and what we answered (hikvision_push_log), so
+ * an outage shows whether we kept refusing a punch or the device stopped
+ * calling. Fails open.
+ */
+async function logPush(entry: PushLogEntry) {
+  const supabase = serviceClient(PUSH_LOG_TIMEOUT_MS)
+  if (!supabase) return
+  const event = (entry.event ?? {}) as {
+    eventType?: unknown
+    dateTime?: unknown
+    AccessControllerEvent?: {
+      employeeNoString?: unknown
+      attendanceStatus?: unknown
+      subEventType?: unknown
+    }
+  }
+  const ace = event.AccessControllerEvent ?? {}
+  const text = (value: unknown) => (typeof value === "string" ? value.slice(0, 200) : null)
+  try {
+    const { error } = await supabase.from("hikvision_push_log").insert({
+      status: entry.status,
+      outcome: entry.outcome,
+      reason: entry.reason?.slice(0, 500) ?? null,
+      event_type: text(event.eventType),
+      device_time: text(event.dateTime),
+      employee_no: text(ace.employeeNoString),
+      attendance_status: text(ace.attendanceStatus),
+      sub_event_type: typeof ace.subEventType === "number" ? ace.subEventType : null,
+      duration_ms: Date.now() - entry.startedAt,
+      raw_event: entry.raw ? entry.raw.slice(0, 4000) : null,
+    })
+    if (error) log.warn({ err: error.message }, "Could not write Hikvision push log")
+  } catch (err) {
+    log.warn({ err: String(err) }, "Could not write Hikvision push log")
+  }
+}
+
+async function processHikvisionEvent(event: ParsedEvent): Promise<PunchOutcome> {
+  const supabase = serviceClient(DB_REQUEST_TIMEOUT_MS)
+  if (!supabase) throw new PunchNotStoredError("Missing Supabase env vars")
 
   // Load attendance policy configuration
   const { data: settingRow, error: settingError } = await supabase
@@ -63,10 +118,12 @@ async function processHikvisionEvent(event: ParsedEvent) {
   const { employeeNoString, attendanceStatus } = ace
 
   // Skip events with no employee ID
-  if (!employeeNoString) return
+  if (!employeeNoString) return { outcome: "skipped", reason: "no employee number" }
 
   // Skip break events
-  if (attendanceStatus === "breakIn" || attendanceStatus === "breakOut") return
+  if (attendanceStatus === "breakIn" || attendanceStatus === "breakOut") {
+    return { outcome: "skipped", reason: "break event" }
+  }
 
   // Resolve employee by the compact device key enrolled on the Hikvision unit.
   // device_key is derived from employee_number: full-time = numeric suffix (e.g. "063"),
@@ -84,7 +141,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
 
   if (!profile) {
     log.info({ employeeNoString }, "No active profile found for device employee ID — skipping")
-    return
+    return { outcome: "skipped", reason: "no active profile for device key" }
   }
 
   const userId = profile.id
@@ -201,7 +258,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
         "Hikvision after-midnight exit rolled back to close prior day"
       )
       await closeAppealsMadeMootByDevice(supabase, { userId, date: prevDate, policy })
-      return
+      return { outcome: "stored" }
     }
   }
 
@@ -225,7 +282,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
       const clockInTs = new Date(`${date}T${existing.clock_in}Z`).getTime()
       if (incomingTs - clockInTs < 3 * 60_000) {
         log.info({ userId, date, time }, "Hikvision clock-out ignored — within 3-minute grace window of clock_in")
-        return
+        return { outcome: "skipped", reason: "clock-out within 3 minutes of clock-in" }
       }
     }
   }
@@ -278,7 +335,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
   } else {
     if (!existing?.clock_in) {
       log.warn({ userId, date, time }, "Hikvision clock-out received but no clock-in on record — skipping")
-      return
+      return { outcome: "skipped", reason: "clock-out with no clock-in" }
     }
 
     const clockIn = new Date(`${date}T${existing.clock_in}Z`)
@@ -347,13 +404,17 @@ async function processHikvisionEvent(event: ParsedEvent) {
   await closeAppealsMadeMootByDevice(supabase, { userId, date, policy })
 
   log.info({ userId, date, action, employeeNoString }, "Hikvision attendance recorded")
+  return { outcome: "stored" }
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+
   // Every staff swipe arrives from the office NAT's single IP, and the morning
   // rush can exceed one event per second; 60/min dropped real clock-ins.
   const rl = await rateLimit(`hikvision-events:${getClientId(request)}`, { limit: 600, windowSec: 60 })
   if (!rl.allowed) {
+    await logPush({ status: 429, outcome: "rate_limited", startedAt })
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
   }
 
@@ -365,33 +426,39 @@ export async function POST(request: NextRequest) {
   const token = readBearerToken(request) ?? request.nextUrl.searchParams.get("token")
   if (!secret || !token || !safeCompare(token, secret)) {
     log.warn("Invalid or missing webhook token")
+    await logPush({ status: 401, outcome: "unauthorized", reason: token ? "wrong token" : "no token", startedAt })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   // ── Parse & validate body (must happen before responding) ──────────────────
+  const badRequest = async (error: string, raw: string | null, event?: unknown) => {
+    await logPush({ status: 400, outcome: "bad_request", reason: error, raw, event, startedAt })
+    return NextResponse.json({ error }, { status: 400 })
+  }
+
   let raw: string | null = null
   try {
     const formData = await request.formData()
     raw = formData.get("event_log") as string | null
   } catch {
-    return NextResponse.json({ error: "Invalid multipart body" }, { status: 400 })
+    return badRequest("Invalid multipart body", null)
   }
 
   if (!raw) {
-    return NextResponse.json({ error: "Missing event_log field" }, { status: 400 })
+    return badRequest("Missing event_log field", null)
   }
 
   let parsedJson: unknown
   try {
     parsedJson = JSON.parse(raw)
   } catch {
-    return NextResponse.json({ error: "event_log is not valid JSON" }, { status: 400 })
+    return badRequest("event_log is not valid JSON", raw)
   }
 
   const result = HikvisionEventSchema.safeParse(parsedJson)
   if (!result.success) {
     log.warn({ issues: result.error.issues }, "Invalid Hikvision event payload")
-    return NextResponse.json({ error: "Invalid event payload" }, { status: 400 })
+    return badRequest("Invalid event payload", raw, parsedJson)
   }
 
   // ── Process the event before responding ─────────────────────────────────────
@@ -401,12 +468,21 @@ export async function POST(request: NextRequest) {
   // Only a stored (or deliberately skipped) punch gets a 200. Anything else is a
   // 503 so the device keeps the punch and resends it; a retry is harmless because
   // a repeat of the same punch lands inside the 3-minute duplicate window.
+  let punch: PunchOutcome
   try {
-    await processHikvisionEvent(result.data)
+    punch = await processHikvisionEvent(result.data)
   } catch (err) {
     log.error({ err: String(err) }, "Failed to process Hikvision event; asking the device to retry")
+    await logPush({ status: 503, outcome: "not_stored", reason: String(err), raw, event: parsedJson, startedAt })
     return NextResponse.json({ error: "Punch not stored, retry later" }, { status: 503 })
   }
 
+  await logPush({
+    status: 200,
+    outcome: punch.outcome,
+    reason: punch.outcome === "skipped" ? punch.reason : undefined,
+    event: parsedJson,
+    startedAt,
+  })
   return NextResponse.json({ success: true })
 }
