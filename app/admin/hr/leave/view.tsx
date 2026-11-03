@@ -46,6 +46,7 @@ import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName, cn } from "@/lib/utils"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 export { resolveLeaveRouteStages }
 export type { RouteSnapshotStage }
@@ -326,6 +327,7 @@ export function LeaveApprovePage({
   apiBasePath = "/api/hr/leave",
 }: { backLinkHref?: string; apiBasePath?: string } = {}) {
   const normalizedApiBasePath = apiBasePath.replace(/\/$/, "")
+  const deptCode = useDepartmentCodes()
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
   const [activeTab, setActiveTab] = useState("all")
@@ -752,8 +754,12 @@ export function LeaveApprovePage({
             isLoading={isLoading}
             error={error instanceof Error ? error.message : null}
             onRetry={refetch}
-            searchPlaceholder="Search employee name or leave type..."
-            searchFn={(r, q) => `${r.user?.full_name} ${r.leave_type?.name} ${r.status}`.toLowerCase().includes(q)}
+            searchPlaceholder="Search employee name, department, or leave type..."
+            searchFn={(r, q) =>
+              `${r.user?.full_name} ${r.user?.department} ${deptCode(r.user?.department)} ${r.leave_type?.name} ${r.status}`
+                .toLowerCase()
+                .includes(q)
+            }
             filters={filters}
             rowActions={[
               {
@@ -835,7 +841,8 @@ export function LeaveApprovePage({
                 />
               ),
               title: (r) => r.user?.full_name || "Employee",
-              subtitle: (r) => `${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
+              subtitle: (r) =>
+                `${deptCode(r.user?.department) ? `${deptCode(r.user?.department)} · ` : ""}${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
               trailing: (r) => (
                 <div className="flex items-center gap-1.5">
                   <StatusBadge status={r.status} className="text-xs" />
@@ -871,7 +878,7 @@ export function LeaveApprovePage({
                   {
                     icon: Building2,
                     label: "Department",
-                    value: r.user?.department || "—",
+                    value: r.user?.department ? `${r.user.department} (${deptCode(r.user.department)})` : "—",
                   },
                   {
                     icon: CalendarDays,
@@ -923,7 +930,12 @@ export function LeaveApprovePage({
                       {r.start_date} to {r.end_date} ({r.days_count} days)
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.user?.department && (
+                      <Badge variant="outline" className="text-xs">
+                        {deptCode(r.user.department)}
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-xs">
                       {STAGE_LABELS[r.current_stage_code || r.approval_stage] || r.current_stage_code}
                     </Badge>

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api-client"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 const log = logger("settings-users")
 
@@ -34,6 +35,7 @@ const ROLE_COLORS: Record<string, "destructive" | "default" | "secondary"> = {
 }
 
 export default function UsersPage() {
+  const deptCode = useDepartmentCodes()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -310,6 +312,7 @@ export default function UsersPage() {
         searchFn={(u, q) =>
           `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(q) ||
           u.department?.toLowerCase().includes(q) ||
+          deptCode(u.department).toLowerCase().includes(q) ||
           false
         }
         filters={filters}
@@ -326,7 +329,7 @@ export default function UsersPage() {
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           title: (u) => (u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email || "User"),
-          subtitle: (u) => `${u.role.replace(/_/g, " ")} · ${u.department || "No department"} · ${u.email}`,
+          subtitle: (u) => `${u.role.replace(/_/g, " ")} · ${deptCode(u.department) || "No dept"} · ${u.email}`,
           trailing: (u) => (
             <StatusBadge
               status={u.employment_status === "exited" ? "exited" : u.is_active ? "active" : "inactive"}
@@ -357,7 +360,7 @@ export default function UsersPage() {
                 </Badge>
                 {u.department && (
                   <Badge variant="outline" className="border-2 font-normal">
-                    {u.department}
+                    {deptCode(u.department)}
                   </Badge>
                 )}
               </div>

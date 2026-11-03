@@ -13,6 +13,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 type AttemptRow = {
   id: string
@@ -45,6 +46,7 @@ type AttemptRow = {
 }
 
 export default function CbtDetailsLogPage() {
+  const deptCode = useDepartmentCodes()
   const {
     data: data = [],
     isLoading,
@@ -210,7 +212,15 @@ export default function CbtDetailsLogPage() {
         searchPlaceholder="Search employee, email, cycle, or status..."
         searchFn={(row, query) => {
           const name = row.profiles ? [row.profiles.first_name, row.profiles.last_name].join(" ") : ""
-          return [name, row.company_email, row.cbt_details?.last_name, row.review_cycles?.name, row.status]
+          return [
+            name,
+            row.company_email,
+            row.profiles?.department,
+            deptCode(row.profiles?.department),
+            row.cbt_details?.last_name,
+            row.review_cycles?.name,
+            row.status,
+          ]
             .join(" ")
             .toLowerCase()
             .includes(query)
@@ -251,7 +261,7 @@ export default function CbtDetailsLogPage() {
           expandInline: true,
           title: (row) => (row.profiles ? `${row.profiles.first_name} ${row.profiles.last_name}` : row.company_email),
           subtitle: (row) =>
-            `${row.profiles?.department || "No dept"} · ${row.review_cycles?.name || "No cycle"}${
+            `${deptCode(row.profiles?.department) || "No dept"} · ${row.review_cycles?.name || "No cycle"}${
               row.status === "submitted" && typeof row.score === "number" ? ` · Score: ${row.score}%` : ""
             }`,
           trailing: (row) => (
@@ -278,7 +288,7 @@ export default function CbtDetailsLogPage() {
               />
             </div>
             <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
-              <span>{row.profiles?.department || "No dept"}</span>
+              <span>{deptCode(row.profiles?.department) || "No dept"}</span>
               <span>{row.review_cycles?.name || "No cycle"}</span>
             </div>
           </div>

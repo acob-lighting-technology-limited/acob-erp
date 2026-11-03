@@ -13,6 +13,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { ManualLinkDialog } from "./_components/manual-link-dialog"
 
 type ImpersonationRow = {
@@ -101,6 +102,7 @@ async function copyLinkWithFallback(link: string): Promise<"copied" | "manual"> 
 }
 
 export function DevImpersonationContent() {
+  const deptCode = useDepartmentCodes()
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null)
   const [manualLink, setManualLink] = useState<string | null>(null)
 
@@ -272,6 +274,7 @@ export function DevImpersonationContent() {
             row.full_name.toLowerCase().includes(q) ||
             row.company_email.toLowerCase().includes(q) ||
             row.department.toLowerCase().includes(q) ||
+            deptCode(row.department).toLowerCase().includes(q) ||
             row.role.toLowerCase().includes(q)
           )
         }}
@@ -293,7 +296,7 @@ export function DevImpersonationContent() {
         ]}
         mobileRow={{
           title: (row) => row.full_name,
-          subtitle: (row) => `${row.department} · ${row.role}`,
+          subtitle: (row) => `${deptCode(row.department)} · ${row.role}`,
           trailing: (row) => (
             <Button
               size="sm"
@@ -316,7 +319,10 @@ export function DevImpersonationContent() {
             badges: (row) => <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />,
             fields: (row) => [
               { label: "Email", value: row.company_email, copyable: true },
-              { label: "Department", value: row.department },
+              {
+                label: "Department",
+                value: row.department ? `${row.department} (${deptCode(row.department)})` : "—",
+              },
               { label: "Role", value: row.role },
               { label: "Employment Status", value: row.employment_status },
             ],
@@ -336,7 +342,7 @@ export function DevImpersonationContent() {
               <p className="text-muted-foreground text-sm">{row.company_email}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{row.department}</Badge>
+              <Badge variant="outline">{deptCode(row.department)}</Badge>
               <Badge variant="outline">{row.role}</Badge>
               <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />
             </div>
