@@ -7,7 +7,6 @@ import {
   type UnifiedAttendanceStatus,
 } from "@/lib/hr/attendance-status"
 import type { AttendancePolicy } from "@/lib/org-config"
-import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { createNotification } from "@/lib/notifications/create"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
 import { expandDepartmentScopeForQuery, type AdminScope } from "@/lib/admin/rbac"
@@ -40,7 +39,7 @@ function statusLabel(status: string): string {
  * Every manual closure is now 'resolved', whatever status was set - including
  * the one requested - so the log always shows the day was handled outside the
  * appeal. The note records the status actually set. The employee is told in-app
- * and by email.
+ * now, and by email in the next appeal summary (sendAppealDecisionDigest).
  *
  * An edit that leaves the day on the status that was appealed (for example a
  * clock-time correction on a late day) does not count as acting on the appeal.
@@ -127,18 +126,6 @@ export async function resolvePendingAppealsOnManualStatus(
       } catch (notifyErr) {
         log.error({ err: String(notifyErr), appealId: appeal.id }, "Failed to notify employee of resolved appeal")
       }
-
-      await notifyAttendanceMail(client, {
-        affectedUserId: appeal.user_id,
-        actorId: params.actorId ?? null,
-        date: appeal.appeal_date,
-        fromStatus: appeal.current_status,
-        toStatus: params.status,
-        decision: "resolved",
-        requesterComment: appeal.appeal_reason,
-        approverComment: note,
-        occurredAt: now,
-      })
     }
   } catch (err) {
     log.error({ err: String(err) }, "Failed to resolve pending appeals")
@@ -208,7 +195,15 @@ export async function closeAppealsMadeMootByDevice(
     for (const appeal of pending) {
       const { error } = await client
         .from("attendance_appeals")
-        .update({ status: "resolved", resolution_note: note, reviewed_by: null, reviewed_at: now, updated_at: now })
+        // Stamped as already emailed: the device fixed the day, so the appeal summary skips it.
+        .update({
+          status: "resolved",
+          resolution_note: note,
+          reviewed_by: null,
+          reviewed_at: now,
+          updated_at: now,
+          decision_emailed_at: now,
+        })
         .eq("id", appeal.id)
         .eq("status", "pending")
       if (error) {

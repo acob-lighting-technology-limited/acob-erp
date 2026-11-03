@@ -14,7 +14,14 @@ export interface AttendanceMailPayload {
   message: string
   detailsTitle?: string
   details?: AttendanceMailDetail[]
+  /** Extra cards after `details`, one per group (a summary email lists one per employee). */
+  sections?: AttendanceMailSection[]
   ctaPath?: string
+}
+
+export interface AttendanceMailSection {
+  title: string
+  details: AttendanceMailDetail[]
 }
 
 function buildDetailsCard(title: string, details: AttendanceMailDetail[]): string {
@@ -75,6 +82,7 @@ function buildEmailHtml(payload: Omit<AttendanceMailPayload, "to" | "subject">) 
     `<div class="title">${escapeHtml(payload.title)}</div>` +
     `<p class="text">${escapeHtml(payload.message)}</p>` +
     buildDetailsCard(payload.detailsTitle ?? "Details", payload.details ?? []) +
+    (payload.sections ?? []).map((section) => buildDetailsCard(section.title, section.details)).join("") +
     '<div class="cta">' +
     `<a href="${ctaUrl}" class="button" style="color:#fff;">Open Attendance Portal</a>` +
     "</div>" +
@@ -106,6 +114,7 @@ export async function sendAttendanceMail(payload: AttendanceMailPayload) {
       message: payload.message,
       detailsTitle: payload.detailsTitle,
       details: payload.details,
+      sections: payload.sections,
       ctaPath: payload.ctaPath,
     }),
   })

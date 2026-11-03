@@ -6,7 +6,6 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireApiAdminScope, getScopedDepartments, type AdminScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import { applyExemptionChange, type ExemptionChange } from "@/lib/hr/exemptions"
@@ -641,7 +640,8 @@ async function notifyDecision(
     p_entity_id: appeal.id,
   })
 
-  // An override tells whoever's step it skipped, and the Admin & HR Lead, in-app and by email.
+  // An override tells whoever's step it skipped, and the Admin & HR Lead, in-app here and by
+  // email in the next appeal summary (sendAppealDecisionDigest).
   let skippedIds: string[] = []
   if (action === "override") {
     const leads = await loadDepartmentLeads(dataClient)
@@ -667,19 +667,6 @@ async function notifyDecision(
       })
     }
   }
-
-  await notifyAttendanceMail(dataClient, {
-    affectedUserId: appeal.user_id,
-    actorId: scope.userId,
-    date: when,
-    fromStatus: appeal.current_status,
-    toStatus: approved ? appeal.requested_status : appeal.current_status,
-    decision: action === "override" ? "overridden" : approved ? "approved" : "rejected",
-    requesterComment: appeal.appeal_reason,
-    approverComment: resolutionNote || null,
-    occurredAt: new Date().toISOString(),
-    alsoNotifyUserIds: skippedIds,
-  })
 }
 
 export async function PATCH(request: NextRequest) {
