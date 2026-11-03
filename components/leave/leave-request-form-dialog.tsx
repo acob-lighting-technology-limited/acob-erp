@@ -451,9 +451,9 @@ export function LeaveRequestFormDialog({
                   </div>
 
                   {departmentOverlapSummary.hasOverlap && (
-                    <div className="border-warning/80 bg-warning/70 text-warning mt-2.5 rounded-md border p-3 text-xs">
+                    <div className="border-warning/30 bg-warning/15 text-warning mt-2.5 rounded-md border p-3 text-xs">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div className="space-y-1">
                           <p className="font-semibold">Department Overlap Notice</p>
                           <p className="leading-relaxed">

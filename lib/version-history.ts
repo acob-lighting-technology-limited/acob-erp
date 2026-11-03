@@ -32,6 +32,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.11",
+    title: "UI refinement and workflow enhancements",
+    summary: "Visual contrast improvements across status banners and approval workflows.",
+    areas: [
+      {
+        area: "Leave Management",
+        items: [
+          "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
+        ],
+      },
+    ],
+  },
+  {
     version: "2026.10",
     title: "Security, mailboxes and requisitions",
     summary:

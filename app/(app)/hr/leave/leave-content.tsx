@@ -1063,12 +1063,12 @@ export function LeaveContent({
           render: (r) => (
             <div className="space-y-4 text-xs">
               {r.department_overlaps && r.department_overlaps.length > 0 && (
-                <div className="border-warning/80 bg-warning/70 text-warning space-y-1 rounded-md border p-3 text-xs">
-                  <div className="text-warning flex items-center gap-1.5 font-semibold">
-                    <AlertCircle className="text-warning h-4 w-4 shrink-0" />
+                <div className="border-warning/30 bg-warning/15 text-warning space-y-1 rounded-md border p-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>Concurrent Department Leave Notice</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
+                  <p className="text-muted-foreground leading-relaxed">
                     The following colleague(s) in this department also have scheduled or pending leave during these
                     dates:
                   </p>
