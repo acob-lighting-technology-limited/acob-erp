@@ -37,6 +37,12 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "UI & Badges",
+        items: [
+          "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
+        ],
+      },
+      {
         area: "Leave Management",
         items: [
           "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
