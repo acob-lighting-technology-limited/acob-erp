@@ -104,6 +104,23 @@ export function DevImpersonationContent() {
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null)
   const [manualLink, setManualLink] = useState<string | null>(null)
 
+  const handleCopyLink = async (row: ImpersonationRow) => {
+    try {
+      setLinkingUserId(row.id)
+      const link = await startImpersonation(row.id)
+      const mode = await copyLinkWithFallback(link)
+      if (mode === "copied") {
+        toast.success(`Login link copied for ${row.full_name}`)
+      } else {
+        setManualLink(link)
+      }
+    } catch (actionError) {
+      toast.error(actionError instanceof Error ? actionError.message : "Failed to copy login link")
+    } finally {
+      setLinkingUserId(null)
+    }
+  }
+
   const {
     data: rows = [],
     isLoading,
@@ -186,26 +203,7 @@ export function DevImpersonationContent() {
         label: "Action",
         mode: "display",
         render: (row) => (
-          <Button
-            size="sm"
-            disabled={Boolean(linkingUserId)}
-            onClick={async () => {
-              try {
-                setLinkingUserId(row.id)
-                const link = await startImpersonation(row.id)
-                const mode = await copyLinkWithFallback(link)
-                if (mode === "copied") {
-                  toast.success(`Login link copied for ${row.full_name}`)
-                } else {
-                  setManualLink(link)
-                }
-              } catch (actionError) {
-                toast.error(actionError instanceof Error ? actionError.message : "Failed to copy login link")
-              } finally {
-                setLinkingUserId(null)
-              }
-            }}
-          >
+          <Button size="sm" disabled={Boolean(linkingUserId)} onClick={() => void handleCopyLink(row)}>
             <Copy className="mr-2 h-4 w-4" />
             {linkingUserId === row.id ? "Generating..." : "Copy Login Link"}
           </Button>
@@ -286,14 +284,50 @@ export function DevImpersonationContent() {
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        rowActions={[
+          {
+            label: "Copy Login Link",
+            icon: Copy,
+            onClick: (row) => void handleCopyLink(row),
+          },
+        ]}
         mobileRow={{
           title: (row) => row.full_name,
           subtitle: (row) => `${row.department} · ${row.role}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-xs">
-              {row.role}
-            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 px-2.5 text-xs"
+              disabled={Boolean(linkingUserId)}
+              onClick={(e) => {
+                e.stopPropagation()
+                void handleCopyLink(row)
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>{linkingUserId === row.id ? "Generating..." : "Copy Link"}</span>
+            </Button>
           ),
+          onSelect: (row) => void handleCopyLink(row),
+          detail: {
+            title: (row) => row.full_name,
+            subtitle: (row) => `${row.department} · ${row.role}`,
+            badges: (row) => <EmployeeStatusBadge status={row.employment_status as any} size="sm" showIcon={false} />,
+            fields: (row) => [
+              { label: "Email", value: row.company_email, copyable: true },
+              { label: "Department", value: row.department },
+              { label: "Role", value: row.role },
+              { label: "Employment Status", value: row.employment_status },
+            ],
+            actions: (row) => [
+              {
+                label: linkingUserId === row.id ? "Generating..." : "Copy Login Link",
+                icon: Copy,
+                onClick: () => void handleCopyLink(row),
+              },
+            ],
+          },
         }}
         cardRenderer={(row) => (
           <div className="space-y-3 rounded-xl border p-4">
@@ -310,22 +344,7 @@ export function DevImpersonationContent() {
               size="sm"
               className="w-full"
               disabled={Boolean(linkingUserId)}
-              onClick={async () => {
-                try {
-                  setLinkingUserId(row.id)
-                  const link = await startImpersonation(row.id)
-                  const mode = await copyLinkWithFallback(link)
-                  if (mode === "copied") {
-                    toast.success(`Login link copied for ${row.full_name}`)
-                  } else {
-                    toast.info("Clipboard blocked. Copy the link from the prompt.")
-                  }
-                } catch (actionError) {
-                  toast.error(actionError instanceof Error ? actionError.message : "Failed to copy login link")
-                } finally {
-                  setLinkingUserId(null)
-                }
-              }}
+              onClick={() => void handleCopyLink(row)}
             >
               <Copy className="mr-2 h-4 w-4" />
               {linkingUserId === row.id ? "Generating..." : "Copy Login Link"}

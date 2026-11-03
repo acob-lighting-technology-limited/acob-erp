@@ -204,6 +204,17 @@ export function WorkTasksTable({
             .filter(Boolean)
             .join(" · "),
         trailing: (r) => <TaskStatusBadge status={r.status} />,
+        detail: {
+          title: (r) => r.title,
+          subtitle: (r) => r.work_item_number || "Task",
+          badges: (r) => <TaskStatusBadge status={r.status} />,
+          fields: (r) => [
+            { label: "Assignee", value: assigneeName(r) || "Unassigned" },
+            { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No due date" },
+            ...(r.rating ? [{ label: "Rating", value: `${r.rating} / 5` }] : []),
+            ...(showProject ? [{ label: "Project", value: projectLabel(r) }] : []),
+          ],
+        },
       }}
       cardRenderer={(r) => (
         <div className="bg-card space-y-2 rounded-xl border p-4 text-xs">

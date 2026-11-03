@@ -388,6 +388,14 @@ export function ChallengesView({
         viewToggle
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        rowActions={[
+          {
+            label: "Update",
+            icon: Pencil,
+            onClick: (row: ChallengeItem) => handleOpenEdit(row),
+            hidden: (row: ChallengeItem) => !canEditChallenge(row),
+          },
+        ]}
         mobileRow={{
           title: (row) => row.title,
           subtitle: (row) => `${row.department} · Week ${row.week_number}, ${row.year}`,
@@ -398,6 +406,9 @@ export function ChallengesView({
                 ? `Details: ${row.description}`
                 : null,
           trailing: (row) => getStatusBadge(row.status),
+          onSelect: (row) => {
+            if (canEditChallenge(row)) handleOpenEdit(row)
+          },
           detail: {
             title: (row) => row.title,
             subtitle: (row) => row.department,
@@ -409,7 +420,7 @@ export function ChallengesView({
               { label: "Resolution / Mitigation", value: row.resolution_note || "No note yet", fullWidth: true },
             ],
             actions: (row) =>
-              isAdminContext && canEditChallenge(row)
+              canEditChallenge(row)
                 ? [{ label: "Update Challenge", icon: Pencil, onClick: () => handleOpenEdit(row) }]
                 : [],
           },
