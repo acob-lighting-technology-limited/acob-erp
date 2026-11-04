@@ -7,18 +7,8 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { NewRequisitionDialog } from "@/components/requisitions/new-requisition-dialog"
-import {
-  Headset,
-  Clock,
-  AlertCircle,
-  History,
-  UserCheck,
-  ShieldCheck,
-  Receipt,
-  MoveRight,
-  Building2,
-} from "lucide-react"
+
+import { Headset, Clock, AlertCircle, History, UserCheck, ShieldCheck, MoveRight, Building2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -71,8 +61,6 @@ export function AdminHelpDeskContent({
   const [activeTab, setActiveTab] = useState("my-actions")
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
   const [loadingTicketId, setLoadingTicketId] = useState<string | null>(null)
-  // Help desk handles support only; anything that needs buying becomes a requisition.
-  const [requisitionTicket, setRequisitionTicket] = useState<HelpDeskTicket | null>(null)
 
   const stats = useMemo(() => {
     const breached = tickets.filter(
@@ -157,7 +145,6 @@ export function AdminHelpDeskContent({
       new Set([...tickets.map((t) => t.priority), "low", "normal", "high", "urgent"].filter(Boolean))
     )
     const departments = Array.from(new Set(tickets.map((t) => t.service_department).filter(Boolean)))
-    const types = Array.from(new Set(tickets.map((t) => t.request_type).filter(Boolean)))
 
     return [
       {
@@ -175,12 +162,6 @@ export function AdminHelpDeskContent({
         label: "Department",
         options: departments.map((d) => ({ value: d, label: d })),
         hidden: departments.length === 0,
-      },
-      {
-        key: "request_type",
-        label: "Request Type",
-        options: types.map((t) => ({ value: t, label: formatName(t) })),
-        hidden: types.length === 0,
       },
     ] as DataTableFilter<HelpDeskTicket>[]
   }, [tickets])
@@ -269,7 +250,6 @@ export function AdminHelpDeskContent({
         render: (r) => (
           <div className="flex max-w-[300px] flex-col">
             <span className="truncate font-medium">{r.title}</span>
-            <span className="text-muted-foreground text-xs tracking-widest uppercase">{r.request_type}</span>
           </div>
         ),
       },
@@ -441,12 +421,6 @@ export function AdminHelpDeskContent({
                   onClick: (r) => routeTicket(r.id, "assign_me"),
                   hidden: (r) => r.status !== "pending_lead_review" && r.status !== "department_queue",
                 },
-                {
-                  label: "Raise requisition",
-                  icon: Receipt,
-                  onClick: (r) => setRequisitionTicket(r),
-                  hidden: (r) => ["resolved", "closed", "cancelled", "rejected"].includes(r.status),
-                },
               ]
             : []
         }
@@ -461,10 +435,6 @@ export function AdminHelpDeskContent({
                   <div className="flex flex-col">
                     <span className="text-muted-foreground text-xs font-medium">Department</span>
                     <span>{r.requester_department || "Unknown"}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-muted-foreground text-xs font-medium">Type</span>
-                    <span className="capitalize">{r.request_type}</span>
                   </div>
                 </div>
               </div>
@@ -522,14 +492,6 @@ export function AdminHelpDeskContent({
                 value: r.requester_department || "Staff",
               },
               {
-                label: "Request Type",
-                value: r.request_type || "-",
-              },
-              {
-                label: "Approval Stage",
-                value: r.current_approval_stage ? r.current_approval_stage.replace(/_/g, " ") : "Direct Handling",
-              },
-              {
                 label: "Handling Mode",
                 value: r.handling_mode || "Individual",
               },
@@ -559,22 +521,6 @@ export function AdminHelpDeskContent({
           </div>
         )}
         urlSync
-      />
-
-      <NewRequisitionDialog
-        open={requisitionTicket !== null}
-        onOpenChange={(open) => {
-          if (!open) setRequisitionTicket(null)
-        }}
-        helpDeskTicket={
-          requisitionTicket
-            ? {
-                id: requisitionTicket.id,
-                ticket_number: requisitionTicket.ticket_number,
-                title: requisitionTicket.title,
-              }
-            : null
-        }
       />
     </DataTablePage>
   )

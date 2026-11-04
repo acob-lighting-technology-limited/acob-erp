@@ -105,12 +105,10 @@ export function NewRequisitionDialog({
   open,
   onOpenChange,
   onSuccess,
-  helpDeskTicket,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: (requisition: Requisition) => void
-  helpDeskTicket?: { id: string; ticket_number: string; title: string } | null
 }) {
   const [formType, setFormType] = useState<RequisitionFormType | null>(null)
   const [costCategory, setCostCategory] = useState<CostCategory>("operational")
@@ -137,12 +135,10 @@ export function NewRequisitionDialog({
     setSelectedProjectId("")
     setCustomProjectName("")
     setProjectName("")
-    setPurpose(helpDeskTicket ? `For help desk ticket ${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "")
+    setPurpose("")
     setSiteLocation("")
     setAmount("")
-    setLines([
-      { description: helpDeskTicket ? `${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "", amount: "" },
-    ])
+    setLines([{ description: "", amount: "" }])
     setBeneficiaries([emptyBeneficiary()])
     setAttachments([])
     setFundingId(NO_FUNDING)
@@ -173,7 +169,7 @@ export function NewRequisitionDialog({
     ]).finally(() => {
       setLoadingProjects(false)
     })
-  }, [open, helpDeskTicket])
+  }, [open])
 
   const resolvedProjectName =
     costCategory === "operational"
@@ -290,7 +286,6 @@ export function NewRequisitionDialog({
       beneficiary_details: beneficiaryPayload,
       attachments,
       funding_category_id: fundingId === NO_FUNDING ? null : fundingId,
-      help_desk_ticket_id: helpDeskTicket?.id ?? null,
     }
     const body =
       formType === "petty_cash"

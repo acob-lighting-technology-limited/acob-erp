@@ -9,7 +9,6 @@ export interface HelpDeskTicket {
   handling_mode: "individual" | "queue" | "department" | null
   current_approval_stage: string | null
   assigned_to: string | null
-  request_type: "support" | "procurement"
   sla_target_at: string | null
 }
 
@@ -48,14 +47,11 @@ function managesDepartment(
 }
 
 export function resolveCurrentStage(ticket: HelpDeskTicket) {
-  if (ticket.status === "pending_approval") return stageLabel(ticket.current_approval_stage)
   if (ticket.status === "new") return "Intake"
-  if (ticket.status === "pending_lead_review") return "Lead Approval"
+  if (ticket.status === "pending_lead_review") return "Lead Review"
   if (ticket.status === "department_queue") return "Queue Handling"
   if (ticket.status === "department_assigned") return "Department Execution"
   if (ticket.status === "assigned" || ticket.status === "in_progress") return "Execution"
-  if (ticket.status === "approved_for_procurement") return "Procurement Approved"
-  if (ticket.status === "rejected") return "Rejected"
   if (ticket.status === "resolved") return "Resolved"
   if (ticket.status === "closed") return "Closed"
   if (ticket.status === "cancelled") return "Cancelled"
@@ -69,24 +65,6 @@ export function resolveApproverName(ticket: HelpDeskTicket, leadDirectory: LeadD
     return `No lead assigned (${fallbackScope})`
   }
 
-  if (ticket.status === "pending_approval") {
-    if (ticket.current_approval_stage === "department_lead") {
-      return getLeadName(ticket.service_department, ticket.service_department || "service department")
-    }
-    if (ticket.current_approval_stage === "requester_department_lead") {
-      return getLeadName(ticket.requester_department, ticket.requester_department || "requester department")
-    }
-    if (ticket.current_approval_stage === "service_department_lead") {
-      return getLeadName(ticket.service_department, ticket.service_department || "service department")
-    }
-    if (ticket.current_approval_stage === "head_corporate_services") {
-      return getLeadName("Corporate Services", "Corporate Services")
-    }
-    if (ticket.current_approval_stage === "managing_director") {
-      return getLeadName("Executive Management", "Executive Management")
-    }
-    return stageLabel(ticket.current_approval_stage)
-  }
   if (ticket.status === "pending_lead_review") {
     return getLeadName(ticket.service_department, ticket.service_department || "service department")
   }

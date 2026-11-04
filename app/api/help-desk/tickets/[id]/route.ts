@@ -30,18 +30,9 @@ const VALID_HD_TRANSITIONS: Record<string, string[]> = {
   returned: ["in_progress"],
   closed: [],
   cancelled: [],
-  pending_approval: ["approved_for_procurement", "rejected"],
-  approved_for_procurement: ["assigned", "cancelled"],
-  rejected: ["new"],
   pending_lead_review: ["department_queue", "assigned", "cancelled"],
 }
-const DEPARTMENT_WORKFLOW_STATUSES = new Set([
-  "department_queue",
-  "department_assigned",
-  "pending_lead_review",
-  "pending_approval",
-  "approved_for_procurement",
-])
+const DEPARTMENT_WORKFLOW_STATUSES = new Set(["department_queue", "department_assigned", "pending_lead_review"])
 const UpdateHelpDeskTicketSchema = z.object({
   status: z.enum(HELP_DESK_STATUSES).optional(),
   status_note: z.string().optional().nullable(),
@@ -81,17 +72,12 @@ export async function GET(_: NextRequest, props: { params: Promise<{ id: string 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const [commentsRes, approvalsRes, eventsRes] = await Promise.all([
+    const [commentsRes, eventsRes] = await Promise.all([
       supabase
         .from("help_desk_comments")
         .select("*")
         .eq("ticket_id", ticket.id)
         .order("created_at", { ascending: true }),
-      supabase
-        .from("help_desk_approvals")
-        .select("*")
-        .eq("ticket_id", ticket.id)
-        .order("requested_at", { ascending: true }),
       supabase.from("help_desk_events").select("*").eq("ticket_id", ticket.id).order("created_at", { ascending: true }),
     ])
 
@@ -99,7 +85,7 @@ export async function GET(_: NextRequest, props: { params: Promise<{ id: string 
       data: {
         ticket,
         comments: commentsRes.data || [],
-        approvals: approvalsRes.data || [],
+        approvals: [],
         events: eventsRes.data || [],
       },
     })
@@ -142,11 +128,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const nextStatus = parsed.data.status ? String(parsed.data.status) : null
     const statusNote = parsed.data.status_note ? String(parsed.data.status_note).trim() : null
 
-    // Anyone in the chain can move a ticket to "rejected" from here, so the
-    // requester is owed an explanation — same rule the approvals route applies.
-    if (nextStatus === "rejected" && !statusNote) {
-      return NextResponse.json({ error: "A reason is required when rejecting a ticket" }, { status: 400 })
-    }
     const csatRating = parsed.data.csat_rating
     const csatFeedback = parsed.data.csat_feedback ? String(parsed.data.csat_feedback) : null
 

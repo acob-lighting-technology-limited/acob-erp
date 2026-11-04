@@ -97,7 +97,6 @@ export function HelpDeskContent({
     description: "",
     service_department: "IT and Communications",
     priority: "medium",
-    request_type: "support",
   })
 
   useEffect(() => {
@@ -342,7 +341,6 @@ export function HelpDeskContent({
         description: "",
         service_department: "IT and Communications",
         priority: "medium",
-        request_type: "support",
       })
       await refreshTickets()
     } catch (error: unknown) {
@@ -596,7 +594,6 @@ export function HelpDeskContent({
             fields: (ticket) => [
               { label: "Ticket Number", value: ticket.ticket_number, copyable: true },
               { label: "Service Dept", value: ticket.service_department },
-              { label: "Request Type", value: ticket.request_type || "-" },
               { label: "Priority", value: ticket.priority },
               { label: "Created", value: formatWATDate(ticket.created_at) },
               { label: "Description", value: ticket.description, fullWidth: true },
@@ -619,14 +616,10 @@ export function HelpDeskContent({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
                   <span className="text-muted-foreground block text-xs font-semibold uppercase">Service Dept</span>
                   <span className="font-medium">{ticket.service_department}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Request Type</span>
-                  <span className="font-medium capitalize">{ticket.request_type || "—"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs font-semibold uppercase">Created</span>

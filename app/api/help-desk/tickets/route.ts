@@ -45,13 +45,6 @@ const CreateTicketSchema = z.object({
   title: z.string().trim().min(1, "title and service_department are required"),
   description: z.string().optional(),
   service_department: z.string().trim().min(1, "title and service_department are required"),
-  // The help desk is support-only: anything that costs money is a requisition.
-  request_type: z
-    .literal("support", {
-      errorMap: () => ({ message: "Procurement goes through Requisitions, not the help desk." }),
-    })
-    .optional()
-    .default("support"),
   priority: z.enum(HELP_DESK_PRIORITIES).optional().default("medium"),
 })
 
@@ -226,7 +219,6 @@ export async function POST(request: NextRequest) {
     const title = parsed.data.title
     const description = (parsed.data.description || "").trim()
     const serviceDepartment = parsed.data.service_department
-    const requestType = parsed.data.request_type
     const priority = parsed.data.priority
 
     const postScope = await getRequestScope()
@@ -245,13 +237,11 @@ export async function POST(request: NextRequest) {
     const initialHandlingMode = "queue"
     const commonCategoryValue = "Support"
 
-    const modernInsertPayload = {
+    const insertPayload = {
       title,
       description: description || null,
       service_department: serviceDepartment,
-      request_type: requestType,
       category: commonCategoryValue,
-      category_id: null,
       priority,
       status: initialStatus,
       requester_id: user.id,
@@ -259,24 +249,6 @@ export async function POST(request: NextRequest) {
       requester_department: profile.department || null,
       support_mode: supportMode,
       handling_mode: initialHandlingMode,
-      approval_required: false,
-      submitted_at: submittedAt.toISOString(),
-      sla_target_at: slaTarget.toISOString(),
-      paused_at: null,
-      current_approval_stage: null,
-    }
-
-    const legacyInsertPayload = {
-      title,
-      description: description || null,
-      service_department: serviceDepartment,
-      request_type: requestType,
-      category: commonCategoryValue,
-      priority,
-      status: "new",
-      requester_id: user.id,
-      created_by: user.id,
-      approval_required: false,
       submitted_at: submittedAt.toISOString(),
       sla_target_at: slaTarget.toISOString(),
       paused_at: null,
@@ -299,18 +271,7 @@ export async function POST(request: NextRequest) {
       return { data: null, error: lastError }
     }
 
-    let { data: created, error: createError } = await insertTicketWithCollisionRetry(modernInsertPayload)
-
-    const schemaDriftError =
-      !!createError &&
-      typeof createError.message === "string" &&
-      (createError.message.includes("column") ||
-        createError.message.includes("violates check constraint") ||
-        createError.message.includes("invalid input value"))
-
-    if (schemaDriftError) {
-      ;({ data: created, error: createError } = await insertTicketWithCollisionRetry(legacyInsertPayload))
-    }
+    const { data: created, error: createError } = await insertTicketWithCollisionRetry(insertPayload)
 
     if (createError) throw createError
     if (!created) {
@@ -331,7 +292,6 @@ export async function POST(request: NextRequest) {
       newStatus: created.status,
       details: {
         priority,
-        requestType,
         serviceDepartment,
         support_mode: supportMode,
         requester_department: profile.department || null,
@@ -360,8 +320,8 @@ export async function POST(request: NextRequest) {
     if (firstApprover?.id) {
       await createNotification({
         p_user_id: firstApprover.id,
-        p_type: "task_assigned",
-        p_category: "tasks",
+        p_type: "help_desk",
+        p_category: "help_desk",
         p_title: "New help desk ticket in your queue",
         p_message: `${created.ticket_number} - ${created.title}`,
         p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
@@ -370,7 +330,6 @@ export async function POST(request: NextRequest) {
         p_entity_type: "help_desk_ticket",
         p_entity_id: created.id,
         p_rich_content: {
-          request_type: requestType,
           priority,
           service_department: serviceDepartment,
           requester_department: profile.department || null,

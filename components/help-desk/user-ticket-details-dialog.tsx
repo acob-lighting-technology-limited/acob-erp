@@ -35,9 +35,6 @@ const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
   returned: ["in_progress"],
   closed: [],
   cancelled: [],
-  pending_approval: ["approved_for_procurement", "rejected"],
-  approved_for_procurement: ["assigned", "cancelled"],
-  rejected: ["new"],
   pending_lead_review: ["department_queue", "assigned", "cancelled"],
 }
 
@@ -254,10 +251,7 @@ export function UserHelpDeskTicketDetailsDialog({
               <DetailProperties>
                 <DetailProperty label="Service department">{ticket.service_department}</DetailProperty>
                 <DetailProperty label="Raised from">{ticket.requester_department}</DetailProperty>
-                <DetailProperty label="Request type">
-                  <span className="capitalize">{formatLabel(ticket.request_type)}</span>
-                  {ticket.category ? ` · ${ticket.category}` : ""}
-                </DetailProperty>
+                {ticket.category ? <DetailProperty label="Category">{ticket.category}</DetailProperty> : null}
                 <DetailProperty label="Logged">{formatDateTime(ticket.created_at)}</DetailProperty>
                 {/* Surfaced for the first time — the SLA target was on the record
                     all along and the sheet never showed it. */}

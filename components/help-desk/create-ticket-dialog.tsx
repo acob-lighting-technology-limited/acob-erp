@@ -23,7 +23,6 @@ export interface CreateTicketForm {
   description: string
   service_department: string
   priority: string
-  request_type: string
 }
 
 interface CreateTicketDialogProps {
@@ -78,7 +77,7 @@ export function CreateTicketDialog({
                 {
                   label: "What you are creating",
                   value:
-                    "This ticket tells another department what support, fix, purchase, or action you need from them.",
+                    "This ticket tells another department what support, fix, or operational assistance you need from them.",
                 },
                 {
                   label: "What happens after submission",
@@ -147,15 +146,11 @@ export function CreateTicketDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="border-primary/30 bg-primary/5 text-foreground rounded-lg border p-3 text-sm md:col-span-2">
-            <p className="font-medium">Need something bought or paid for?</p>
-            <p className="text-muted-foreground mt-1">
-              The help desk is for support. Money goes through a Payment Request or Petty Cash, which routes it for
-              signatures and payment.
-            </p>
+          <div className="border-primary/30 bg-primary/5 text-foreground flex items-center justify-between rounded-lg border px-3 py-2 text-xs md:col-span-2">
+            <span>Need something bought or paid for? Money goes through Requisitions, not the help desk.</span>
             <Link
               href="/accounts/requisitions"
-              className="text-primary mt-2 inline-flex items-center gap-1 font-medium hover:underline"
+              className="text-primary inline-flex shrink-0 items-center gap-1 font-medium hover:underline"
             >
               Go to Requisitions
               <ArrowUpRight className="h-3.5 w-3.5" />

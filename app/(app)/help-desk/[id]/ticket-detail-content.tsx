@@ -14,7 +14,6 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { apiFetch } from "@/lib/api-client"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
-import { TicketRequisitionsCard } from "@/components/requisitions/ticket-requisitions-card"
 
 type Ticket = {
   id: string
@@ -195,10 +194,6 @@ export function TicketDetailContent({
               ))}
             </CardContent>
           </Card>
-          <TicketRequisitionsCard
-            ticket={{ id: ticket.id, ticket_number: ticket.ticket_number, title: ticket.title }}
-            canRaise={!["resolved", "closed", "cancelled", "rejected"].includes(ticket.status)}
-          />
         </div>
         <div className="space-y-6">
           <Card>

@@ -63,9 +63,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return NextResponse.json({ error: "Only the service department lead can assign this ticket." }, { status: 403 })
     }
 
-    if (ticket.status === "pending_approval") {
-      return NextResponse.json({ error: "Cannot assign while ticket is pending approval." }, { status: 400 })
-    }
     if (!["new", "pending_lead_review", "department_queue", "department_assigned"].includes(ticket.status)) {
       return NextResponse.json({ error: "Ticket is not assignable at its current stage." }, { status: 400 })
     }
