@@ -285,24 +285,6 @@ export function AdminAttendanceRecordsPage({
         </Badge>
       ),
     },
-    {
-      key: "actions",
-      label: "",
-      accessor: () => "",
-      render: (r) => (
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" onClick={() => openEdit(r)} aria-label="Edit record">
-                <Pencil className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Edit record</TooltipContent>
-          </Tooltip>
-        </div>
-      ),
-      align: "center",
-    },
   ]
 
   const tableFilters: DataTableFilter<AttendanceRecord>[] = [

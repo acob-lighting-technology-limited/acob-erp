@@ -74,15 +74,6 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
         </span>
       ),
     },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (e: UserPayrollEntry) => (
-        <Button size="sm" variant="outline" onClick={() => setSelectedEntry(e)}>
-          <Eye className="mr-1.5 h-4 w-4" /> View Payslip
-        </Button>
-      ),
-    },
   ]
 
   // Calculate statistics
