@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import {
-  appendAuditLog,
-  appendHelpDeskEvent,
-  getAuthContext,
-  HelpDeskProfile,
-  syncHelpDeskTicketTask,
-} from "@/lib/help-desk/server"
+import { appendAuditLog, appendHelpDeskEvent, getAuthContext, HelpDeskProfile } from "@/lib/help-desk/server"
+
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -148,12 +143,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (updateError) throw updateError
 
-    const syncResult = await syncHelpDeskTicketTask({
-      ticket: updated,
-      actorId: user.id,
-    })
-
-    const workItemNumber = syncResult?.workItemNumber || updated.ticket_number || ticket.ticket_number
+    const ticketNumber = updated.ticket_number || ticket.ticket_number
 
     await appendHelpDeskEvent({
       ticketId: ticket.id,
@@ -183,10 +173,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (newAssignedTo) {
       await createNotification({
         p_user_id: newAssignedTo,
-        p_type: "task_assigned",
-        p_category: "tasks",
+        p_type: "help_desk",
+        p_category: "help_desk",
         p_title: "Help desk ticket assigned",
-        p_message: `${workItemNumber} - ${ticket.title}`,
+        p_message: `${ticketNumber} - ${ticket.title}`,
         p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
         p_link_url: "/help-desk",
         p_actor_id: user.id,
@@ -198,10 +188,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       try {
         await sendHelpDeskMail({
           userIds: [newAssignedTo],
-          subject: `Help Desk Ticket Assigned — ${workItemNumber}`,
+          subject: `Help Desk Ticket Assigned — ${ticketNumber}`,
           title: "Ticket Assigned To You",
           message: `${ticket.title} has been assigned to you for execution.`,
-          ticketNumber: workItemNumber,
+          ticketNumber: ticketNumber,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error (assign):")

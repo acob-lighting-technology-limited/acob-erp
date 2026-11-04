@@ -7,8 +7,8 @@ import {
   canLeadDepartment,
   getAuthContext,
   isAdminRole,
-  syncHelpDeskTicketTask,
 } from "@/lib/help-desk/server"
+
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
@@ -188,30 +188,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         )
       }
 
-      if (["in_progress", "resolved", "closed"].includes(nextStatus)) {
-        const taskId = String(ticket.task_id || "")
-        if (!taskId) {
-          return NextResponse.json(
-            { error: "This help desk item must be linked to a department goal before work can continue" },
-            { status: 400 }
-          )
-        }
-
-        const { data: linkedTask } = await supabase
-          .from("tasks")
-          .select("id, goal_id")
-          .eq("id", taskId)
-          .maybeSingle<{ id: string; goal_id?: string | null }>()
-
-        if (!linkedTask?.goal_id) {
-          return NextResponse.json(
-            { error: "Link this help desk item to a department goal before starting or resolving it" },
-            { status: 400 }
-          )
-        }
-      }
-
       updates.status = nextStatus
+
       if (nextStatus === "in_progress" && !ticket.started_at) {
         updates.started_at = new Date().toISOString()
       }
@@ -260,13 +238,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (commentError) throw commentError
     }
 
-    const syncResult = nextStatus
-      ? await syncHelpDeskTicketTask({
-          ticket: updated,
-          actorId: user.id,
-        })
-      : null
-    const workItemNumber = syncResult?.workItemNumber || updated.ticket_number || ticket.ticket_number
+    const ticketNumber = updated.ticket_number || ticket.ticket_number
 
     await appendHelpDeskEvent({
       ticketId: ticket.id,
@@ -296,25 +268,25 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (nextStatus === "resolved") {
       await createNotification({
         p_user_id: ticket.requester_id,
-        p_type: "task_completed",
-        p_category: "tasks",
+        p_type: "help_desk",
+        p_category: "help_desk",
         p_title: "Ticket resolved",
-        p_message: `${workItemNumber} has been resolved. Please review and rate the service.`,
+        p_message: `${ticketNumber} has been resolved. Please review and rate the service.`,
         p_priority: "normal",
         p_link_url: "/help-desk",
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
-        p_rich_content: { ticket_number: workItemNumber },
+        p_rich_content: { ticket_number: ticketNumber },
       })
 
       try {
         await sendHelpDeskMail({
           userIds: [ticket.requester_id],
-          subject: `Ticket Resolved: ${workItemNumber}`,
+          subject: `Ticket Resolved: ${ticketNumber}`,
           title: "Help Desk Ticket Resolved",
           message: `${ticket.title} has been resolved. Please confirm and provide your service rating.`,
-          ticketNumber: workItemNumber,
+          ticketNumber: ticketNumber,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error on resolve")

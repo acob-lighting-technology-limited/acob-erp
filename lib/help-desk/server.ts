@@ -4,7 +4,6 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { TaskStatus } from "@/lib/tasks/constants"
 
 /** Minimal profile shape used in help-desk access-control helpers */
 export interface ProfileLike {
@@ -89,11 +88,6 @@ export type HelpDeskPriority = (typeof HELP_DESK_PRIORITIES)[number]
 export type HelpDeskStatus = (typeof HELP_DESK_STATUSES)[number]
 export type HelpDeskSupportMode = (typeof HELP_DESK_SUPPORT_MODES)[number]
 export type HelpDeskHandlingMode = (typeof HELP_DESK_HANDLING_MODES)[number]
-
-type SyncedTaskRow = {
-  id: string
-  work_item_number: string | null
-}
 
 export function addBusinessHours(baseDate: Date, hours: number): Date {
   const date = new Date(baseDate)
@@ -261,135 +255,8 @@ export async function appendAuditLog(params: {
   )
 }
 
-function normalizeTaskStatusFromTicket(ticketStatus: string): TaskStatus | null {
-  switch (ticketStatus) {
-    case "department_queue":
-    case "department_assigned":
-    case "assigned":
-    case "approved_for_procurement":
-      return "pending"
-    case "in_progress":
-      return "in_progress"
-    case "resolved":
-    case "closed":
-      return "completed"
-    case "rejected":
-    case "cancelled":
-      return "cancelled"
-    default:
-      return null
-  }
-}
-
-// A ticket still sitting in the help-desk queue has no owner yet, so it mirrors
-// to a task with a null `assigned_to`. That keeps it off every personal list
-// until someone picks it up — the queue itself lives in the help-desk module,
-// which is why tasks no longer carry a department-wide assignment type.
-function normalizeTaskAssignee(ticket: HelpDeskTicketRow): string | null {
-  return ticket.handling_mode === "individual" ? (ticket.assigned_to ?? null) : null
-}
-
-function normalizeTaskDueDate(value: string | null | undefined): string | null {
-  if (!value) return null
-  return value.includes("T") ? value.split("T")[0] || null : value
-}
-
 export function generateFallbackHelpDeskTicketNumber(): string {
   const epochMillis = Date.now().toString()
   const randomSuffix = parseInt(crypto.randomUUID().replace(/-/g, "").slice(0, 3), 16).toString().padStart(3, "0")
   return `HDT-${epochMillis}${randomSuffix}`
-}
-
-export async function syncHelpDeskTicketTask(params: {
-  ticket: HelpDeskTicketRow
-  actorId: string
-}): Promise<{ taskId: string; workItemNumber: string | null } | null> {
-  const taskStatus = normalizeTaskStatusFromTicket(params.ticket.status)
-  if (!taskStatus) return null
-
-  const supabase = await createClient()
-  const dataClient = getServiceRoleClientOrFallback(supabase)
-
-  let existingTask: SyncedTaskRow | null = null
-
-  if (params.ticket.task_id) {
-    const { data } = await dataClient
-      .from("tasks")
-      .select("id, work_item_number")
-      .eq("id", params.ticket.task_id)
-      .maybeSingle<SyncedTaskRow>()
-    existingTask = data ?? null
-  }
-
-  if (!existingTask) {
-    const { data } = await dataClient
-      .from("tasks")
-      .select("id, work_item_number")
-      .eq("source_type", "help_desk")
-      .eq("source_id", params.ticket.id)
-      .maybeSingle<SyncedTaskRow>()
-    existingTask = data ?? null
-  }
-
-  const assignedTo = normalizeTaskAssignee(params.ticket)
-  const taskPayload = {
-    title: params.ticket.title,
-    description: params.ticket.description ?? null,
-    priority: params.ticket.priority,
-    status: taskStatus,
-    assigned_to: assignedTo,
-    assigned_by: params.ticket.assigned_by || params.ticket.created_by || params.ticket.requester_id || params.actorId,
-    department: params.ticket.service_department || params.ticket.requester_department || null,
-    due_date: normalizeTaskDueDate(params.ticket.sla_target_at),
-    started_at: params.ticket.started_at || null,
-    completed_at:
-      taskStatus === "completed"
-        ? params.ticket.resolved_at || params.ticket.closed_at || new Date().toISOString()
-        : null,
-    source_type: "help_desk" as const,
-    source_id: params.ticket.id,
-    assignment_type: "individual" as const,
-    goal_id: null,
-  }
-
-  // work_item_number is insert-only. The assign trigger is BEFORE INSERT, so
-  // including this key on the update path would blank an existing task's
-  // number with no way to restore it.
-  const { data: syncedTask, error } = existingTask
-    ? await dataClient
-        .from("tasks")
-        .update(taskPayload)
-        .eq("id", existingTask.id)
-        .select("id, work_item_number")
-        .single<SyncedTaskRow>()
-    : await dataClient
-        .from("tasks")
-        .insert({
-          ...taskPayload,
-          work_item_number: params.ticket.ticket_number?.startsWith("TSK-") ? params.ticket.ticket_number : null,
-        })
-        .select("id, work_item_number")
-        .single<SyncedTaskRow>()
-
-  if (error || !syncedTask) {
-    throw error || new Error("Failed to sync help desk task")
-  }
-
-  // Tickets keep their own HD- identity; only the link is written back. The
-  // task carries the TSK number.
-  if (params.ticket.task_id !== syncedTask.id) {
-    const { error: linkError } = await dataClient
-      .from("help_desk_tickets")
-      .update({ task_id: syncedTask.id })
-      .eq("id", params.ticket.id)
-
-    if (linkError) {
-      throw linkError
-    }
-  }
-
-  return {
-    taskId: syncedTask.id,
-    workItemNumber: syncedTask.work_item_number,
-  }
 }

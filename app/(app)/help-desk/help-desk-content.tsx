@@ -218,20 +218,8 @@ export function HelpDeskContent({
       render: (ticket) => <TicketStatusBadge status={ticket.status} />,
     },
     {
-      key: "goal",
-      label: "Goal",
-      sortable: true,
-      accessor: (ticket) => ticket.goal_title || "",
-      render: (ticket) =>
-        ticket.goal_title ? (
-          <span className="line-clamp-1 text-xs font-medium">{ticket.goal_title}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">Not linked</span>
-        ),
-      hideOnMobile: true,
-    },
-    {
       key: "comments",
+
       label: "Comments",
       sortable: true,
       accessor: (ticket) => ticket.comment_count || 0,
@@ -643,10 +631,6 @@ export function HelpDeskContent({
                 <div>
                   <span className="text-muted-foreground block text-xs font-semibold uppercase">Created</span>
                   <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Goal</span>
-                  <span className="font-medium">{ticket.goal_title || "—"}</span>
                 </div>
               </div>
 
