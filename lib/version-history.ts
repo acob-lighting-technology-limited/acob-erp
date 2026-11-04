@@ -57,6 +57,7 @@ export const RELEASES: Release[] = [
         area: "Leave Management",
         items: [
           "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
+          "Leave Without Pay (LWOP) is now automatically hidden from the admin leave calendar by default, with a dedicated toolbar toggle to show or hide it on demand",
         ],
       },
     ],
