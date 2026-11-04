@@ -232,61 +232,8 @@ export function ChallengesView({
         hideOnMobile: true,
         accessor: (row) => row.year,
       },
-      {
-        key: "actions",
-        label: "Action",
-        align: "right",
-        render: (row) => {
-          const editable = canEditChallenge(row)
-          if (!isAdminContext) {
-            return (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-block cursor-not-allowed">
-                    <Button variant="ghost" size="sm" disabled className="h-7 px-2 text-xs opacity-50">
-                      View Only
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p className="text-xs">Challenges are updated in the Admin Console by department leads</p>
-                </TooltipContent>
-              </Tooltip>
-            )
-          }
-
-          if (editable) {
-            return (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1 px-2 text-xs"
-                onClick={() => handleOpenEdit(row)}
-              >
-                <Pencil className="h-3 w-3" />
-                <span>Update</span>
-              </Button>
-            )
-          }
-
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-block cursor-not-allowed">
-                  <Button variant="ghost" size="sm" disabled className="h-7 px-2 text-xs opacity-50">
-                    Locked
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="text-xs">Only leads of {row.department} or administrators can update this challenge</p>
-              </TooltipContent>
-            </Tooltip>
-          )
-        },
-      },
     ],
-    [isAdminContext, canEditChallenge]
+    []
   )
 
   const filters = useMemo<DataTableFilter<ChallengeItem>[]>(

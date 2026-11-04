@@ -201,19 +201,8 @@ export function DevImpersonationContent() {
         sortable: true,
         render: (row) => <EmployeeStatusBadge status={row.employment_status} size="sm" showIcon={false} />,
       },
-      {
-        key: "action",
-        label: "Action",
-        mode: "display",
-        render: (row) => (
-          <Button size="sm" disabled={Boolean(linkingUserId)} onClick={() => void handleCopyLink(row)}>
-            <Copy className="mr-2 h-4 w-4" />
-            {linkingUserId === row.id ? "Generating..." : "Copy Login Link"}
-          </Button>
-        ),
-      },
     ],
-    [linkingUserId]
+    []
   )
 
   const filters = useMemo<DataTableFilter<ImpersonationRow>[]>(

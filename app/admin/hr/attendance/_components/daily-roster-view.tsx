@@ -528,15 +528,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       render: (r) => <span className="text-muted-foreground text-xs">{labelSource(r)}</span>,
       hideOnMobile: true,
     },
-    {
-      key: "actions",
-      label: "Edit",
-      render: (r) => (
-        <Button aria-label="Edit" variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(r)}>
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-      ),
-    },
   ]
 
   const tableFilters: DataTableFilter<AttendanceRecord>[] = [
