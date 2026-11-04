@@ -34,8 +34,19 @@ export const RELEASES: Release[] = [
   {
     version: "2026.11",
     title: "UI refinement and workflow enhancements",
-    summary: "Visual contrast improvements across status banners and approval workflows.",
+    summary:
+      "Standalone Help Desk ticket workflows, service ratings on close, and visual contrast improvements across approval workflows.",
     areas: [
+      {
+        area: "Help Desk",
+        items: [
+          "Standalone ticket workflows decoupled from Tasks — tickets no longer create mirror task items or clutter task boards",
+          "Tickets can be assigned directly to department team members upon creation, with real-time indicators if the staff member is currently on approved leave",
+          "Department leads and admins can reassign tickets directly from any open status",
+          "Resolving tickets is separated from closing: assignees resolve tickets when work is done, and requesters or leads close tickets with a required 1–5 service rating",
+          "Tickets that turn into substantial projects can now be converted into formal tasks with weight assignment directly from management views",
+        ],
+      },
       {
         area: "UI & Badges",
         items: [

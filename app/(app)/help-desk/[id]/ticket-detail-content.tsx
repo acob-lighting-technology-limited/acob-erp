@@ -243,14 +243,16 @@ export function TicketDetailContent({
                 </Button>
               </CardContent>
             </Card>
-          ) : ticket.csat_rating ? (
+          ) : (ticket as any).rating || ticket.csat_rating ? (
             <Card>
               <CardHeader>
                 <CardTitle>Service Rating</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div>Rating: {ticket.csat_rating}/5</div>
-                {ticket.csat_feedback ? <div>{ticket.csat_feedback}</div> : null}
+                <div>Rating: {(ticket as any).rating || ticket.csat_rating}/5</div>
+                {(ticket as any).rating_comment || ticket.csat_feedback ? (
+                  <div>{(ticket as any).rating_comment || ticket.csat_feedback}</div>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

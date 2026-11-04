@@ -45,7 +45,7 @@ export default async function HelpDeskTicketPage(props: { params: Promise<{ id: 
     <TicketDetailContent
       ticket={ticket}
       viewerId={user.id}
-      canRate={ticket.requester_id === user.id && ["resolved", "closed"].includes(String(ticket.status))}
+      canRate={ticket.requester_id === user.id && ticket.status === "resolved"}
       events={eventsResult.data || []}
       comments={commentsResult.data || []}
     />
