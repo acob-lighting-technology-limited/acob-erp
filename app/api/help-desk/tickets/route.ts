@@ -15,6 +15,10 @@ import {
 } from "@/lib/help-desk/server"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
+import { loadAwayToday } from "@/lib/admin/away-today"
+import { isAssignableProfile, getUnassignableReason } from "@/lib/workforce/assignment-policy"
+import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
+import { formatFullName } from "@/lib/utils"
 import { logger } from "@/lib/logger"
 import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -46,6 +50,7 @@ const CreateTicketSchema = z.object({
   description: z.string().optional(),
   service_department: z.string().trim().min(1, "title and service_department are required"),
   priority: z.enum(HELP_DESK_PRIORITIES).optional().default("medium"),
+  assigned_to: z.string().trim().optional().nullable(),
 })
 
 function describeError(error: unknown): string {
@@ -233,9 +238,61 @@ export async function POST(request: NextRequest) {
     const submittedAt = new Date()
     const slaTarget = getSlaTarget(priority, submittedAt)
     const supportMode = "open_queue" as const
-    const initialStatus = "department_queue"
-    const initialHandlingMode = "queue"
     const commonCategoryValue = "Support"
+
+    const rawAssignedTo = parsed.data.assigned_to?.trim() || null
+    let assignedToId: string | null = null
+    let assigneeName: string = ""
+    let isAssigneeOnLeave = false
+    let onLeaveUntilFormatted: string = ""
+
+    type StaffDirectoryRow = {
+      id: string
+      first_name: string | null
+      last_name: string | null
+      full_name: string | null
+      department: string | null
+      employment_status: string | null
+    }
+
+    const serviceClient = getServiceRoleClientOrFallback(supabase)
+
+    if (rawAssignedTo) {
+      const { data: rawAssignee, error: assigneeErr } = await (serviceClient as any)
+        .from("staff_directory")
+        .select("id, first_name, last_name, full_name, department, employment_status")
+        .eq("id", rawAssignedTo)
+        .single()
+      const assigneeRow = rawAssignee as StaffDirectoryRow | null
+
+      if (assigneeErr || !assigneeRow) {
+        return NextResponse.json({ error: "Selected assignee not found" }, { status: 400 })
+      }
+
+      const unassignableReason = getUnassignableReason(
+        { employment_status: assigneeRow.employment_status, department: assigneeRow.department },
+        { requiredDepartment: serviceDepartment, allowOnLeave: true }
+      )
+      if (unassignableReason) {
+        return NextResponse.json({ error: unassignableReason }, { status: 400 })
+      }
+
+      assignedToId = assigneeRow.id
+      assigneeName =
+        formatFullName(assigneeRow.first_name, assigneeRow.last_name) || assigneeRow.full_name || "Assignee"
+
+      const todayIso = toLocalISODate()
+      const awayRecords = await loadAwayToday(serviceClient, todayIso, [assignedToId as string])
+      if (awayRecords.length > 0) {
+        isAssigneeOnLeave = true
+        if (awayRecords[0]?.until) {
+          onLeaveUntilFormatted = formatWATDate(awayRecords[0].until, { day: "numeric", month: "short" })
+        }
+      }
+    }
+
+    const initialStatus = assignedToId ? "assigned" : "department_queue"
+    const initialHandlingMode = assignedToId ? "individual" : "queue"
 
     const insertPayload = {
       title,
@@ -246,6 +303,9 @@ export async function POST(request: NextRequest) {
       status: initialStatus,
       requester_id: user.id,
       created_by: user.id,
+      assigned_to: assignedToId,
+      assigned_by: assignedToId ? user.id : null,
+      assigned_at: assignedToId ? submittedAt.toISOString() : null,
       requester_department: profile.department || null,
       support_mode: supportMode,
       handling_mode: initialHandlingMode,
@@ -315,40 +375,96 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const firstApprover = serviceLead
-
-    if (firstApprover?.id) {
+    if (assignedToId) {
+      // Notify assigned staff member
       await createNotification({
-        p_user_id: firstApprover.id,
+        p_user_id: assignedToId,
         p_type: "help_desk",
         p_category: "help_desk",
-        p_title: "New help desk ticket in your queue",
-        p_message: `${created.ticket_number} - ${created.title}`,
+        p_title: "New help desk ticket assigned to you",
+        p_message: `${created.ticket_number} - ${created.title} (${created.service_department})`,
         p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
-        p_link_url: "/admin/help-desk",
+        p_link_url: `/help-desk/${created.id}`,
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: created.id,
         p_rich_content: {
           priority,
           service_department: serviceDepartment,
-          requester_department: profile.department || null,
-          support_mode: supportMode,
         },
       })
-    }
 
-    try {
-      await sendHelpDeskMail({
-        userIds: [user.id, firstApprover?.id].filter(Boolean) as string[],
-        subject: `Help Desk Ticket Created — ${created.ticket_number}`,
-        title: "New Help Desk Ticket Submitted",
-        message: `${created.title} (${created.service_department}) has been submitted with ${created.priority} priority.`,
-        ticketNumber: created.ticket_number,
-        ctaPath: "/help-desk",
-      })
-    } catch (mailError) {
-      log.error({ err: String(mailError) }, "Help desk mail error on create")
+      // Notify department lead for visibility so they can reassign if needed
+      if (serviceLead?.id) {
+        const leaveNote = isAssigneeOnLeave
+          ? ` (Note: Assignee is currently on leave${onLeaveUntilFormatted ? ` until ${onLeaveUntilFormatted}` : ""})`
+          : ""
+        await createNotification({
+          p_user_id: serviceLead.id,
+          p_type: "help_desk",
+          p_category: "help_desk",
+          p_title: "New ticket assigned in your department",
+          p_message: `${created.ticket_number} - ${created.title} (Assigned to ${assigneeName}${leaveNote})`,
+          p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
+          p_link_url: `/admin/help-desk/${created.id}`,
+          p_actor_id: user.id,
+          p_entity_type: "help_desk_ticket",
+          p_entity_id: created.id,
+          p_rich_content: {
+            priority,
+            service_department: serviceDepartment,
+            assigned_to: assignedToId,
+            is_on_leave: isAssigneeOnLeave,
+          },
+        })
+      }
+
+      try {
+        await sendHelpDeskMail({
+          userIds: [user.id, assignedToId, serviceLead?.id].filter(Boolean) as string[],
+          subject: `Help Desk Ticket Created — ${created.ticket_number}`,
+          title: "New Help Desk Ticket Submitted",
+          message: `${created.title} (${created.service_department}) has been submitted and assigned to ${assigneeName}.`,
+          ticketNumber: created.ticket_number,
+          ctaPath: `/help-desk/${created.id}`,
+        })
+      } catch (mailError) {
+        log.error({ err: String(mailError) }, "Help desk mail error on create")
+      }
+    } else {
+      if (serviceLead?.id) {
+        await createNotification({
+          p_user_id: serviceLead.id,
+          p_type: "help_desk",
+          p_category: "help_desk",
+          p_title: "New help desk ticket in your queue",
+          p_message: `${created.ticket_number} - ${created.title}`,
+          p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
+          p_link_url: `/admin/help-desk/${created.id}`,
+          p_actor_id: user.id,
+          p_entity_type: "help_desk_ticket",
+          p_entity_id: created.id,
+          p_rich_content: {
+            priority,
+            service_department: serviceDepartment,
+            requester_department: profile.department || null,
+            support_mode: supportMode,
+          },
+        })
+      }
+
+      try {
+        await sendHelpDeskMail({
+          userIds: [user.id, serviceLead?.id].filter(Boolean) as string[],
+          subject: `Help Desk Ticket Created — ${created.ticket_number}`,
+          title: "New Help Desk Ticket Submitted",
+          message: `${created.title} (${created.service_department}) has been submitted with ${created.priority} priority.`,
+          ticketNumber: created.ticket_number,
+          ctaPath: `/help-desk/${created.id}`,
+        })
+      } catch (mailError) {
+        log.error({ err: String(mailError) }, "Help desk mail error on create")
+      }
     }
 
     const responsePayload = { data: created }

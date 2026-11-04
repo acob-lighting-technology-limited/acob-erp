@@ -17,12 +17,17 @@ import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { ArrowUpRight, Plus } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { apiFetch } from "@/lib/api-client"
+import { formatWATDate } from "@/lib/utils/date"
 
 export interface CreateTicketForm {
   title: string
   description: string
   service_department: string
   priority: string
+  assigned_to?: string | null
 }
 
 interface CreateTicketDialogProps {
@@ -51,10 +56,25 @@ export function CreateTicketDialog({
     [departmentOptions, userDepartment]
   )
 
+  const { data: assigneesData, isLoading: isLoadingAssignees } = useQuery({
+    queryKey: QUERY_KEYS.helpDeskAssignees(form.service_department),
+    queryFn: async () => {
+      if (!form.service_department) return []
+      const res = await apiFetch(`/api/help-desk/assignees?department=${encodeURIComponent(form.service_department)}`)
+      if (!res.ok) throw new Error("Failed to load assignees")
+      const json = await res.json()
+      return (json.data || []) as Array<{ id: string; name: string; on_leave_until: string | null }>
+    },
+    enabled: Boolean(form.service_department && open),
+    staleTime: 60_000,
+  })
+
+  const assignees = assigneesData ?? []
+
   useEffect(() => {
     if (availableDepartmentOptions.length === 0) return
     if (availableDepartmentOptions.includes(form.service_department)) return
-    onFormChange({ ...form, service_department: availableDepartmentOptions[0] || "" })
+    onFormChange({ ...form, service_department: availableDepartmentOptions[0] || "", assigned_to: null })
   }, [availableDepartmentOptions, form, onFormChange])
 
   return (
@@ -115,7 +135,7 @@ export function CreateTicketDialog({
             <Label>Department</Label>
             <Select
               value={form.service_department}
-              onValueChange={(value) => onFormChange({ ...form, service_department: value })}
+              onValueChange={(value) => onFormChange({ ...form, service_department: value, assigned_to: null })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -145,6 +165,35 @@ export function CreateTicketDialog({
                 <SelectItem value="urgent">Urgent</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Specific Assignee (Optional)</Label>
+            <Select
+              value={form.assigned_to ?? "unassigned"}
+              onValueChange={(value) => onFormChange({ ...form, assigned_to: value === "unassigned" ? null : value })}
+              disabled={isLoadingAssignees}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Department Queue (Default)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Department Queue (Default)</SelectItem>
+                {assignees.map((person) => {
+                  const onLeave = person.on_leave_until
+                    ? ` (On leave until ${formatWATDate(person.on_leave_until, { day: "numeric", month: "short" })})`
+                    : ""
+                  return (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.name}
+                      {onLeave}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              Leave blank to route to the department queue, or choose a team member to assign directly.
+            </p>
           </div>
           <div className="border-primary/30 bg-primary/5 text-foreground flex items-center justify-between rounded-lg border px-3 py-2 text-xs md:col-span-2">
             <span>Need something bought or paid for? Money goes through Requisitions, not the help desk.</span>

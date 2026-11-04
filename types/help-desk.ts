@@ -32,6 +32,15 @@ export interface HelpDeskTicket {
   closed_at: string | null
   csat_rating: number | null
   csat_feedback: string | null
+  rating?: number | null
+  rating_comment?: string | null
+  rated_by?: string | null
+  rated_at?: string | null
+  resolved_by?: string | null
+  closed_by?: string | null
+  converted_task_id?: string | null
+  converted_task_number?: string | null
+  metadata?: Record<string, unknown> | null
   comment_count?: number
   created_at: string
   updated_at: string

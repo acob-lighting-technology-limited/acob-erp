@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import { HELP_DESK_STATUSES, appendAuditLog, appendHelpDeskEvent, getAuthContext } from "@/lib/help-desk/server"
 import {
-  HELP_DESK_STATUSES,
-  appendAuditLog,
-  appendHelpDeskEvent,
-  canLeadDepartment,
-  getAuthContext,
-  isAdminRole,
-} from "@/lib/help-desk/server"
+  canViewTicket,
+  canStartWork,
+  canPauseWork,
+  canResolveTicket,
+  canCloseTicket,
+  canCancelTicket,
+} from "@/lib/help-desk/permissions"
 
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
@@ -34,13 +35,11 @@ const VALID_HD_TRANSITIONS: Record<string, string[]> = {
 }
 const DEPARTMENT_WORKFLOW_STATUSES = new Set(["department_queue", "department_assigned", "pending_lead_review"])
 const UpdateHelpDeskTicketSchema = z.object({
-  status: z.enum(HELP_DESK_STATUSES).optional(),
+  status: z.string().optional(),
   status_note: z.string().optional().nullable(),
-  csat_rating: z
-    .number()
-    .min(1, "CSAT rating must be between 1 and 5")
-    .max(5, "CSAT rating must be between 1 and 5")
-    .optional(),
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  rating_comment: z.string().trim().optional().nullable(),
+  csat_rating: z.number().int().min(1).max(5).optional().nullable(),
   csat_feedback: z.string().optional().nullable(),
 })
 
@@ -59,16 +58,7 @@ export async function GET(_: NextRequest, props: { params: Promise<{ id: string 
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
     }
 
-    const getScope = await getRequestScope()
-    const isGlobalAdmin = isAdminRole(profile.role) && getScope?.scopeMode !== "lead"
-    const canView =
-      isGlobalAdmin ||
-      canLeadDepartment(profile, ticket.service_department) ||
-      canLeadDepartment(profile, ticket.requester_department) ||
-      ticket.requester_id === user.id ||
-      ticket.assigned_to === user.id
-
-    if (!canView) {
+    if (!canViewTicket(profile, ticket)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -131,33 +121,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const csatRating = parsed.data.csat_rating
     const csatFeedback = parsed.data.csat_feedback ? String(parsed.data.csat_feedback) : null
 
-    const patchScope = await getRequestScope()
-    const isGlobalAdminPatch = isAdminRole(profile.role) && patchScope?.scopeMode !== "lead"
-    const canManageWorkflow =
-      isGlobalAdminPatch ||
-      canLeadDepartment(profile, ticket.service_department) ||
-      canLeadDepartment(profile, ticket.requester_department) ||
-      ticket.assigned_to === user.id
-    const canLeadWorkflow =
-      isGlobalAdminPatch ||
-      canLeadDepartment(profile, ticket.service_department) ||
-      canLeadDepartment(profile, ticket.requester_department)
-    const isDepartmentTicket =
-      String(ticket.handling_mode || "") === "queue" || DEPARTMENT_WORKFLOW_STATUSES.has(String(ticket.status || ""))
-
-    const canRateTicket = ticket.requester_id === user.id
-
-    if (nextStatus && !canManageWorkflow) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-    if (nextStatus && isDepartmentTicket && !canLeadWorkflow) {
-      return NextResponse.json(
-        { error: "Department help desk tickets can only be updated by leads/admin from Admin Help Desk" },
-        { status: 403 }
-      )
-    }
-
     const updates: Record<string, unknown> = {}
+    const now = new Date().toISOString()
+    const metadata = typeof ticket.metadata === "object" && ticket.metadata !== null ? { ...ticket.metadata } : {}
 
     if (nextStatus) {
       const currentStatus = String(ticket.status)
@@ -169,45 +135,116 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         )
       }
 
-      updates.status = nextStatus
+      if (nextStatus === "in_progress") {
+        if (!canStartWork(profile, ticket)) {
+          return NextResponse.json({ error: "Forbidden: You cannot start work on this ticket" }, { status: 403 })
+        }
+        updates.status = "in_progress"
+        if (!ticket.started_at) updates.started_at = now
+        updates.resumed_at = now
+      } else if (nextStatus === "paused") {
+        if (!canPauseWork(profile, ticket)) {
+          return NextResponse.json({ error: "Forbidden: You cannot pause this ticket" }, { status: 403 })
+        }
+        updates.status = "paused"
+        updates.paused_at = now
+      } else if (nextStatus === "resolved") {
+        if (!canResolveTicket(profile, ticket)) {
+          return NextResponse.json({ error: "Forbidden: You cannot resolve this ticket" }, { status: 403 })
+        }
+        updates.status = "resolved"
+        updates.resolved_at = now
+        updates.resolved_by = user.id
+        metadata.resolved_by = user.id
+        metadata.resolved_at = now
+      } else if (nextStatus === "closed") {
+        if (!canCloseTicket(profile, ticket)) {
+          return NextResponse.json(
+            {
+              error:
+                "Forbidden: Only requester or service lead/admin can close a ticket. Assignees cannot rate or close their own tickets.",
+            },
+            { status: 403 }
+          )
+        }
+        const effectiveRating = parsed.data.rating ?? (typeof csatRating === "number" ? csatRating : null)
+        if (!effectiveRating || effectiveRating < 1 || effectiveRating > 5) {
+          return NextResponse.json(
+            { error: "A service rating between 1 and 5 is required to close a ticket" },
+            { status: 400 }
+          )
+        }
+        const effectiveComment = parsed.data.rating_comment ?? csatFeedback ?? null
 
-      if (nextStatus === "in_progress" && !ticket.started_at) {
-        updates.started_at = new Date().toISOString()
-      }
-      if (nextStatus === "resolved") {
-        updates.resolved_at = new Date().toISOString()
-      }
-      if (nextStatus === "closed") {
-        updates.closed_at = new Date().toISOString()
+        updates.status = "closed"
+        updates.closed_at = now
+        updates.closed_by = user.id
+        updates.rating = effectiveRating
+        updates.rating_comment = effectiveComment
+        updates.rated_by = user.id
+        updates.rated_at = now
+        // Backfill legacy csat columns during transition:
+        updates.csat_rating = effectiveRating
+        updates.csat_feedback = effectiveComment
+
+        metadata.closed_by = user.id
+        metadata.closed_at = now
+        metadata.rating = effectiveRating
+        metadata.rating_comment = effectiveComment
+        metadata.rated_by = user.id
+        metadata.rated_at = now
+      } else if (nextStatus === "cancelled") {
+        if (!canCancelTicket(profile, ticket)) {
+          return NextResponse.json(
+            {
+              error:
+                "Forbidden: Requesters can only cancel tickets before work starts. Service leads can cancel open tickets.",
+            },
+            { status: 403 }
+          )
+        }
+        updates.status = "cancelled"
+      } else {
+        updates.status = nextStatus
       }
     }
 
-    if (typeof csatRating === "number") {
-      if (!canRateTicket) {
-        return NextResponse.json({ error: "Only requester can rate a ticket" }, { status: 403 })
-      }
-      if (!["resolved", "closed"].includes(String(ticket.status || "").toLowerCase())) {
-        return NextResponse.json({ error: "Ticket can only be rated after it is resolved or closed" }, { status: 400 })
-      }
-      if (csatRating < 1 || csatRating > 5) {
-        return NextResponse.json({ error: "CSAT rating must be between 1 and 5" }, { status: 400 })
-      }
-      updates.csat_rating = csatRating
-      updates.csat_feedback = csatFeedback
-    }
-
-    if (!nextStatus && typeof csatRating !== "number") {
+    if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid update provided" }, { status: 400 })
     }
 
-    const { data: updated, error: updateError } = await supabase
+    updates.metadata = metadata
+
+    let updated: any = null
+    const { data: primaryUpdated, error: updateError } = await supabase
       .from("help_desk_tickets")
       .update(updates)
       .eq("id", params.id)
       .select("*")
       .single()
 
-    if (updateError) throw updateError
+    if (updateError) {
+      // If forward-compatible columns have not been migrated yet, retry without them
+      const safeUpdates = { ...updates }
+      delete safeUpdates.rating
+      delete safeUpdates.rating_comment
+      delete safeUpdates.rated_by
+      delete safeUpdates.rated_at
+      delete safeUpdates.resolved_by
+      delete safeUpdates.closed_by
+
+      const { data: fallbackUpdated, error: fallbackError } = await supabase
+        .from("help_desk_tickets")
+        .update(safeUpdates)
+        .eq("id", params.id)
+        .select("*")
+        .single()
+
+      if (fallbackError) throw fallbackError
+      updated = fallbackUpdated
+    } else {
+      updated = primaryUpdated
+    }
 
     if (nextStatus && statusNote) {
       const { error: commentError } = await supabase.from("help_desk_comments").insert({
@@ -252,9 +289,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         p_type: "help_desk",
         p_category: "help_desk",
         p_title: "Ticket resolved",
-        p_message: `${ticketNumber} has been resolved. Please review and rate the service.`,
+        p_message: `${ticketNumber} - ${ticket.title} has been resolved. Please review and close with your service rating.`,
         p_priority: "normal",
-        p_link_url: "/help-desk",
+        p_link_url: `/help-desk/${ticket.id}`,
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
@@ -268,9 +305,44 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           title: "Help Desk Ticket Resolved",
           message: `${ticket.title} has been resolved. Please confirm and provide your service rating.`,
           ticketNumber: ticketNumber,
+          ctaPath: `/help-desk/${ticket.id}`,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error on resolve")
+      }
+    } else if (nextStatus === "closed") {
+      const closedNotifyUserIds = [
+        ticket.assigned_to,
+        ticket.requester_id !== user.id ? ticket.requester_id : null,
+      ].filter(Boolean) as string[]
+
+      for (const recipientId of closedNotifyUserIds) {
+        await createNotification({
+          p_user_id: recipientId,
+          p_type: "help_desk",
+          p_category: "help_desk",
+          p_title: "Ticket closed with service rating",
+          p_message: `${ticketNumber} - ${ticket.title} has been closed with a service rating of ${updates.rating ?? updates.csat_rating}/5.`,
+          p_priority: "normal",
+          p_link_url: `/help-desk/${ticket.id}`,
+          p_actor_id: user.id,
+          p_entity_type: "help_desk_ticket",
+          p_entity_id: ticket.id,
+          p_rich_content: { ticket_number: ticketNumber, rating: updates.rating ?? updates.csat_rating },
+        })
+      }
+
+      try {
+        await sendHelpDeskMail({
+          userIds: closedNotifyUserIds,
+          subject: `Ticket Closed: ${ticketNumber}`,
+          title: "Help Desk Ticket Closed",
+          message: `${ticket.title} has been closed with a service rating of ${updates.rating ?? updates.csat_rating}/5.`,
+          ticketNumber: ticketNumber,
+          ctaPath: `/help-desk/${ticket.id}`,
+        })
+      } catch (mailError) {
+        log.error({ err: String(mailError) }, "Help desk mail error on close")
       }
     }
 

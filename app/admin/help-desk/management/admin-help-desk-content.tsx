@@ -8,7 +8,21 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 
-import { Headset, Clock, AlertCircle, History, UserCheck, ShieldCheck, MoveRight, Building2 } from "lucide-react"
+import {
+  Headset,
+  Clock,
+  AlertCircle,
+  History,
+  UserCheck,
+  ShieldCheck,
+  MoveRight,
+  Building2,
+  ListTodo,
+  Star,
+} from "lucide-react"
+import { canReassignTicket, canConvertToTask, canCloseTicket } from "@/lib/help-desk/permissions"
+import { TaskFormDialog, EMPTY_TASK_FORM, type TaskFormState } from "@/components/tasks/TaskFormDialog"
+import { CloseTicketDialog } from "@/components/help-desk/close-ticket-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -36,7 +50,7 @@ interface AdminHelpDeskContentProps {
   backLinkHref?: string
 }
 
-const FINAL_STATUSES = new Set(["resolved", "closed", "cancelled", "rejected"])
+const FINAL_STATUSES = new Set(["resolved", "closed", "cancelled", "rejected", "converted"])
 
 const TABS: DataTableTab[] = [
   { key: "my-actions", label: "My Actions", icon: UserCheck },
@@ -61,6 +75,10 @@ export function AdminHelpDeskContent({
   const [activeTab, setActiveTab] = useState("my-actions")
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
   const [loadingTicketId, setLoadingTicketId] = useState<string | null>(null)
+  const [convertingTicket, setConvertingTicket] = useState<HelpDeskTicket | null>(null)
+  const [taskFormState, setTaskFormState] = useState<TaskFormState>(EMPTY_TASK_FORM)
+  const [isConverting, setIsConverting] = useState(false)
+  const [closingTicket, setClosingTicket] = useState<HelpDeskTicket | null>(null)
 
   const stats = useMemo(() => {
     const breached = tickets.filter(
@@ -90,10 +108,9 @@ export function AdminHelpDeskContent({
 
   const canAssignTicket = useCallback(
     (ticket: HelpDeskTicket) => {
-      if (!canLeadDepartment(ticket.service_department)) return false
-      return ["new", "pending_lead_review", "department_queue", "department_assigned"].includes(ticket.status)
+      return canReassignTicket(viewer, ticket)
     },
-    [canLeadDepartment]
+    [viewer]
   )
 
   const allPendingTickets = useMemo(() => tickets.filter((ticket) => !FINAL_STATUSES.has(ticket.status)), [tickets])
@@ -400,30 +417,43 @@ export function AdminHelpDeskContent({
           `${r.ticket_number} ${r.title} ${r.requester_department} ${r.service_department}`.toLowerCase().includes(q)
         }
         filters={filters}
-        rowActions={
-          activeTab === "my-actions"
-            ? [
-                {
-                  label: "Send to Queue",
-                  icon: MoveRight,
-                  onClick: (r) => routeTicket(r.id, "send_to_queue"),
-                  hidden: (r) => r.status !== "pending_lead_review" && r.status !== "department_assigned",
-                },
-                {
-                  label: "Assign to Dept",
-                  icon: Building2,
-                  onClick: (r) => routeTicket(r.id, "assign_department"),
-                  hidden: (r) => r.status !== "pending_lead_review" && r.status !== "department_queue",
-                },
-                {
-                  label: "Claim Ticket",
-                  icon: UserCheck,
-                  onClick: (r) => routeTicket(r.id, "assign_me"),
-                  hidden: (r) => r.status !== "pending_lead_review" && r.status !== "department_queue",
-                },
-              ]
-            : []
-        }
+        rowActions={[
+          {
+            label: "Convert to Task",
+            icon: ListTodo,
+            onClick: (r) => {
+              setConvertingTicket(r)
+              setTaskFormState({
+                ...EMPTY_TASK_FORM,
+                title: r.title,
+                description: "",
+                priority: r.priority || "medium",
+                department: r.service_department || "",
+                assigned_to: r.assigned_to || "",
+                weight: 3,
+              })
+            },
+            hidden: (r) => !canConvertToTask(viewer, r),
+          },
+          {
+            label: "Close & Rate",
+            icon: Star,
+            onClick: (r) => setClosingTicket(r),
+            hidden: (r) => !canCloseTicket(viewer, r),
+          },
+          {
+            label: "Send to Queue",
+            icon: MoveRight,
+            onClick: (r) => routeTicket(r.id, "send_to_queue"),
+            hidden: (r) => !canReassignTicket(viewer, r) || r.status === "department_queue",
+          },
+          {
+            label: "Claim Ticket",
+            icon: UserCheck,
+            onClick: (r) => routeTicket(r.id, "assign_me"),
+            hidden: (r) => !canReassignTicket(viewer, r) || r.assigned_to === viewer.id,
+          },
+        ]}
         expandable={{
           render: (r) => (
             <div className="space-y-4">
@@ -522,6 +552,62 @@ export function AdminHelpDeskContent({
         )}
         urlSync
       />
+      {convertingTicket && (
+        <TaskFormDialog
+          isOpen={Boolean(convertingTicket)}
+          onOpenChange={(open: boolean) => {
+            if (!open) setConvertingTicket(null)
+          }}
+          selectedTask={null}
+          taskForm={taskFormState}
+          setTaskForm={setTaskFormState}
+          onSave={async (form: TaskFormState) => {
+            if (!convertingTicket) return
+            setIsConverting(true)
+            try {
+              const res = await apiFetch(`/api/help-desk/tickets/${convertingTicket.id}/convert-to-task`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+              })
+              const json = await res.json().catch(() => null)
+              if (!res.ok) {
+                throw new Error(json?.error || "Failed to convert ticket to task")
+              }
+              toast.success("Ticket converted to task successfully")
+              setConvertingTicket(null)
+              await refresh()
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Failed to convert ticket")
+            } finally {
+              setIsConverting(false)
+            }
+          }}
+          isSaving={isConverting}
+          scopedAssignableEmployees={employees as any}
+          scopedAssignableDepartments={
+            lockedDepartment
+              ? [lockedDepartment]
+              : viewer.lead_departments.length
+                ? viewer.lead_departments
+                : [convertingTicket.service_department]
+          }
+        />
+      )}
+
+      {closingTicket && (
+        <CloseTicketDialog
+          open={Boolean(closingTicket)}
+          onOpenChange={(open: boolean) => {
+            if (!open) setClosingTicket(null)
+          }}
+          ticket={closingTicket}
+          onSuccess={async () => {
+            setClosingTicket(null)
+            await refresh()
+          }}
+        />
+      )}
     </DataTablePage>
   )
 }

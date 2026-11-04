@@ -12,6 +12,7 @@ import { Headset, Play, CheckCircle2, LifeBuoy, MessageSquare, Star, Building2 }
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
+import { RatingInput } from "@/components/ui/rating-input"
 import type { HelpDeskTicket, HelpDeskContentProps } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import { UserHelpDeskTicketDetailsDialog } from "@/components/help-desk/user-ticket-details-dialog"
@@ -97,6 +98,7 @@ export function HelpDeskContent({
     description: "",
     service_department: "IT and Communications",
     priority: "medium",
+    assigned_to: null,
   })
 
   useEffect(() => {
@@ -341,6 +343,7 @@ export function HelpDeskContent({
         description: "",
         service_department: "IT and Communications",
         priority: "medium",
+        assigned_to: null,
       })
       await refreshTickets()
     } catch (error: unknown) {
@@ -375,16 +378,17 @@ export function HelpDeskContent({
       const res = await apiFetch(`/api/help-desk/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csat_rating: rating }),
+        body: JSON.stringify({ status: "closed", rating }),
       })
 
       if (!res.ok) {
         const body = await res.json()
-        throw new Error(body.error || "Failed to rate")
+        throw new Error(body.error || "Failed to close ticket with rating")
       }
 
-      toast.success("Thanks for your feedback")
+      toast.success("Ticket closed and service rating recorded")
       await refreshTickets()
+      setDetailsOpen(false)
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to submit rating"))
     }
@@ -707,27 +711,24 @@ export function HelpDeskContent({
           selectedTicketDetail?.ticket &&
           selectedTicketDetail.ticket.requester_id === userId &&
           selectedTicketDetail.ticket.status === "resolved" ? (
-            <div className="flex items-center gap-2">
-              <Select
-                value={ratingDrafts[selectedTicketDetail.ticket.id] || ""}
-                onValueChange={(value) =>
-                  setRatingDrafts((previous) => ({ ...previous, [selectedTicketDetail.ticket.id]: value }))
-                }
-              >
-                <SelectTrigger className="h-9 w-32 text-sm">
-                  <SelectValue placeholder="Rate 1-5" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-semibold">Service Rating (1–5) *</span>
+                <RatingInput
+                  value={
+                    ratingDrafts[selectedTicketDetail.ticket.id]
+                      ? Number(ratingDrafts[selectedTicketDetail.ticket.id])
+                      : null
+                  }
+                  onChange={(val) =>
+                    setRatingDrafts((previous) => ({ ...previous, [selectedTicketDetail.ticket.id]: String(val) }))
+                  }
+                  min={1}
+                  max={5}
+                />
+              </div>
               <Button
                 size="sm"
-                variant="outline"
                 disabled={!ratingDrafts[selectedTicketDetail.ticket.id]}
                 onClick={async () => {
                   const ticketId = selectedTicketDetail.ticket.id
@@ -741,7 +742,7 @@ export function HelpDeskContent({
                   })
                 }}
               >
-                Submit
+                Close Ticket with Rating
               </Button>
             </div>
           ) : null

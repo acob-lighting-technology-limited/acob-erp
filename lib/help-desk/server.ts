@@ -79,6 +79,7 @@ export const HELP_DESK_STATUSES = [
   "resolved",
   "closed",
   "cancelled",
+  "converted",
 ] as const
 
 export const HELP_DESK_SUPPORT_MODES = ["open_queue", "lead_review_required"] as const
@@ -130,38 +131,7 @@ export function getSlaTarget(priority: HelpDeskPriority, submittedAt: Date): Dat
     : addBusinessDays(submittedAt, budget.value)
 }
 
-export function isAdminRole(role?: string | null): boolean {
-  return role === "developer" || role === "admin" || role === "super_admin"
-}
-
-export function isLeadRole(profile?: { is_department_lead?: boolean } | null): boolean {
-  return Boolean(profile?.is_department_lead)
-}
-
-/**
- * Department-lead membership check — no admin bypass.
- * Callers that want to allow global admins must OR this with their own
- * `isGlobalAdmin` check (derived from `getRequestScope()` + `scopeMode`).
- */
-export function canLeadDepartment(profile: ProfileLike | null | undefined, department: string): boolean {
-  if (!profile?.is_department_lead) return false
-
-  const managedDepartments = Array.isArray(profile?.managed_departments)
-    ? profile.managed_departments
-    : Array.isArray(profile?.lead_departments)
-      ? profile.lead_departments
-      : []
-  return managedDepartments.includes(department) || profile?.department === department
-}
-
-/**
- * Dept-membership / lead check — no admin bypass.
- * Callers that want to allow global admins must OR this with their own
- * `isGlobalAdmin` check.
- */
-export function canWorkDepartment(profile: ProfileLike | null | undefined, department: string): boolean {
-  return profile?.department === department || canLeadDepartment(profile, department)
-}
+export { isAdminRole, isLeadRole, canLeadDepartment, canWorkDepartment } from "./permissions"
 
 export function resolveLeadForDepartment<
   T extends { is_department_lead?: boolean; department?: string | null; lead_departments?: string[] | null },

@@ -13,6 +13,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { apiFetch } from "@/lib/api-client"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { RatingInput } from "@/components/ui/rating-input"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 type Ticket = {
@@ -115,8 +116,9 @@ export function TicketDetailContent({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          csat_rating: Number(rating),
-          csat_feedback: feedback.trim() || null,
+          status: "closed",
+          rating: Number(rating),
+          rating_comment: feedback.trim() || null,
         }),
       })
       const payload = (await response.json().catch(() => null)) as { error?: string } | null
@@ -225,25 +227,19 @@ export function TicketDetailContent({
                 <CardTitle>Service Rating</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <select
-                  value={rating}
-                  onChange={(event) => setRating(event.target.value)}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
-                >
-                  <option value="">Select a rating</option>
-                  <option value="1">1 - Poor</option>
-                  <option value="2">2 - Fair</option>
-                  <option value="3">3 - Good</option>
-                  <option value="4">4 - Very Good</option>
-                  <option value="5">5 - Excellent</option>
-                </select>
+                <RatingInput
+                  value={rating ? Number(rating) : null}
+                  onChange={(val) => setRating(String(val))}
+                  min={1}
+                  max={5}
+                />
                 <Textarea
                   value={feedback}
                   onChange={(event) => setFeedback(event.target.value)}
                   placeholder="Optional feedback about how the ticket was handled"
                 />
                 <Button onClick={submitRating} disabled={!rating || isSubmittingRating}>
-                  {isSubmittingRating ? "Submitting..." : "Submit Rating"}
+                  {isSubmittingRating ? "Closing..." : "Close Ticket with Rating"}
                 </Button>
               </CardContent>
             </Card>
