@@ -94,7 +94,7 @@ function renderStatusBadge(r: AppealRow) {
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
   const staffAvatars = useStaffAvatars()
   const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const statusFilter = "all"
 
   const {
     data: appeals = [],
@@ -206,7 +206,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         key: "status",
         label: "Status / Stage",
         sortable: true,
-        accessor: (r) => r.stage ?? r.status,
+        accessor: (r) => (r.status === "pending" ? (r.stage ?? "pending_lead") : r.status),
         render: (r) => renderStatusBadge(r),
       },
     ],
@@ -219,11 +219,20 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         key: "status",
         label: "Status",
         options: [
-          { value: "pending", label: "Pending" },
+          { value: "pending_admin", label: "Pending Admin" },
+          { value: "pending_lead", label: "Pending Lead & Admin" },
+          { value: "pending_hr_lead", label: "Pending Admin & HR Lead" },
           { value: "approved", label: "Approved" },
           { value: "rejected", label: "Rejected" },
           { value: "resolved", label: "Resolved manually" },
         ],
+        defaultValues: lockedDepartment ? ["pending_lead"] : ["pending_admin", "pending_lead"],
+        mode: "custom",
+        filterFn: (row, values) => {
+          if (values.length === 0) return true
+          const eff = row.status === "pending" ? (row.stage ?? "pending_lead") : row.status
+          return values.includes(eff)
+        },
         placeholder: "All Statuses",
       },
       {
