@@ -219,21 +219,34 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         key: "status",
         label: "Status",
         options: [
-          { value: "pending_admin", label: "Pending Admin" },
-          { value: "pending_lead", label: "Pending Lead & Admin" },
-          { value: "pending_hr_lead", label: "Pending Admin & HR Lead" },
+          { value: "pending", label: "Pending" },
           { value: "approved", label: "Approved" },
           { value: "rejected", label: "Rejected" },
           { value: "resolved", label: "Resolved manually" },
+        ],
+        defaultValues: ["pending"],
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.status),
+        placeholder: "All Statuses",
+      },
+      {
+        key: "stage",
+        label: "Stage",
+        options: [
+          { value: "pending_admin", label: "Pending Admin" },
+          { value: "pending_lead", label: "Pending Lead & Admin" },
+          { value: "pending_hr_lead", label: "Pending Admin & HR Lead" },
         ],
         defaultValues: lockedDepartment ? ["pending_lead"] : ["pending_admin", "pending_lead"],
         mode: "custom",
         filterFn: (row, values) => {
           if (values.length === 0) return true
-          const eff = row.status === "pending" ? (row.stage ?? "pending_lead") : row.status
+          // Stage applies specifically to pending appeals; completed records are governed by the Status filter.
+          if (row.status !== "pending") return true
+          const eff = row.stage ?? "pending_lead"
           return values.includes(eff)
         },
-        placeholder: "All Statuses",
+        placeholder: "All Stages",
       },
       {
         key: "decision",

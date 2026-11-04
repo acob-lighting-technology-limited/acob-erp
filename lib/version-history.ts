@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
       {
         area: "Attendance",
         items: [
-          "Attendance Appeals now default to filtering by actionable open appeals ('Pending Admin' and 'Pending Lead & Admin') on load, with direct options to filter by stage or view all historical decisions.",
+          "Separated Attendance Appeals filtering into distinct Status and Stage controls, defaulting to open appeals in actionable stages ('Pending Admin' and 'Pending Lead & Admin') on load.",
         ],
       },
     ],
