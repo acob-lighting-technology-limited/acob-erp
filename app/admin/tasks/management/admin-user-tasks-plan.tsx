@@ -105,8 +105,8 @@ export function AdminUserTasksPlan({
   const staffAvatars = useStaffAvatars()
   const currentYear = new Date().getFullYear()
 
-  // Period filter state — driven directly by DataTable's single-select filter
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("all_time")
+  // Period filter state — defaults to current week
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("this_week")
 
   // Options for the Time Period filter dropdown
   const periodOptions = useMemo(() => {
@@ -507,7 +507,9 @@ export function AdminUserTasksPlan({
   // Export mirrors the table: its filtered/sorted row ids, resolved against the
   // latest rows (a period change can alter figures without changing the ids).
   const [visibleRowIds, setVisibleRowIds] = useState<string[]>([])
-  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({})
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({
+    period: ["this_week"],
+  })
   const [searchQuery, setSearchQuery] = useState("")
 
   const handlePeriodFilterChange = useCallback((fv: Record<string, string[]>) => {
@@ -597,6 +599,7 @@ export function AdminUserTasksPlan({
         searchPlaceholder="Search employee name, email, or department..."
         searchFn={(r, q) => `${r.name} ${r.email} ${r.department}`.toLowerCase().includes(q.toLowerCase())}
         filters={filters}
+        filterValues={filterValues}
         onFilterChange={handlePeriodFilterChange}
         onFilterValuesChange={handlePeriodFilterChange}
         onSearchChange={setSearchQuery}

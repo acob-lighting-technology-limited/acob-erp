@@ -19,6 +19,8 @@ import {
   Target,
   Scale,
   Eye,
+  FolderKanban,
+  Layers,
 } from "lucide-react"
 
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
@@ -314,6 +316,18 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             </TooltipContent>
           </Tooltip>
           <RecurringTaskBadge task={t} onOpen={setOpenSeriesId} />
+          {t.project_name && (
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+              <FolderKanban className="h-3 w-3 shrink-0" />
+              <span className="line-clamp-1">{t.project_name}</span>
+            </span>
+          )}
+          {t.portfolio_name && (
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+              <Layers className="h-3 w-3 shrink-0" />
+              <span className="line-clamp-1">{t.portfolio_name}</span>
+            </span>
+          )}
         </div>
       ),
     },

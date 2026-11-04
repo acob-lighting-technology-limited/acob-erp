@@ -28,8 +28,13 @@ const log = logger("task-detail-route")
 // mandatory-rating rule exists to close. Every status change now goes through
 // /api/tasks/[id]/status, which enforces both.
 const UpdateTaskSchema = z.object({
-  title: z.string().trim().min(1).optional(),
-  description: z.string().optional().nullable(),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Task title must be at least 3 characters")
+    .max(200, "Task title must be at most 200 characters")
+    .optional(),
+  description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional().nullable(),
   priority: z.string().trim().min(1).optional(),
   due_date: z.string().optional().nullable(),
   department: z.string().optional().nullable(),

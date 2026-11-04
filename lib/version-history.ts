@@ -46,6 +46,14 @@ export const RELEASES: Release[] = [
         ],
       },
       {
+        area: "Tasks & Workflows",
+        items: [
+          "Enforced a 3 to 200 character limit on task titles with live counter feedback, and capped task descriptions at 5,000 characters to keep lists and table views clean and scannable",
+          "Differentiated recurring cadence badges from linked project and portfolio metadata with neutral styling to keep action buttons distinct from structural context",
+          "The User Task Plan table now automatically seeds its time period filter to the current week on load, showing active weekly tasks immediately without manual filtering",
+        ],
+      },
+      {
         area: "Leave Management",
         items: [
           "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",

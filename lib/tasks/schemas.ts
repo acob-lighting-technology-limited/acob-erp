@@ -4,8 +4,12 @@ import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "./scoring"
 import { SERIES_FREQUENCIES, SERIES_MONTH_MODES } from "./recurrence"
 
 export const TaskBodySchema = z.object({
-  title: z.string().trim().min(1, "Task title is required"),
-  description: z.string().optional().nullable(),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Task title must be at least 3 characters")
+    .max(200, "Task title must be at most 200 characters"),
+  description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional().nullable(),
   priority: z.string().trim().min(1).default("medium"),
   status: z.enum(TASK_STATUSES).default("pending"),
   due_date: z.string().optional().nullable(),
@@ -44,8 +48,12 @@ const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date")
  */
 export const TaskSeriesBodySchema = z
   .object({
-    title: z.string().trim().min(1, "Task title is required"),
-    description: z.string().optional().nullable(),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Task title must be at least 3 characters")
+      .max(200, "Task title must be at most 200 characters"),
+    description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional().nullable(),
     priority: z.string().trim().min(1).default("medium"),
     department: z.string().optional().nullable(),
     assigned_to: z.string().uuid().optional().nullable(),
@@ -96,8 +104,13 @@ export const TaskSeriesActionSchema = z.discriminatedUnion("action", [
   // so a different schedule is a new series.
   z.object({
     action: z.literal("edit"),
-    title: z.string().trim().min(1).optional(),
-    description: z.string().optional().nullable(),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Task title must be at least 3 characters")
+      .max(200, "Task title must be at most 200 characters")
+      .optional(),
+    description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional().nullable(),
     priority: z.string().trim().min(1).optional(),
     weight: z.number().int().min(TASK_WEIGHT_MIN).max(TASK_WEIGHT_MAX).optional(),
     kpi_id: z.string().uuid().optional(),
