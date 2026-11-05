@@ -3,17 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
-import {
-  Clock,
-  Download,
-  FileQuestion,
-  UserCheck,
-  AlertCircle,
-  Calendar,
-  MessageSquare,
-  Gavel,
-  Trash2,
-} from "lucide-react"
+import { Clock, Download, FileQuestion, AlertCircle, MessageSquare, Gavel, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -22,9 +12,6 @@ import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
 import { AppealAuditTrail } from "@/components/hr/appeal-audit-trail"
 import { DeviceStatusDialog } from "@/components/hr/device-status-banner"
-import { StatCard } from "@/components/ui/stat-card"
-import { StatGrid } from "@/components/ui/stat-grid"
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -48,6 +35,7 @@ import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { AttendanceOverview } from "./_components/attendance-overview"
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -590,7 +578,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   )
 
   const todayIso = toLocalISODate()
-  const todayHours = todayRecord?.total_hours ? `${todayRecord.total_hours.toFixed(2)} hrs` : "-"
   const todayStatus = todayRecord ? normalizeStatus(todayRecord, todayIso) : isWeekend(todayIso) ? "weekend" : "absent"
 
   // Computed stats from current month workdays
@@ -667,76 +654,21 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         spacing="tight"
         actionsPlacement="inline-always"
         stats={
-          <TooltipProvider>
-            <StatGrid>
-              <StatCard
-                variant="compact"
-                title="Today Status"
-                value={ATTENDANCE_STATUS_LABELS[todayStatus] ?? todayStatus}
-                icon={UserCheck}
-                iconBgColor="bg-blue-500/10"
-                iconColor="text-blue-500"
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="h-full cursor-help">
-                    <StatCard
-                      variant="compact"
-                      className="h-full"
-                      title="Total Days"
-                      value={`${attendedDays} / ${totalWorkdays} days`}
-                      icon={Calendar}
-                      iconBgColor="bg-emerald-500/10"
-                      iconColor="text-emerald-500"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-xs">
-                    Expected workdays in the period. Excludes holidays, leaves, exemptions, waivers, and AWP.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="h-full cursor-help">
-                    <StatCard
-                      variant="compact"
-                      className="h-full"
-                      title="Total Work Hours"
-                      value={`${totalWorkedHours} hrs`}
-                      icon={Clock}
-                      iconBgColor="bg-emerald-500/10"
-                      iconColor="text-emerald-500"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-xs">
-                    Total verified work hours credited across expected workdays in this period.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="h-full cursor-help">
-                    <StatCard
-                      variant="compact"
-                      className="h-full"
-                      title="Missed Hours"
-                      value={`${totalMissedHours} hrs`}
-                      icon={AlertCircle}
-                      iconBgColor="bg-amber-500/10"
-                      iconColor="text-amber-500"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-xs">Total unworked hours deducted across expected workdays.</p>
-                </TooltipContent>
-              </Tooltip>
-            </StatGrid>
-          </TooltipProvider>
+          <AttendanceOverview
+            attendedDays={attendedDays}
+            totalWorkdays={totalWorkdays}
+            totalWorkedHours={totalWorkedHours}
+            totalMissedHours={totalMissedHours}
+            periodLabel={formatWATDate(`${toLocalYearMonth()}-15T12:00:00+01:00`, {
+              month: "long",
+              year: "numeric",
+            })}
+            todayStatusClassName={
+              ATTENDANCE_STATUS_COLORS[todayStatus as keyof typeof ATTENDANCE_STATUS_COLORS] ??
+              "bg-muted text-foreground"
+            }
+            todayStatusLabel={ATTENDANCE_STATUS_LABELS[todayStatus] ?? todayStatus}
+          />
         }
       >
         <DeviceStatusDialog />

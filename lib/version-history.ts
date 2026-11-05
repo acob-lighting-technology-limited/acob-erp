@@ -110,6 +110,7 @@ export const RELEASES: Release[] = [
       {
         area: "Attendance",
         items: [
+          "Attendance now opens with a clearer monthly overview of recorded days, credited time and missed time",
           "Weekend clock-ins and clock-outs are displayed as Present with their punch times instead of showing only a generic weekend status, and are kept out of workday attendance calculations",
           "Attendance appeals display full audit history including initiator, lead endorsement, and admin approval with timestamps, with separation of duties enforcing department lead confirmation on manual alterations",
           "Attendance change log showing every edit to a record",
