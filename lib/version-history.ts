@@ -50,6 +50,7 @@ export const RELEASES: Release[] = [
       {
         area: "UI & Badges",
         items: [
+          "Minutes summaries now open with a clearer meeting header and readable full summary, with matching cards for quick scanning",
           "Admin attendance records now group exceptions by attention, approved exceptions and covered days, with clearer day-by-day time and history actions",
           "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
           "Enhanced list views and side sheets across Impersonation, Payroll, Attendance, Stock Movements, Challenges, and Tasks with one-click actions, expandable details, and full record properties",

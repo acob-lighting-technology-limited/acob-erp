@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertCircle, CalendarDays, Eye, FileText, Pencil, Plus, ScrollText, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -455,13 +457,56 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
         error={error instanceof Error ? error.message : null}
         onRetry={() => void refetch()}
         rowActions={rowActions}
+        cards
+        cardRenderer={(row) => {
+          const editorName = row.updated_by ? nameMap.get(row.updated_by) || "Unknown" : "Not recorded"
+          return (
+            <Card className="border-border/80 bg-card hover:border-primary/40 h-full transition-colors">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-foreground text-sm font-semibold">
+                      {formatMeetingMonday(row.meeting_week, row.meeting_year)}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">Summary of minutes</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">{`Week ${row.meeting_week}`}</Badge>
+                </div>
+                <p className="text-muted-foreground line-clamp-3 text-sm leading-6">{summaryText(row.content_html)}</p>
+                <div className="border-border/60 flex items-center justify-between gap-3 border-t pt-3 text-xs">
+                  <span className="text-muted-foreground truncate">{editorName}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {formatWATDate(row.updated_at, { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }}
         expandable={{
-          render: (row) => (
-            <div
-              className={`${SUMMARY_PROSE} rounded-lg border p-4`}
-              dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(row.content_html) }}
-            />
-          ),
+          render: (row) => {
+            const editorName = row.updated_by ? nameMap.get(row.updated_by) || "Unknown" : "Not recorded"
+            return (
+              <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+                <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-foreground text-sm font-semibold">
+                      {formatMeetingMonday(row.meeting_week, row.meeting_year)}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">Summary of minutes</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{`Week ${row.meeting_week}`}</Badge>
+                    <span className="text-muted-foreground text-xs">Updated by {editorName}</span>
+                  </div>
+                </div>
+                <div
+                  className={`${SUMMARY_PROSE} px-4 py-5 sm:px-5`}
+                  dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(row.content_html) }}
+                />
+              </div>
+            )
+          },
         }}
         mobileRow={{
           title: (row) => `Week ${row.meeting_week}, ${row.meeting_year}`,
