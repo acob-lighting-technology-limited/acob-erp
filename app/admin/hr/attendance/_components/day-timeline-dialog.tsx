@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 
+import { RowsSkeleton } from "@/components/skeletons"
 interface DayTimelineDialogProps {
   historyOpen: boolean
   setHistoryOpen: Dispatch<SetStateAction<boolean>>
@@ -59,7 +60,7 @@ export function DayTimelineDialog({
 
         <div className="max-h-[420px] space-y-3 overflow-y-auto">
           {historyLoading ? (
-            <p className="text-muted-foreground text-sm">Loading…</p>
+            <RowsSkeleton rows={3} />
           ) : historyItems.length === 0 ? (
             <p className="text-muted-foreground text-sm">No recorded events for this day.</p>
           ) : (

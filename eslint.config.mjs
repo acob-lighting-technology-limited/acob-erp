@@ -57,6 +57,18 @@ export default defineConfig([
             "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value=/^\\x2Fapi\\x2F/]",
           message: "Use apiFetch from '@/lib/api-client' for /api calls: it adds the CSRF token and dept context.",
         },
+        // AGENTS.md "Loading states": content that is loading gets a skeleton from @/components/skeletons,
+        // never a "Loading…" line. Matches loading text written directly in JSX.
+        {
+          selector: "JSXText[value=/^\\s*Loading\\b/]",
+          message:
+            "Do not show 'Loading…' text. Use a skeleton from '@/components/skeletons' (RowsSkeleton, LinesSkeleton, MenuSkeleton) or the table's isLoading (AGENTS.md, Loading states).",
+        },
+        {
+          selector: "JSXExpressionContainer > Literal[value=/^\\s*Loading\\b/]",
+          message:
+            "Do not show 'Loading…' text. Use a skeleton from '@/components/skeletons' (RowsSkeleton, LinesSkeleton, MenuSkeleton) or the table's isLoading (AGENTS.md, Loading states).",
+        },
         {
           selector:
             "CallExpression[callee.name='fetch'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\x2Fapi\\x2F/]",

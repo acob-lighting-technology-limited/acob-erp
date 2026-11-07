@@ -74,6 +74,7 @@ import { apiFetch, apiJson, readCsrfCookie, readDeptContext } from "@/lib/api-cl
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { Skeleton } from "@/components/ui/skeleton"
 interface DepartmentDocumentsBrowserProps {
   initialPath?: string
   rootLabel?: string
@@ -1597,7 +1598,7 @@ export function DepartmentDocumentsBrowser({
           <div className="text-muted-foreground flex items-center justify-between pt-0.5 text-xs font-medium">
             <span>
               {loading ? (
-                "Loading items..."
+                <Skeleton className="inline-block h-3 w-16 align-middle" />
               ) : processedFiles.length === 0 ? (
                 "0 items"
               ) : (

@@ -58,6 +58,7 @@ import type { Payment, Department, Category, PaymentDocument, PaymentEditFormDat
 import { apiFetch } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { LinesSkeleton } from "@/components/skeletons"
 export interface PaymentPreviewSheetProps {
   paymentId: string | null
   open: boolean
@@ -431,9 +432,7 @@ export function PaymentPreviewSheet({
                 : `One-time payment · ${payment.payment_date ? format(parseISO(payment.payment_date), "MMM d, yyyy") : "N/A"}`}
               {payment.department?.name && ` · ${payment.department.name}`}
             </>
-          ) : (
-            "Loading payment information..."
-          )
+          ) : null
         }
         badges={
           payment ? (
@@ -500,9 +499,8 @@ export function PaymentPreviewSheet({
       >
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
           {isLoading && (
-            <div className="text-muted-foreground flex min-h-[300px] flex-col items-center justify-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-sm">Loading payment preview...</p>
+            <div className="min-h-[300px] p-6">
+              <LinesSkeleton lines={6} />
             </div>
           )}
 

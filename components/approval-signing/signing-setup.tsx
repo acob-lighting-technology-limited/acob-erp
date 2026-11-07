@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { PinInput } from "./pin-input"
 import { SignaturePad } from "./signature-pad"
 
+import { LinesSkeleton } from "@/components/skeletons"
 export interface SigningStatus {
   has_signature: boolean
   has_pin: boolean
@@ -452,8 +453,9 @@ export function SigningSetup({ returnTo }: { returnTo?: string }) {
   if (error) return <p className="text-destructive text-sm">{error}</p>
   if (!status) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+      <div className="space-y-6" aria-busy="true">
+        <LinesSkeleton lines={4} />
+        <LinesSkeleton lines={4} />
       </div>
     )
   }

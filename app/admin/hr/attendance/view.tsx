@@ -49,6 +49,7 @@ import { AttendanceDialog } from "./_components/attendance-dialog"
 import { DayTimelineDialog } from "./_components/day-timeline-dialog"
 import { EmployeeAttendanceLog } from "./_components/employee-attendance-log"
 
+import { RowsSkeleton } from "@/components/skeletons"
 const log = logger("hr-attendance-reports")
 
 export interface AttendanceReport {
@@ -497,7 +498,11 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
   }
 
   if (!days) {
-    return <div className="text-muted-foreground py-4 text-center text-sm">Loading days…</div>
+    return (
+      <div className="py-4">
+        <RowsSkeleton rows={3} />
+      </div>
+    )
   }
 
   const today = toLocalISODate()
@@ -1175,7 +1180,7 @@ export function AttendanceReportsPage({
               </div>
             </div>
           )}
-          emptyTitle={loading ? "Loading attendance report…" : "No attendance report"}
+          emptyTitle="No attendance report"
           emptyDescription="No attendance results available for this period."
           emptyIcon={FileText}
           skeletonRows={6}

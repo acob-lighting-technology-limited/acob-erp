@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { RowsSkeleton } from "@/components/skeletons"
 type AttendanceDay = {
   date: string
   record?: {
@@ -84,9 +85,8 @@ export function IndividualAttendanceExpandedRow({
 
   if (isLoading) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading daily attendance logs...
+      <div className="py-4">
+        <RowsSkeleton rows={2} />
       </div>
     )
   }

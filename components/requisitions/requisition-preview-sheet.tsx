@@ -32,6 +32,7 @@ import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/t
 import { StageIcon, stageLine, statusBadgeVariant } from "./requisition-detail"
 import type { SignMode } from "./sign-dialog"
 
+import { LinesSkeleton } from "@/components/skeletons"
 export interface RequisitionPreviewSheetProps {
   requisitionId: string | null
   open: boolean
@@ -64,7 +65,9 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
       open={open}
       onOpenChange={onOpenChange}
       title={requisition ? requisition.requisition_number : "Requisition details"}
-      description={requisition ? `Quick preview of requisition ${requisition.requisition_number}` : "Loading details…"}
+      description={
+        requisition ? `Quick preview of requisition ${requisition.requisition_number}` : "Requisition preview"
+      }
       badges={
         requisition ? (
           <>
@@ -113,8 +116,8 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
       }
     >
       {isLoading ? (
-        <div className="text-muted-foreground flex flex-1 items-center justify-center gap-2 p-8 text-sm">
-          <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Loading requisition…
+        <div className="flex-1 p-6">
+          <LinesSkeleton lines={6} />
         </div>
       ) : error || !requisition ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">

@@ -45,6 +45,7 @@ import { logger } from "@/lib/logger"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { LinesSkeleton } from "@/components/skeletons"
 const log = logger("lunch-content")
 
 interface LunchDay {
@@ -595,9 +596,8 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
           </div>
 
           {loadingDay ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-3 p-12">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">Loading menu…</span>
+            <div className="p-6">
+              <LinesSkeleton lines={4} />
             </div>
           ) : !menu ? (
             <EmptyState

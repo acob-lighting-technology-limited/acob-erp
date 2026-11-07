@@ -38,6 +38,7 @@ import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { useStaffOptions } from "./use-staff-options"
 
+import { LinesSkeleton } from "@/components/skeletons"
 export type Viewer = RequisitionViewerActions & { is_admin: boolean }
 
 export function when(value: string | null) {
@@ -188,8 +189,8 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
 
   if (!requisition || !viewer) {
     return (
-      <div className="text-muted-foreground flex min-h-[50vh] items-center justify-center gap-2 text-sm">
-        <Loader2 className="h-5 w-5 animate-spin" /> Loading requisition…
+      <div className="min-h-[50vh] p-6">
+        <LinesSkeleton lines={6} />
       </div>
     )
   }

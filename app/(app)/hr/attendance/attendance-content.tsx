@@ -765,10 +765,8 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
               })
             }
             isLoading={unifiedDays === null}
-            emptyTitle={unifiedDays === null ? "Loading attendance..." : "No attendance records"}
-            emptyDescription={
-              unifiedDays === null ? "Fetching your attendance status..." : "No records are available yet."
-            }
+            emptyTitle="No attendance records"
+            emptyDescription="No records are available yet."
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{

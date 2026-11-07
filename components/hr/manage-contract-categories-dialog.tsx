@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 
+import { RowsSkeleton } from "@/components/skeletons"
 interface ManageContractCategoriesDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
@@ -243,8 +244,8 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
-                        Loading categories...
+                      <TableCell colSpan={5} className="py-4">
+                        <RowsSkeleton rows={3} />
                       </TableCell>
                     </TableRow>
                   ) : categories.length === 0 ? (
