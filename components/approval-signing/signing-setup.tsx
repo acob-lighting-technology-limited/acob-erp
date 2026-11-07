@@ -147,7 +147,7 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
           text={status.has_signature ? "Signature on file" : "No signature yet"}
         />
         {status.signature_url ? (
-          <div className="inline-block rounded-md border bg-white p-3">
+          <div className="w-fit rounded-md border bg-white p-3">
             <img src={status.signature_url} alt="Your current signature" className="h-14 w-auto" />
           </div>
         ) : null}
