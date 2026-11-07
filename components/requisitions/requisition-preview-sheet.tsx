@@ -21,6 +21,8 @@ import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { CopyButton } from "@/components/ui/copy-button"
+import { cn } from "@/lib/utils"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
@@ -239,11 +241,29 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                   <tbody>
                     {requisition.beneficiary_details.map((b, idx) => (
                       <tr key={`row-${idx}`} className="border-b last:border-b-0">
-                        <td className="p-2 font-medium">{b.account_name}</td>
-                        <td className="p-2 font-mono">{b.account_number}</td>
-                        <td className="p-2">{b.bank_name}</td>
+                        <td className="p-2 font-medium">
+                          <CopyableCell value={b.account_name} label="account name" />
+                        </td>
+                        <td className="p-2 font-mono">
+                          <CopyableCell value={b.account_number} label="account number" />
+                        </td>
+                        <td className="p-2">
+                          <CopyableCell value={b.bank_name} label="bank name" />
+                        </td>
                         {requisition.beneficiary_details.some((item) => item.amount != null) ? (
-                          <td className="p-2 text-right font-mono">{b.amount != null ? formatNaira(b.amount) : "—"}</td>
+                          <td className="p-2 text-right font-mono">
+                            {b.amount != null ? (
+                              // Copies the bare figure, which pastes cleanly into a bank's transfer form.
+                              <CopyableCell
+                                value={String(Number(b.amount))}
+                                display={formatNaira(b.amount)}
+                                label="amount"
+                                className="justify-end"
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                         ) : null}
                       </tr>
                     ))}
@@ -356,5 +376,26 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
         </div>
       )}
     </DetailSheet>
+  )
+}
+
+/** A beneficiary value with a copy button beside it. Empty values show a dash and nothing to copy. */
+function CopyableCell({
+  value,
+  display,
+  label,
+  className,
+}: {
+  value: string | null | undefined
+  display?: string
+  label: string
+  className?: string
+}) {
+  if (!value) return <>—</>
+  return (
+    <span className={cn("flex items-center gap-1", className)}>
+      <span className="min-w-0 break-words">{display ?? value}</span>
+      <CopyButton value={value} label={label} />
+    </span>
   )
 }
