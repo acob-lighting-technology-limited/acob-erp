@@ -57,6 +57,7 @@ export const RELEASES: Release[] = [
           "Adopted standardized department short codes in list views and card subtitles across Impersonation, User Settings, Challenges, CBT logs, and Leave Management to eliminate text truncation on mobile while retaining full department names in side sheets and search filters",
           "Removed duplicate inline Action columns on desktop data tables where rowActions was active, keeping a single standardized trailing Action column",
           "Removed redundant expandable row accordions across Attendance, Assets, Leave, Fleet, Notifications, Feedback, Bills, and Invoices tables so desktop rows remain compact and open full records directly in standardized side sheets",
+          "Staff lunch voting view now displays the time each vote was cast alongside voter names, with vote timestamps also reflected on the choice summary card",
         ],
       },
       {
