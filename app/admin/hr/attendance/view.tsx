@@ -47,6 +47,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
 import { AttendanceDialog } from "./_components/attendance-dialog"
 import { DayTimelineDialog } from "./_components/day-timeline-dialog"
+import { EmployeeAttendanceLog } from "./_components/employee-attendance-log"
 
 const log = logger("hr-attendance-reports")
 
@@ -117,7 +118,7 @@ type DayStatus =
   | "early_closure"
   | "late_resumption"
 
-interface CalendarDay {
+export interface CalendarDay {
   date: string
   dayName: string
   record: DayRecord | null
@@ -516,151 +517,167 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
 
   return (
     <>
-      <div className="bg-muted/40 mb-4 grid max-w-4xl grid-cols-3 gap-2 rounded-lg border p-3 sm:grid-cols-5 lg:grid-cols-9">
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Late</span>
-          <span className="mt-1 text-sm font-semibold text-yellow-600">{report.late_days}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Incomplete</span>
-          <span className="mt-1 text-sm font-semibold text-cyan-600">{report.incomplete_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Exempted</span>
-          <span className="mt-1 text-sm font-semibold text-violet-600">{report.exempted_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">LWP</span>
-          <span className="mt-1 text-sm font-semibold text-amber-600">{report.lateness_with_permission_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">OOS</span>
-          <span className="mt-1 text-sm font-semibold text-indigo-600">{report.out_of_station_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">AWP</span>
-          <span className="mt-1 text-sm font-semibold text-teal-600">{report.absent_with_permission_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Leave</span>
-          <span className="mt-1 text-sm font-semibold text-purple-600">{report.leave_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Holiday</span>
-          <span className="mt-1 text-sm font-semibold text-sky-600">{report.holiday_days || 0}</span>
-        </div>
-        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-xs font-bold uppercase">Waiver</span>
-          <span className="mt-1 text-sm font-semibold text-blue-600">{report.waived_days || 0}</span>
-        </div>
-      </div>
+      <EmployeeAttendanceLog
+        days={visibleDays}
+        report={report}
+        periodLabel={formatWATDate(`${yearMonth}-15T12:00:00+01:00`, { month: "long", year: "numeric" })}
+        getHours={(day) =>
+          getHourBreakdown(day.record, day.status, day.lateResumptionTime, day.earlyClosureTime, policy, day.date)
+        }
+        getSourceLabel={daySourceLabel}
+        onEdit={openEdit}
+        onOpenHistory={openHistory}
+      />
 
-      <div className="space-y-1 py-2">
-        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-xs font-semibold uppercase">
-          <span>Day</span>
-          <span>Status</span>
-          <span>In</span>
-          <span>Out</span>
-          <span>Work</span>
-          <span>Missed</span>
-          <span>Total</span>
-          <span>Overtime</span>
-          <span>Source</span>
-          <span></span>
+      <div className="hidden">
+        <div className="bg-muted/40 mb-4 grid max-w-4xl grid-cols-3 gap-2 rounded-lg border p-3 sm:grid-cols-5 lg:grid-cols-9">
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Late</span>
+            <span className="mt-1 text-sm font-semibold text-yellow-600">{report.late_days}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Incomplete</span>
+            <span className="mt-1 text-sm font-semibold text-cyan-600">{report.incomplete_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Exempted</span>
+            <span className="mt-1 text-sm font-semibold text-violet-600">{report.exempted_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">LWP</span>
+            <span className="mt-1 text-sm font-semibold text-amber-600">
+              {report.lateness_with_permission_days || 0}
+            </span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">OOS</span>
+            <span className="mt-1 text-sm font-semibold text-indigo-600">{report.out_of_station_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">AWP</span>
+            <span className="mt-1 text-sm font-semibold text-teal-600">{report.absent_with_permission_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Leave</span>
+            <span className="mt-1 text-sm font-semibold text-purple-600">{report.leave_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Holiday</span>
+            <span className="mt-1 text-sm font-semibold text-sky-600">{report.holiday_days || 0}</span>
+          </div>
+          <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+            <span className="text-muted-foreground text-xs font-bold uppercase">Waiver</span>
+            <span className="mt-1 text-sm font-semibold text-blue-600">{report.waived_days || 0}</span>
+          </div>
         </div>
-        {visibleDays.map((day) => {
-          const hours = getHourBreakdown(
-            day.record,
-            day.status,
-            day.lateResumptionTime,
-            day.earlyClosureTime,
-            policy,
-            day.date
-          )
-          return (
-            <div
-              key={day.date}
-              className="hover:bg-muted/30 grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 rounded px-2 py-1.5 text-sm"
-            >
-              <span className="text-xs font-medium">{day.dayName}</span>
-              <div>
-                <StatusBadge
-                  status={day.status}
-                  waived={day.record?.waived}
-                  record={day.record}
-                  earlyClosure={day.earlyClosureTime ? { closeTime: day.earlyClosureTime } : null}
-                  recordDate={day.date}
-                />
-              </div>
-              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                {day.record?.clock_in ? (
-                  <>
-                    <Clock
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0",
-                        day.status === "late" ||
-                          day.status === "lateness_with_permission" ||
-                          (day.status !== "present" && isLate(day.record.clock_in))
-                          ? "text-warning"
-                          : "text-green-600"
-                      )}
-                    />
-                    <span>{formatTime(day.record.clock_in)}</span>
-                  </>
-                ) : (
-                  "—"
-                )}
-              </span>
-              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                {day.record?.clock_out ? (
-                  <>
-                    <Clock className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                    <span>{formatTime(day.record.clock_out)}</span>
-                  </>
-                ) : (
-                  "—"
-                )}
-              </span>
-              <span className="text-xs">{formatHours(hours.work)}</span>
-              <span
-                className={`text-xs ${hours.missed !== null && hours.missed > 0 ? "text-orange-500" : "text-muted-foreground"}`}
+
+        <div className="space-y-1 py-2">
+          <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-xs font-semibold uppercase">
+            <span>Day</span>
+            <span>Status</span>
+            <span>In</span>
+            <span>Out</span>
+            <span>Work</span>
+            <span>Missed</span>
+            <span>Total</span>
+            <span>Overtime</span>
+            <span>Source</span>
+            <span></span>
+          </div>
+          {visibleDays.map((day) => {
+            const hours = getHourBreakdown(
+              day.record,
+              day.status,
+              day.lateResumptionTime,
+              day.earlyClosureTime,
+              policy,
+              day.date
+            )
+            return (
+              <div
+                key={day.date}
+                className="hover:bg-muted/30 grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 rounded px-2 py-1.5 text-sm"
               >
-                {hours.missed !== null ? formatHours(hours.missed) : "—"}
-              </span>
-              <span className="text-xs">{formatHours(hours.total ?? day.record?.total_hours ?? null)}</span>
-              <span className="text-xs">
-                {hours.overtime != null && hours.overtime >= 0.05 ? formatHours(hours.overtime) : "—"}
-              </span>
-              <span className="text-xs">{daySourceLabel(day)}</span>
-              <div className="flex items-center justify-end gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                <span className="text-xs font-medium">{day.dayName}</span>
+                <div>
+                  <StatusBadge
+                    status={day.status}
+                    waived={day.record?.waived}
+                    record={day.record}
+                    earlyClosure={day.earlyClosureTime ? { closeTime: day.earlyClosureTime } : null}
+                    recordDate={day.date}
+                  />
+                </div>
+                <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                  {day.record?.clock_in ? (
+                    <>
+                      <Clock
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          day.status === "late" ||
+                            day.status === "lateness_with_permission" ||
+                            (day.status !== "present" && isLate(day.record.clock_in))
+                            ? "text-warning"
+                            : "text-green-600"
+                        )}
+                      />
+                      <span>{formatTime(day.record.clock_in)}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                  {day.record?.clock_out ? (
+                    <>
+                      <Clock className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                      <span>{formatTime(day.record.clock_out)}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="text-xs">{formatHours(hours.work)}</span>
+                <span
+                  className={`text-xs ${hours.missed !== null && hours.missed > 0 ? "text-orange-500" : "text-muted-foreground"}`}
+                >
+                  {hours.missed !== null ? formatHours(hours.missed) : "—"}
+                </span>
+                <span className="text-xs">{formatHours(hours.total ?? day.record?.total_hours ?? null)}</span>
+                <span className="text-xs">
+                  {hours.overtime != null && hours.overtime >= 0.05 ? formatHours(hours.overtime) : "—"}
+                </span>
+                <span className="text-xs">{daySourceLabel(day)}</span>
+                <div className="flex items-center justify-end gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => openHistory(day)}
+                        aria-label="View edit history"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">View edit history</TooltipContent>
+                  </Tooltip>
+                  {!day.isOnLeave && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => openHistory(day)}
-                      aria-label="View edit history"
+                      onClick={() => openEdit(day.date, day.record)}
                     >
-                      <Info className="h-3.5 w-3.5" />
+                      <Pencil className="h-3 w-3" />
                     </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">View edit history</TooltipContent>
-                </Tooltip>
-                {!day.isOnLeave && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => openEdit(day.date, day.record)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
       <AttendanceDialog
