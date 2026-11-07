@@ -794,10 +794,14 @@ export function DataTable<TData>({
         if (expandable) {
           e.preventDefault()
           toggleExpand(rowId)
+        } else if (detailConfig) {
+          e.preventDefault()
+          const row = paginatedData.find((r) => getRowId(r) === rowId)
+          if (row) setDetailRow(row)
         }
       }
     },
-    [expandable, toggleExpand]
+    [expandable, toggleExpand, detailConfig, paginatedData, getRowId]
   )
 
   // Where the pointer went down on a row, so a click that was really a text-selection
@@ -1300,12 +1304,14 @@ export function DataTable<TData>({
                         if (clickWasTextSelection(e)) return
                         if (canExpand) {
                           toggleExpand(rowId)
+                        } else if (detailConfig) {
+                          setDetailRow(row)
                         }
                       }}
                       className={cn(
                         isExpanded && "border-b-0",
                         selectedRows.has(rowId) && "bg-muted/50",
-                        canExpand && "hover:bg-muted/30 cursor-pointer",
+                        (canExpand || Boolean(detailConfig)) && "hover:bg-muted/30 cursor-pointer",
                         "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
                       )}
                     >

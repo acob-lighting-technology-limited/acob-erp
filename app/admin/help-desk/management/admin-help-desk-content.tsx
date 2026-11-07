@@ -454,36 +454,6 @@ export function AdminHelpDeskContent({
             hidden: (r) => !canReassignTicket(viewer, r) || r.assigned_to === viewer.id,
           },
         ]}
-        expandable={{
-          render: (r) => (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
-                  Requester Info
-                </h4>
-                <div className="flex gap-4 text-sm">
-                  <div className="flex flex-col">
-                    <span className="text-muted-foreground text-xs font-medium">Department</span>
-                    <span>{r.requester_department || "Unknown"}</span>
-                  </div>
-                </div>
-              </div>
-              {r.sla_target_at && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
-                    SLA Status
-                  </h4>
-                  <p className="text-sm">
-                    Target Date: {formatWATDateTime(r.sla_target_at)}
-                    {new Date(r.sla_target_at).getTime() < Date.now() && (
-                      <span className="ml-2 font-medium text-red-600">(Breached)</span>
-                    )}
-                  </p>
-                </div>
-              )}
-            </div>
-          ),
-        }}
         viewToggle
         contactsView
         stickyToolbar

@@ -56,6 +56,7 @@ export const RELEASES: Release[] = [
           "Enhanced list views and side sheets across Impersonation, Payroll, Attendance, Stock Movements, Challenges, and Tasks with one-click actions, expandable details, and full record properties",
           "Adopted standardized department short codes in list views and card subtitles across Impersonation, User Settings, Challenges, CBT logs, and Leave Management to eliminate text truncation on mobile while retaining full department names in side sheets and search filters",
           "Removed duplicate inline Action columns on desktop data tables where rowActions was active, keeping a single standardized trailing Action column",
+          "Removed redundant expandable row accordions across Attendance, Assets, Leave, Fleet, Notifications, Feedback, Bills, and Invoices tables so desktop rows remain compact and open full records directly in standardized side sheets",
         ],
       },
       {

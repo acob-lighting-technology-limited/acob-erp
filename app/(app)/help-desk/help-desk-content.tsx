@@ -610,41 +610,6 @@ export function HelpDeskContent({
             ],
           },
         }}
-        expandable={{
-          render: (ticket) => (
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <span className="text-muted-foreground block text-xs font-semibold uppercase">Description</span>
-                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
-                  {ticket.description || "No description provided."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Service Dept</span>
-                  <span className="font-medium">{ticket.service_department}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Created</span>
-                  <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 border-t pt-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs"
-                  onClick={() => void openTicketDetails(ticket.id)}
-                >
-                  <Headset className="h-3.5 w-3.5" />
-                  View Full Ticket & Comments {(ticket.comment_count || 0) > 0 ? `(${ticket.comment_count})` : ""}
-                </Button>
-              </div>
-            </div>
-          ),
-        }}
         emptyTitle="No tickets"
         emptyDescription="Tickets you raise or are assigned appear here."
         emptyIcon={Headset}
