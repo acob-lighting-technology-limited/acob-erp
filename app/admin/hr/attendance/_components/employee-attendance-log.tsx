@@ -1,7 +1,6 @@
-import { AlertCircle, CalendarDays, CheckCircle2, Clock, Info, Pencil, ShieldCheck } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { AlertCircle, CalendarDays, Clock, Info, Pencil, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { StatCard } from "@/components/ui/stat-card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { AttendanceReport, CalendarDay, DayRecord } from "../view"
@@ -58,12 +57,12 @@ export function EmployeeAttendanceLog({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
         <SummaryGroup
           icon={AlertCircle}
           title="Needs attention"
-          description="Days that may need review"
-          iconClassName="bg-warning/10 text-warning"
+          iconBgColor="bg-warning/10"
+          iconColor="text-warning"
           metrics={[
             { label: "Late", value: report.late_days, valueClassName: "text-warning" },
             { label: "Incomplete", value: report.incomplete_days ?? 0, valueClassName: "text-info" },
@@ -73,8 +72,8 @@ export function EmployeeAttendanceLog({
         <SummaryGroup
           icon={ShieldCheck}
           title="Approved exceptions"
-          description="Permission or operational status"
-          iconClassName="bg-info/10 text-info"
+          iconBgColor="bg-info/10"
+          iconColor="text-info"
           metrics={[
             { label: "LWP", value: report.lateness_with_permission_days ?? 0, valueClassName: "text-warning" },
             { label: "IWP", value: report.incomplete_with_permission_days ?? 0, valueClassName: "text-info" },
@@ -86,8 +85,8 @@ export function EmployeeAttendanceLog({
         <SummaryGroup
           icon={CalendarDays}
           title="Covered days"
-          description="Excluded from attendance penalties"
-          iconClassName="bg-success/10 text-success"
+          iconBgColor="bg-success/10"
+          iconColor="text-success"
           metrics={[
             { label: "Leave", value: report.leave_days ?? 0, valueClassName: "text-success" },
             { label: "Holiday", value: report.holiday_days ?? 0, valueClassName: "text-info" },
@@ -202,38 +201,29 @@ interface SummaryMetric {
 function SummaryGroup({
   icon: Icon,
   title,
-  description,
-  iconClassName,
+  iconBgColor,
+  iconColor,
   metrics,
 }: {
-  icon: typeof CheckCircle2
+  icon: typeof AlertCircle
   title: string
-  description: string
-  iconClassName: string
+  iconBgColor: string
+  iconColor: string
   metrics: SummaryMetric[]
 }) {
+  const total = metrics.reduce((sum, metric) => sum + metric.value, 0)
+  const tooltip = metrics.map((metric) => `${metric.label}: ${metric.value}`).join(" · ")
+
   return (
-    <Card className="border-border/80 bg-card">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className={cn("rounded-lg p-2", iconClassName)}>
-            <Icon className="h-4 w-4" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-foreground text-sm font-semibold">{title}</h4>
-            <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
-          </div>
-        </div>
-        <dl className="mt-4 grid grid-cols-3 gap-x-2 gap-y-2">
-          {metrics.map((metric) => (
-            <div key={metric.label} className="min-w-0">
-              <dt className="text-muted-foreground truncate text-xs">{metric.label}</dt>
-              <dd className={cn("mt-0.5 text-base font-semibold", metric.valueClassName)}>{metric.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
+    <StatCard
+      variant="compact"
+      title={title}
+      value={`${total} days`}
+      icon={Icon}
+      iconBgColor={iconBgColor}
+      iconColor={iconColor}
+      tooltip={tooltip}
+    />
   )
 }
 
