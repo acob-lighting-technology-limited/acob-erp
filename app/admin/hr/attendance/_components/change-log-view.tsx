@@ -385,8 +385,10 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                   <p className="text-foreground text-sm font-semibold">{r.employee_name}</p>
                   <p className="text-muted-foreground mt-0.5 text-xs">
                     {r.department} · {daySpan(r)}
-                    {r.days.length > 1 ? ` (${dayCount(r)})` : ""} · by {r.actor_name} ·{" "}
-                    {formatWATDateTime(r.changed_at)}
+                    {r.days.length > 1 ? ` (${dayCount(r)})` : ""}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    Changed by {r.actor_name} · {formatWATDateTime(r.changed_at)}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -407,60 +409,65 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                 </div>
               </div>
 
-              <div className="grid gap-5 p-4 lg:grid-cols-2 lg:p-5">
-                <section className="bg-muted/35 space-y-3 rounded-lg p-4" aria-label="Change details">
+              <div className="space-y-4 p-4">
+                <div>
+                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                    Comment
+                  </span>
+                  <p
+                    className={
+                      r.comment
+                        ? "text-foreground mt-1 text-sm leading-6 whitespace-pre-wrap"
+                        : "text-muted-foreground mt-1 text-sm italic"
+                    }
+                  >
+                    {r.comment || "No comment was typed."}
+                  </p>
+                </div>
+
+                {r.details && (
                   <div>
                     <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                      Comment
+                      Recorded by the system
                     </span>
-                    <p className="text-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">
-                      {r.comment || "No comment was typed."}
-                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm leading-6 whitespace-pre-wrap">{r.details}</p>
                   </div>
-                  {r.details && (
-                    <div>
-                      <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                        Recorded by the system
-                      </span>
-                      <p className="text-muted-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">{r.details}</p>
-                    </div>
-                  )}
-                </section>
+                )}
 
                 {r.days.length > 1 && (
-                  <section className="min-w-0" aria-label="Days changed">
-                    <span className="text-muted-foreground mb-3 block text-xs font-semibold tracking-wide uppercase">
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                       Days changed · {r.days.length}
                     </span>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {r.days.map((day) => (
                         <Badge key={day} variant="outline" className="font-normal">
                           {formatWATDate(day, { weekday: "short", day: "numeric", month: "short" })}
                         </Badge>
                       ))}
                     </div>
-                  </section>
+                  </div>
                 )}
 
                 {r.appeal && (
-                  <section className="bg-muted/35 space-y-2 rounded-lg p-4 lg:col-span-2" aria-label="Appeal">
+                  <div>
                     <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                       Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
                     </span>
-                    <p className="text-sm">
+                    <p className="mt-1 text-sm">
                       Asked for <strong>{statusText(r.appeal.requested_status)}</strong>
                     </p>
                     {r.appeal.appeal_reason && (
-                      <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                      <p className="text-muted-foreground mt-1 text-sm whitespace-pre-wrap">
                         Reason: {r.appeal.appeal_reason}
                       </p>
                     )}
                     {r.appeal.resolution_note && (
-                      <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                      <p className="text-muted-foreground mt-1 text-sm whitespace-pre-wrap">
                         Note: {r.appeal.resolution_note}
                       </p>
                     )}
-                  </section>
+                  </div>
                 )}
               </div>
             </div>
