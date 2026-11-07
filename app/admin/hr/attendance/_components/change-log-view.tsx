@@ -379,47 +379,90 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
         emptyIcon={History}
         expandable={{
           render: (r) => (
-            <div className="grid gap-4 text-sm md:grid-cols-2">
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold">Comment</span>
-                  <p className="whitespace-pre-wrap">{r.comment || "No comment was typed."}</p>
+            <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+              <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-foreground text-sm font-semibold">{r.employee_name}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {r.department} · {daySpan(r)}
+                    {r.days.length > 1 ? ` (${dayCount(r)})` : ""} · by {r.actor_name} ·{" "}
+                    {formatWATDateTime(r.changed_at)}
+                  </p>
                 </div>
-                {r.details && (
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block text-xs font-semibold">Recorded by the system</span>
-                    <p className="text-muted-foreground whitespace-pre-wrap">{r.details}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={CATEGORY_CLASSES[r.category]}>{r.change_label}</Badge>
+                  {(r.from_status || r.from_mixed || r.to_status) && (
+                    <span className="flex items-center gap-2">
+                      {r.from_mixed ? (
+                        <Badge variant="outline" className="font-normal">
+                          Various
+                        </Badge>
+                      ) : (
+                        <StatusBadge status={r.from_status} />
+                      )}
+                      <span className="text-muted-foreground text-xs font-semibold">→</span>
+                      <StatusBadge status={r.to_status} />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-5 p-4 lg:grid-cols-2 lg:p-5">
+                <section className="bg-muted/35 space-y-3 rounded-lg p-4" aria-label="Change details">
+                  <div>
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                      Comment
+                    </span>
+                    <p className="text-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">
+                      {r.comment || "No comment was typed."}
+                    </p>
                   </div>
+                  {r.details && (
+                    <div>
+                      <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                        Recorded by the system
+                      </span>
+                      <p className="text-muted-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">{r.details}</p>
+                    </div>
+                  )}
+                </section>
+
+                {r.days.length > 1 && (
+                  <section className="min-w-0" aria-label="Days changed">
+                    <span className="text-muted-foreground mb-3 block text-xs font-semibold tracking-wide uppercase">
+                      Days changed · {r.days.length}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {r.days.map((day) => (
+                        <Badge key={day} variant="outline" className="font-normal">
+                          {formatWATDate(day, { weekday: "short", day: "numeric", month: "short" })}
+                        </Badge>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {r.appeal && (
+                  <section className="bg-muted/35 space-y-2 rounded-lg p-4 lg:col-span-2" aria-label="Appeal">
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                      Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
+                    </span>
+                    <p className="text-sm">
+                      Asked for <strong>{statusText(r.appeal.requested_status)}</strong>
+                    </p>
+                    {r.appeal.appeal_reason && (
+                      <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                        Reason: {r.appeal.appeal_reason}
+                      </p>
+                    )}
+                    {r.appeal.resolution_note && (
+                      <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                        Note: {r.appeal.resolution_note}
+                      </p>
+                    )}
+                  </section>
                 )}
               </div>
-              {r.days.length > 1 && (
-                <div className="space-y-1 md:col-span-2">
-                  <span className="text-muted-foreground block text-xs font-semibold">
-                    Days changed · {r.days.length}
-                  </span>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    {r.days
-                      .map((day) => formatWATDate(day, { weekday: "short", day: "numeric", month: "short" }))
-                      .join(" · ")}
-                  </p>
-                </div>
-              )}
-              {r.appeal && (
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold">
-                    Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
-                  </span>
-                  <p>
-                    Asked for <strong>{statusText(r.appeal.requested_status)}</strong>
-                  </p>
-                  {r.appeal.appeal_reason && (
-                    <p className="text-muted-foreground whitespace-pre-wrap">Reason: {r.appeal.appeal_reason}</p>
-                  )}
-                  {r.appeal.resolution_note && (
-                    <p className="text-muted-foreground whitespace-pre-wrap">Note: {r.appeal.resolution_note}</p>
-                  )}
-                </div>
-              )}
             </div>
           ),
         }}
