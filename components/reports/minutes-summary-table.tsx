@@ -37,6 +37,7 @@ import { apiFetch } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cleanSlideTextHtml, sanitizeSlideTextHtml } from "@/lib/rich-text"
+import { SlideTextPreview } from "@/components/reports/slide-text-preview"
 import { createClient } from "@/lib/supabase/client"
 import { formatWATDate, formatWATTimeDate } from "@/lib/utils/date"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
@@ -56,9 +57,6 @@ interface Props {
   readOnly?: boolean
   pageTabs?: { tabs: DataTableTab[]; activeTab: string; onTabChange: (tab: string) => void }
 }
-
-const SUMMARY_PROSE =
-  "text-[15px] leading-7 break-words [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_h4]:font-bold [&_ol]:list-decimal [&_ol]:pl-6 [&_p+*]:mt-3 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-6"
 
 function formatMeetingMonday(week: number, year: number) {
   return formatWATDate(new Date(`${getDefaultMeetingDateIso(week, year)}T00:00:00`), {
@@ -406,13 +404,7 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
               {viewing ? formatMeetingMonday(viewing.meeting_week, viewing.meeting_year) : null}
             </DialogDescription>
           </DialogHeader>
-          {viewing ? (
-            <div
-              className={SUMMARY_PROSE}
-              // Sanitised to the slide-text tags; stored HTML is never trusted.
-              dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(viewing.content_html) }}
-            />
-          ) : null}
+          {viewing ? <SlideTextPreview html={viewing.content_html} /> : null}
         </DialogContent>
       </Dialog>
 
@@ -422,7 +414,7 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
             <AlertDialogTitle>Delete summary?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
-                ? `Delete the summary for Week ${pendingDelete.meeting_week}, ${pendingDelete.meeting_year}. The agenda deck will show the full minutes instead. This cannot be undone.`
+                ? `Delete the summary for Week ${pendingDelete.meeting_week}, ${pendingDelete.meeting_year}. The agenda deck will show only the Minutes of the Last Meeting title slide. This cannot be undone.`
                 : "This cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -500,10 +492,7 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
                     <span className="text-muted-foreground text-xs">Updated by {editorName}</span>
                   </div>
                 </div>
-                <div
-                  className={`${SUMMARY_PROSE} px-4 py-5 sm:px-5`}
-                  dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(row.content_html) }}
-                />
+                <SlideTextPreview html={row.content_html} className="px-4 py-5 sm:px-5" />
               </div>
             )
           },
