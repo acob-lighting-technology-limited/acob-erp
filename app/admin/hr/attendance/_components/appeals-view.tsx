@@ -356,25 +356,59 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           },
         ]}
         expandable={{
-          render: (r) => (
-            <div className="space-y-3.5 text-sm">
-              <div>
-                <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
-                  {r.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
-                </span>
-                <p className="text-foreground text-sm font-medium whitespace-pre-wrap">
-                  {r.appeal_reason || "No reason specified"}
-                </p>
-              </div>
+          render: (r) => {
+            const isAdminAlteration = r.initiated_by_role === "admin_manual"
+            return (
+              <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+                <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-foreground text-sm font-semibold">Appeal for {appealDateLabel(r)}</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      {r.user_name} · {r.department}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      className={
+                        ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
+                        "bg-muted text-muted-foreground"
+                      }
+                    >
+                      {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
+                    </Badge>
+                    <span className="text-muted-foreground text-xs font-semibold">→</span>
+                    <Badge
+                      className={
+                        ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ??
+                        "bg-info/15 text-info"
+                      }
+                    >
+                      {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
+                    </Badge>
+                    {renderStatusBadge(r)}
+                  </div>
+                </div>
 
-              <div className="border-t pt-3">
-                <span className="text-muted-foreground mb-2 block text-xs font-semibold tracking-wide uppercase">
-                  Audit History
-                </span>
-                <AppealAuditTrail appeal={r} />
+                <div className="grid gap-5 p-4 lg:grid-cols-2 lg:p-5">
+                  <section className="bg-muted/35 rounded-lg p-4" aria-label="Appeal reason">
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                      {isAdminAlteration ? "Admin's reason" : "Appeal reason"}
+                    </span>
+                    <p className="text-foreground mt-2 text-sm leading-6 font-medium whitespace-pre-wrap">
+                      {r.appeal_reason || "No reason specified"}
+                    </p>
+                  </section>
+
+                  <section className="min-w-0" aria-label="Appeal audit history">
+                    <span className="text-muted-foreground mb-3 block text-xs font-semibold tracking-wide uppercase">
+                      Decision trail
+                    </span>
+                    <AppealAuditTrail appeal={r} />
+                  </section>
+                </div>
               </div>
-            </div>
-          ),
+            )
+          },
         }}
       />
 
