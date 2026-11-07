@@ -223,6 +223,11 @@ function SummaryGroup({
       iconBgColor={iconBgColor}
       iconColor={iconColor}
       tooltip={tooltip}
+      detail={metrics.map((metric) => (
+        <span key={metric.label} className="whitespace-nowrap">
+          {metric.label} <span className={cn("font-semibold", metric.valueClassName)}>{metric.value}</span>
+        </span>
+      ))}
     />
   )
 }
