@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,13 +19,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PinInput } from "@/components/approval-signing/pin-input"
-import { PinSection, SignatureSection, type SigningStatus } from "@/components/approval-signing/signing-setup"
-import { apiFetch, apiJson } from "@/lib/api-client"
+import { apiFetch } from "@/lib/api-client"
 import { formatNaira, stageTitle } from "@/lib/requisitions/format"
 import { amountChangeMessage, lineItemsTotal } from "@/lib/requisitions/limits"
 import { STAGE_VERBS } from "@/lib/requisitions/routing"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
-import { QUERY_KEYS } from "@/lib/query-keys"
 
 export type SignMode = "sign" | "reject"
 
@@ -60,24 +59,10 @@ export function SignDialog({
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
 
-  // Missing signature or PIN is set up here, not in Settings. The status is read
-  // when the dialog needs it and re-read after each save.
-  const queryClient = useQueryClient()
-  const setupNeeded = viewer.signing_setup_missing.length > 0
-  const { data: signingStatus } = useQuery({
-    queryKey: QUERY_KEYS.signingStatus(),
-    queryFn: () => apiJson<{ data: SigningStatus }>("/api/profile/signing").then((res) => res.data),
-    enabled: open && setupNeeded,
-  })
-  const setupMissing: ("signature" | "pin")[] = signingStatus
-    ? [
-        ...(signingStatus.has_signature ? [] : (["signature"] as const)),
-        ...(signingStatus.has_pin ? [] : (["pin"] as const)),
-      ]
-    : viewer.signing_setup_missing
-  const refreshSigningStatus = () => {
-    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.signingStatus() })
-  }
+  // A missing signature or PIN is set up in Settings → Signing, which links back here. Setting them up
+  // inside this dialog embedded two full settings cards and a drawing pad, and made it scroll.
+  const pathname = usePathname()
+  const setupMissing = viewer.signing_setup_missing
 
   useEffect(() => {
     if (!open) return
@@ -175,6 +160,15 @@ export function SignDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* First, so nobody types a comment and then loses it by leaving to set up. */}
+          {setupMissing.length ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <span>Before you can sign, set up your {setupMissing.join(" and ")}.</span>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/settings/signing?return=${encodeURIComponent(pathname)}`}>Set up signing</Link>
+              </Button>
+            </div>
+          ) : null}
           {mode === "sign" && bypassed.length ? (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               Signing now bypasses {bypassed.map((s) => stageTitle(s)).join(", ")}.
@@ -243,20 +237,10 @@ export function SignDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="sign-comments">{mode === "reject" ? "Reason (required)" : "Comment (optional)"}</Label>
-            <Textarea id="sign-comments" rows={3} value={comments} onChange={(e) => setComments(e.target.value)} />
+            <Textarea id="sign-comments" rows={2} value={comments} onChange={(e) => setComments(e.target.value)} />
           </div>
 
-          {setupMissing.length ? (
-            <div className="space-y-4 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
-              <p className="text-sm">Before you sign, set up your {setupMissing.join(" and ")} below.</p>
-              {signingStatus && !signingStatus.has_signature ? (
-                <SignatureSection status={signingStatus} onSaved={refreshSigningStatus} />
-              ) : null}
-              {signingStatus && !signingStatus.has_pin ? (
-                <PinSection status={signingStatus} onSaved={refreshSigningStatus} />
-              ) : null}
-            </div>
-          ) : (
+          {setupMissing.length ? null : (
             <div className="space-y-1.5">
               <Label htmlFor="sign-pin">Approval PIN</Label>
               <PinInput id="sign-pin" value={pin} onChange={setPin} />

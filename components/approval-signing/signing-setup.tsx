@@ -3,13 +3,15 @@
 /* eslint-disable @next/next/no-img-element -- the signature preview is a short-lived signed URL */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { CheckCircle2, CircleAlert, KeyRound, Loader2, PenLine, Upload, X } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, CheckCircle2, CircleAlert, KeyRound, Loader2, PenLine, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiFetch } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { PinInput } from "./pin-input"
 import { SignaturePad } from "./signature-pad"
 
@@ -50,6 +52,9 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState("draw")
   const [saving, setSaving] = useState(false)
+  // With a signature on file the card shows it and a Replace button; the pad opens only on request.
+  const [replacing, setReplacing] = useState(false)
+  const editing = !status.has_signature || replacing
   const handleDrawn = useCallback((blob: Blob | null) => setDrawn(blob), [])
 
   useEffect(() => {
@@ -111,6 +116,9 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
       if (!res.ok) throw new Error(await readError(res, "Could not save your signature"))
       onSaved((await res.json()).data)
       toast.success("Signature saved")
+      setReplacing(false)
+      setDrawn(null)
+      setFile(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save your signature")
     } finally {
@@ -143,93 +151,119 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
             <img src={status.signature_url} alt="Your current signature" className="h-14 w-auto" />
           </div>
         ) : null}
-        <Tabs value={mode} onValueChange={setMode} className="max-w-xl">
-          <TabsList>
-            <TabsTrigger value="draw">Draw</TabsTrigger>
-            <TabsTrigger value="upload">Upload</TabsTrigger>
-          </TabsList>
-          <TabsContent value="draw" className="pt-2">
-            <SignaturePad onChange={handleDrawn} />
-          </TabsContent>
-          <TabsContent value="upload" className="space-y-3 pt-2">
-            <Label htmlFor="signature-file" className="text-sm font-medium">
-              Image of your signature (PNG, JPG or WebP)
-            </Label>
+        {editing ? (
+          <>
+            <Tabs value={mode} onValueChange={setMode} className="max-w-xl">
+              <TabsList>
+                <TabsTrigger value="draw">Draw</TabsTrigger>
+                <TabsTrigger value="upload">Upload</TabsTrigger>
+              </TabsList>
+              <TabsContent value="draw" className="pt-2">
+                <SignaturePad onChange={handleDrawn} />
+              </TabsContent>
+              <TabsContent value="upload" className="space-y-3 pt-2">
+                <Label htmlFor="signature-file" className="text-sm font-medium">
+                  Image of your signature (PNG, JPG or WebP)
+                </Label>
 
-            {file && filePreview?.startsWith("blob:") ? (
-              <div className="border-primary/40 bg-muted/20 relative rounded-lg border-2 border-dashed p-4">
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <div className="rounded-md border bg-white p-3 shadow-xs">
-                    <img src={filePreview} alt="Signature preview" className="max-h-24 max-w-full object-contain" />
+                {file && filePreview?.startsWith("blob:") ? (
+                  <div className="border-primary/40 bg-muted/20 relative rounded-lg border-2 border-dashed p-4">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="rounded-md border bg-white p-3 shadow-xs">
+                        <img src={filePreview} alt="Signature preview" className="max-h-24 max-w-full object-contain" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-foreground text-xs font-medium">{file.name}</p>
+                        <p className="text-muted-foreground text-[11px]">{(file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          Choose another
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive h-8 text-xs"
+                          onClick={() => setFile(null)}
+                        >
+                          <X className="mr-1 h-3.5 w-3.5" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-foreground text-xs font-medium">{file.name}</p>
-                    <p className="text-muted-foreground text-[11px]">{(file.size / 1024).toFixed(1)} KB</p>
+                ) : (
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                      isDragging
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="bg-background mb-2 flex h-10 w-10 items-center justify-center rounded-full border shadow-xs">
+                      <Upload className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                    </div>
+                    <p className="text-foreground text-sm font-medium">
+                      <span className="text-primary font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">PNG, JPG or WebP (max 5 MB)</p>
+                    <p className="text-muted-foreground/80 mt-2 text-[11px]">
+                      Dark ink on white background works best.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      Choose another
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive h-8 text-xs"
-                      onClick={() => setFile(null)}
-                    >
-                      <X className="mr-1 h-3.5 w-3.5" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                  isDragging
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/40"
-                }`}
-              >
-                <div className="bg-background mb-2 flex h-10 w-10 items-center justify-center rounded-full border shadow-xs">
-                  <Upload className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
-                </div>
-                <p className="text-foreground text-sm font-medium">
-                  <span className="text-primary font-semibold">Click to upload</span> or drag and drop
-                </p>
-                <p className="text-muted-foreground mt-0.5 text-xs">PNG, JPG or WebP (max 5 MB)</p>
-                <p className="text-muted-foreground/80 mt-2 text-[11px]">Dark ink on white background works best.</p>
-              </div>
-            )}
+                )}
 
-            <input
-              ref={fileInputRef}
-              id="signature-file"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              onChange={(e) => {
-                handleFile(e.target.files?.[0] ?? null)
-                e.target.value = ""
-              }}
-            />
-          </TabsContent>
-        </Tabs>
-        <Button onClick={save} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          {status.has_signature ? "Replace signature" : "Save signature"}
-        </Button>
+                <input
+                  ref={fileInputRef}
+                  id="signature-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    handleFile(e.target.files?.[0] ?? null)
+                    e.target.value = ""
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={save} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {status.has_signature ? "Save new signature" : "Save signature"}
+              </Button>
+              {replacing ? (
+                <Button
+                  variant="ghost"
+                  disabled={saving}
+                  onClick={() => {
+                    setReplacing(false)
+                    setDrawn(null)
+                    setFile(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <Button variant="outline" onClick={() => setReplacing(true)}>
+            <PenLine className="mr-2 h-4 w-4" />
+            Replace signature
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
@@ -242,6 +276,9 @@ export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved
   const [code, setCode] = useState("")
   const [resetSentTo, setResetSentTo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // With a PIN set the card shows Change and Forgot; the fields open only for one of those.
+  const [changing, setChanging] = useState(false)
+  const showForm = !status.has_pin || changing || resetSentTo !== null
 
   const clear = () => {
     setCurrentPin("")
@@ -270,6 +307,7 @@ export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved
       onSaved((await res.json()).data)
       toast.success(status.has_pin ? "PIN changed" : "PIN created")
       setResetSentTo(null)
+      setChanging(false)
       clear()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save your PIN")
@@ -321,56 +359,79 @@ export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved
         <StatusLine done={status.has_pin} text={status.has_pin ? "PIN set" : "No PIN yet"} />
         {locked ? (
           <p className="text-warning text-sm">
-            Too many wrong PINs. Signing is locked until {locked}. You can reset it below.
+            Too many wrong PINs. Signing is locked until {locked}. You can reset it with an emailed code.
           </p>
         ) : null}
 
-        <div className="grid max-w-md gap-4">
-          {resetSentTo ? (
-            <div className="space-y-2">
-              <Label htmlFor="reset-code">Code sent to {resetSentTo}</Label>
-              <PinInput id="reset-code" value={code} onChange={setCode} aria-label="Reset code" />
+        {showForm ? (
+          <>
+            <div className="grid max-w-md gap-4">
+              {resetSentTo ? (
+                <div className="space-y-2">
+                  <Label htmlFor="reset-code">Code sent to {resetSentTo}</Label>
+                  <PinInput id="reset-code" value={code} onChange={setCode} aria-label="Reset code" />
+                </div>
+              ) : status.has_pin ? (
+                <div className="space-y-2">
+                  <Label htmlFor="current-pin">Current PIN</Label>
+                  <PinInput id="current-pin" value={currentPin} onChange={setCurrentPin} />
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="new-pin">{status.has_pin ? "New PIN" : "PIN"}</Label>
+                <PinInput id="new-pin" value={pin} onChange={setPin} />
+                <p className="text-muted-foreground text-xs">Avoid 123456 or one repeated digit.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-pin">Confirm PIN</Label>
+                <PinInput id="confirm-pin" value={confirm} onChange={setConfirm} />
+              </div>
             </div>
-          ) : status.has_pin ? (
-            <div className="space-y-2">
-              <Label htmlFor="current-pin">Current PIN</Label>
-              <PinInput id="current-pin" value={currentPin} onChange={setCurrentPin} />
-            </div>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="new-pin">{status.has_pin ? "New PIN" : "PIN"}</Label>
-            <PinInput id="new-pin" value={pin} onChange={setPin} />
-            <p className="text-muted-foreground text-xs">Avoid 123456 or one repeated digit.</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-pin">Confirm PIN</Label>
-            <PinInput id="confirm-pin" value={confirm} onChange={setConfirm} />
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={submit} disabled={busy}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {resetSentTo ? "Set new PIN" : status.has_pin ? "Change PIN" : "Create PIN"}
-          </Button>
-          {status.has_pin && !resetSentTo ? (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={submit} disabled={busy}>
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {resetSentTo ? "Set new PIN" : status.has_pin ? "Change PIN" : "Create PIN"}
+              </Button>
+              {status.has_pin && changing && !resetSentTo ? (
+                <Button variant="ghost" onClick={requestReset} disabled={busy}>
+                  Forgot PIN? Email me a code
+                </Button>
+              ) : null}
+              {resetSentTo || changing ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setResetSentTo(null)
+                    setChanging(false)
+                    clear()
+                  }}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setChanging(true)} disabled={busy}>
+              <KeyRound className="mr-2 h-4 w-4" />
+              Change PIN
+            </Button>
             <Button variant="ghost" onClick={requestReset} disabled={busy}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Forgot PIN? Email me a code
             </Button>
-          ) : null}
-          {resetSentTo ? (
-            <Button variant="ghost" onClick={() => setResetSentTo(null)} disabled={busy}>
-              Cancel
-            </Button>
-          ) : null}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
 }
 
 /** Settings → Signing: what every signer and payment processor sets up once. */
-export function SigningSetup() {
+export function SigningSetup({ returnTo }: { returnTo?: string }) {
   const [status, setStatus] = useState<SigningStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -397,8 +458,30 @@ export function SigningSetup() {
     )
   }
 
+  const ready = status.has_signature && status.has_pin
+
   return (
     <div className="space-y-6">
+      {returnTo ? (
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm",
+            ready ? "border-emerald-500/40 bg-emerald-500/5" : "border-amber-500/40 bg-amber-500/5"
+          )}
+        >
+          <span>
+            {ready
+              ? "You are set up to sign."
+              : `Set up your ${[!status.has_signature && "signature", !status.has_pin && "PIN"].filter(Boolean).join(" and ")}, then go back to sign.`}
+          </span>
+          <Button asChild size="sm" variant={ready ? "default" : "outline"}>
+            <Link href={returnTo}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to requisition
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       <SignatureSection status={status} onSaved={setStatus} />
       <PinSection status={status} onSaved={setStatus} />
     </div>
