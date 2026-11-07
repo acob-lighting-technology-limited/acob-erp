@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
     const yearParam = searchParams.get("year") // e.g. "2026"
 
     if (month || yearParam || allTime || (startDateParam && endDateParam)) {
-      let query = dataClient.from("attendance_lunch_log").select("user_id, date, employee_deduction")
+      let query = dataClient
+        .from("attendance_lunch_log")
+        .select("user_id, date, cost, company_subsidy, employee_deduction")
       if (month) {
         const year = parseInt(month.substring(0, 4))
         const m = parseInt(month.substring(5, 7))

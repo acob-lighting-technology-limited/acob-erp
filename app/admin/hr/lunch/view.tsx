@@ -163,10 +163,20 @@ export interface LunchSummaryRow {
   total_deduction: number
 }
 
+/** One served lunch, with the prices locked in on the day it was logged. */
 export interface LunchRawLog {
   user_id: string
   date: string
+  cost: number
+  company_subsidy: number
   employee_deduction: number
+}
+
+function formatNaira(amount: number, fractionDigits = 2) {
+  return `₦${Number(amount).toLocaleString("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}`
 }
 
 interface LunchRegisterPageProps {
@@ -2045,7 +2055,8 @@ export function LunchRegisterPage({
                       )
                     }
 
-                    const hasEaten = employeeSelectedLogs.some((log) => log.date === date)
+                    const dayLog = employeeSelectedLogs.find((log) => log.date === date)
+                    const hasEaten = Boolean(dayLog)
                     const bg = hasEaten ? "bg-emerald-500/5 hover:bg-emerald-500/10" : "bg-background hover:bg-muted/10"
 
                     return (
@@ -2063,7 +2074,7 @@ export function LunchRegisterPage({
                               Served
                             </div>
                             <div className="text-muted-foreground leading-tight" style={{ fontSize: "10px" }}>
-                              Deducted: ₦1,100
+                              Deducted: {formatNaira(dayLog?.employee_deduction ?? 0, 0)}
                             </div>
                           </>
                         ) : (
@@ -2265,43 +2276,63 @@ export function LunchRegisterPage({
 }
 
 function FeedbackExpandPanel({ entry }: { entry: LunchReviewSummary }) {
-  if (entry.comments.length === 0) {
-    return (
-      <div className="bg-muted/10 text-muted-foreground border-b p-4 text-xs">
-        Ratings were submitted without written comments for this day.
-      </div>
-    )
-  }
-
   return (
-    <div className="bg-muted/20 space-y-2.5 border-b px-6 py-4">
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-xs font-semibold uppercase">
-          Anonymous Staff Comments ({entry.comments.length})
+    <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+      <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-foreground text-sm font-semibold">
+            Feedback for{" "}
+            {formatWATDate(entry.date, { weekday: "long", day: "numeric", month: "short", year: "numeric" })}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Submitted anonymously — no comment is linked to a staff member.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-warning/15 text-warning gap-1">
+            <Star className="h-3 w-3 fill-current" />
+            {entry.average_rating ? `${entry.average_rating.toFixed(1)} / 5` : "No rating"}
+          </Badge>
+          <Badge variant="outline" className="font-normal">
+            {entry.review_count} review{entry.review_count === 1 ? "" : "s"}
+          </Badge>
+          <Badge variant="outline" className="font-normal">
+            {entry.comments.length} comment{entry.comments.length === 1 ? "" : "s"}
+          </Badge>
+        </div>
+      </div>
+
+      {entry.comments.length === 0 ? (
+        <p className="text-muted-foreground p-4 text-sm italic">
+          Ratings were submitted without written comments for this day.
         </p>
-        <span className="text-muted-foreground text-xs">Feedback is submitted anonymously without employee names.</span>
-      </div>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        {entry.comments.map((comment) => (
-          <div key={comment.id} className="bg-card space-y-1.5 rounded-lg border p-3 text-xs shadow-sm">
-            <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1 font-semibold text-amber-500">
-                <Star className="h-3 w-3 fill-amber-500" />
-                {comment.rating} / 5
+      ) : (
+        <div className="grid gap-3 p-4 sm:grid-cols-2 lg:p-5">
+          {entry.comments.map((comment) => (
+            <section key={comment.id} className="bg-muted/35 rounded-lg p-4" aria-label="Staff comment">
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="text-warning flex items-center gap-0.5"
+                  aria-label={`${comment.rating} out of 5 stars`}
+                >
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star key={i} className={cn("h-3.5 w-3.5", i < comment.rating ? "fill-current" : "opacity-30")} />
+                  ))}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {formatWATDate(comment.created_at, {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
               </div>
-              <span>
-                {formatWATDate(comment.created_at, {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap">{comment.comment}</p>
-          </div>
-        ))}
-      </div>
+              <p className="text-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">{comment.comment}</p>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2446,163 +2477,179 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
     return <p className="text-muted-foreground text-xs">No dishes on this menu yet.</p>
   }
 
+  const statusInfo = getMenuStatusInfo(menu)
+  const viewCount = menu.viewers?.length ?? 0
+  const stats = [
+    { label: "Opted in", value: menu.eatingCount, tone: "text-success" },
+    { label: "Opted out", value: notEatingCount, tone: "text-danger" },
+    { label: "No answer", value: noAnswer, tone: "text-warning" },
+    {
+      label: "Viewed",
+      value: viewCount,
+      suffix: `${totalStaff > 0 ? Math.round((viewCount / totalStaff) * 100) : 0}%`,
+      tone: "text-info",
+    },
+    { label: "Total staff", value: totalStaff, tone: "text-foreground" },
+  ]
+
   return (
-    <div className="space-y-4">
-      {/* 0 ── quick stats, mirroring the attendance expanded-row layout */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+      <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-muted-foreground text-xs uppercase">Opted In</p>
-          <p className="font-semibold text-emerald-600">{menu.eatingCount}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground text-xs uppercase">Opted Out</p>
-          <p className="font-semibold text-rose-500">{notEatingCount}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground text-xs uppercase">No Answer</p>
-          <p className="font-semibold text-amber-500">{noAnswer}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground text-xs uppercase">Views</p>
-          <p className="font-semibold text-blue-600">
-            {menu.viewers?.length ?? 0}
-            <span className="text-muted-foreground ml-1 text-xs">
-              ({totalStaff > 0 ? Math.round(((menu.viewers?.length ?? 0) / totalStaff) * 100) : 0}%)
-            </span>
+          <p className="text-foreground text-sm font-semibold">
+            Menu for {formatWATDate(menu.date, { weekday: "long", day: "numeric", month: "short", year: "numeric" })}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {menu.eatingCount} {menu.eatingCount === 1 ? "meal" : "meals"} to prepare across {prepRows.length}{" "}
+            {prepRows.length === 1 ? "dish" : "dishes"}
           </p>
         </div>
-        <div>
-          <p className="text-muted-foreground text-xs uppercase">Total Staff</p>
-          <p className="text-foreground font-semibold">{totalStaff}</p>
-        </div>
+        <Badge className={cn("self-start sm:self-auto", statusInfo.tone)}>{statusInfo.label}</Badge>
       </div>
 
-      {/* 1 ── the menu, each dish with how many to prepare of it */}
-      <div className="space-y-1 py-2">
-        <p className="text-muted-foreground px-2 text-xs font-semibold uppercase">Menu</p>
-        <div
-          className={cn(
-            "text-muted-foreground grid items-center gap-3 px-2 text-xs font-semibold uppercase",
-            menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
-          )}
-        >
-          {menu.groups.length > 1 && (
-            <SortHeader
-              label="Category"
-              active={prepSort.key === "category"}
-              dir={prepSort.dir}
-              onClick={() => setPrepSort((s) => toggleSort(s, "category", "asc"))}
-            />
-          )}
-          <SortHeader
-            label="Dish"
-            active={prepSort.key === "dish"}
-            dir={prepSort.dir}
-            onClick={() => setPrepSort((s) => toggleSort(s, "dish", "asc"))}
-          />
-          <span className="flex justify-end">
-            <SortHeader
-              label="Count"
-              align="right"
-              active={prepSort.key === "count"}
-              dir={prepSort.dir}
-              onClick={() => setPrepSort((s) => toggleSort(s, "count", "desc"))}
-            />
-          </span>
-        </div>
-        {prepRows.map((tally) => (
-          <div
-            key={tally.option_id}
-            className={cn(
-              "hover:bg-muted/30 grid items-center gap-3 rounded px-2 py-1.5 text-sm",
-              menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
-            )}
-          >
-            {menu.groups.length > 1 && <span className="text-muted-foreground truncate text-xs">{tally.category}</span>}
-            <span className={cn(tally.count === 0 && "text-muted-foreground")}>{tally.name}</span>
-            <div className="flex justify-end">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "border-2 px-2.5 py-0.5 font-semibold",
-                  tally.count > 0 ? dishBadgeClass(tally.name) : "text-muted-foreground/50 border-muted-foreground/20"
-                )}
-              >
-                {tally.count}
-              </Badge>
-            </div>
+      {/* quick stats */}
+      <div className="border-border grid grid-cols-2 border-b sm:grid-cols-5">
+        {stats.map((stat) => (
+          <div key={stat.label} className="border-border px-4 py-3 not-last:border-r max-sm:odd:border-r">
+            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{stat.label}</p>
+            <p className={cn("mt-1 text-lg font-semibold tabular-nums", stat.tone)}>
+              {stat.value}
+              {stat.suffix && <span className="text-muted-foreground ml-1 text-xs font-normal">{stat.suffix}</span>}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* 2 ── the serving list, as a table matching the admin attendance day table */}
-      <div className="space-y-1 py-2">
-        <p className="text-muted-foreground px-2 text-xs font-semibold uppercase">
-          Who gets what{" "}
-          <span className="normal-case">
-            ({eaters.length} {eaters.length === 1 ? "person" : "people"})
-          </span>
-        </p>
-        {eaters.length === 0 ? (
-          <p className="text-muted-foreground px-2 text-xs">Nobody has chosen a meal yet.</p>
-        ) : (
-          <>
-            <div className="text-muted-foreground grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-xs font-semibold uppercase">
-              <span>S/N</span>
+      <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-5">
+        {/* 1 ── the menu, each dish with how many to prepare of it */}
+        <section className="bg-muted/35 min-w-0 space-y-1 rounded-lg p-3" aria-label="Dishes to prepare">
+          <p className="text-muted-foreground px-2 pb-1 text-xs font-semibold tracking-wide uppercase">To prepare</p>
+          <div
+            className={cn(
+              "text-muted-foreground grid items-center gap-3 px-2 text-xs font-semibold uppercase",
+              menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
+            )}
+          >
+            {menu.groups.length > 1 && (
               <SortHeader
-                label="Employee"
-                active={eaterSort.key === "name"}
-                dir={eaterSort.dir}
-                onClick={() => setEaterSort((s) => toggleSort(s, "name", "asc"))}
+                label="Category"
+                active={prepSort.key === "category"}
+                dir={prepSort.dir}
+                onClick={() => setPrepSort((s) => toggleSort(s, "category", "asc"))}
               />
+            )}
+            <SortHeader
+              label="Dish"
+              active={prepSort.key === "dish"}
+              dir={prepSort.dir}
+              onClick={() => setPrepSort((s) => toggleSort(s, "dish", "asc"))}
+            />
+            <span className="flex justify-end">
               <SortHeader
-                label="Department"
-                active={eaterSort.key === "department"}
-                dir={eaterSort.dir}
-                onClick={() => setEaterSort((s) => toggleSort(s, "department", "asc"))}
+                label="Count"
+                align="right"
+                active={prepSort.key === "count"}
+                dir={prepSort.dir}
+                onClick={() => setPrepSort((s) => toggleSort(s, "count", "desc"))}
               />
-              <SortHeader
-                label="Meal"
-                active={eaterSort.key === "meal"}
-                dir={eaterSort.dir}
-                onClick={() => setEaterSort((s) => toggleSort(s, "meal", "asc"))}
-              />
-              <span className="flex justify-end">
-                <SortHeader
-                  label="Voted At"
-                  align="right"
-                  active={eaterSort.key === "voted_at"}
-                  dir={eaterSort.dir}
-                  onClick={() => setEaterSort((s) => toggleSort(s, "voted_at", "desc"))}
-                />
-              </span>
+            </span>
+          </div>
+          {prepRows.map((tally) => (
+            <div
+              key={tally.option_id}
+              className={cn(
+                "hover:bg-muted/30 grid items-center gap-3 rounded px-2 py-1.5 text-sm",
+                menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
+              )}
+            >
+              {menu.groups.length > 1 && (
+                <span className="text-muted-foreground truncate text-xs">{tally.category}</span>
+              )}
+              <span className={cn(tally.count === 0 && "text-muted-foreground")}>{tally.name}</span>
+              <div className="flex justify-end">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-2 px-2.5 py-0.5 font-semibold",
+                    tally.count > 0 ? dishBadgeClass(tally.name) : "text-muted-foreground/50 border-muted-foreground/20"
+                  )}
+                >
+                  {tally.count}
+                </Badge>
+              </div>
             </div>
-            {eaters.map((eater, index) => (
-              <div
-                key={eater.user_id}
-                className="hover:bg-muted/30 grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 rounded px-2 py-1.5 text-sm"
-              >
-                <span className="text-muted-foreground text-xs">{index + 1}</span>
-                <span className="text-foreground truncate font-medium">{eater.full_name}</span>
-                <span className="text-muted-foreground truncate text-xs">{eater.department || "General"}</span>
-                <div>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "border-2 px-2.5 py-0.5 text-xs font-semibold",
-                      eater.combo ? dishBadgeClass(eater.combo) : "text-muted-foreground"
-                    )}
-                  >
-                    {eater.combo || "—"}
-                  </Badge>
-                </div>
-                <span className="text-muted-foreground text-right text-xs">
-                  {eater.voted_at ? formatWATTime(eater.voted_at) : "—"}
+          ))}
+        </section>
+
+        {/* 2 ── the serving list, as a table matching the admin attendance day table */}
+        <section className="min-w-0 space-y-1 overflow-x-auto" aria-label="Who gets what">
+          <p className="text-muted-foreground px-2 pb-1 text-xs font-semibold tracking-wide uppercase">
+            Who gets what{" "}
+            <span className="normal-case">
+              ({eaters.length} {eaters.length === 1 ? "person" : "people"})
+            </span>
+          </p>
+          {eaters.length === 0 ? (
+            <p className="text-muted-foreground px-2 text-xs">Nobody has chosen a meal yet.</p>
+          ) : (
+            <>
+              <div className="text-muted-foreground grid min-w-[560px] grid-cols-[40px_1fr_140px_1fr_90px] items-center gap-3 px-2 text-xs font-semibold uppercase">
+                <span>S/N</span>
+                <SortHeader
+                  label="Employee"
+                  active={eaterSort.key === "name"}
+                  dir={eaterSort.dir}
+                  onClick={() => setEaterSort((s) => toggleSort(s, "name", "asc"))}
+                />
+                <SortHeader
+                  label="Department"
+                  active={eaterSort.key === "department"}
+                  dir={eaterSort.dir}
+                  onClick={() => setEaterSort((s) => toggleSort(s, "department", "asc"))}
+                />
+                <SortHeader
+                  label="Meal"
+                  active={eaterSort.key === "meal"}
+                  dir={eaterSort.dir}
+                  onClick={() => setEaterSort((s) => toggleSort(s, "meal", "asc"))}
+                />
+                <span className="flex justify-end">
+                  <SortHeader
+                    label="Voted At"
+                    align="right"
+                    active={eaterSort.key === "voted_at"}
+                    dir={eaterSort.dir}
+                    onClick={() => setEaterSort((s) => toggleSort(s, "voted_at", "desc"))}
+                  />
                 </span>
               </div>
-            ))}
-          </>
-        )}
+              {eaters.map((eater, index) => (
+                <div
+                  key={eater.user_id}
+                  className="hover:bg-muted/30 grid min-w-[560px] grid-cols-[40px_1fr_140px_1fr_90px] items-center gap-3 rounded px-2 py-1.5 text-sm"
+                >
+                  <span className="text-muted-foreground text-xs">{index + 1}</span>
+                  <span className="text-foreground truncate font-medium">{eater.full_name}</span>
+                  <span className="text-muted-foreground truncate text-xs">{eater.department || "General"}</span>
+                  <div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "border-2 px-2.5 py-0.5 text-xs font-semibold",
+                        eater.combo ? dishBadgeClass(eater.combo) : "text-muted-foreground"
+                      )}
+                    >
+                      {eater.combo || "—"}
+                    </Badge>
+                  </div>
+                  <span className="text-muted-foreground text-right text-xs">
+                    {eater.voted_at ? formatWATTime(eater.voted_at) : "—"}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </section>
       </div>
     </div>
   )
@@ -2638,47 +2685,101 @@ function EmployeeLunchExpandPanel({
     return d.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", weekday: "short", month: "short", day: "numeric" })
   }
 
-  return (
-    <div className="bg-muted/20 space-y-1 border-b px-6 py-4">
-      <div className="text-muted-foreground grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 border-b px-2 pb-2 text-xs font-bold tracking-wider uppercase">
-        <span>Day</span>
-        <span>Status</span>
-        <span>Meal Price</span>
-        <span>Company Subsidy</span>
-        <span>Employee Surcharge</span>
-      </div>
-      <div className="divide-border max-h-[300px] divide-y overflow-y-auto pr-2">
-        {visibleCells.map((dateStr) => {
-          const log = employeeLogs.find((l) => l.date === dateStr)
-          const hasEaten = !!log
-          const dayName = formatDayShort(dateStr)
+  const served = employeeLogs.length
+  const skipped = visibleCells.filter((d) => !employeeLogs.some((l) => l.date === d)).length
+  const totals = employeeLogs.reduce(
+    (sum, log) => ({
+      cost: sum.cost + Number(log.cost),
+      subsidy: sum.subsidy + Number(log.company_subsidy),
+      surcharge: sum.surcharge + Number(log.employee_deduction),
+    }),
+    { cost: 0, subsidy: 0, surcharge: 0 }
+  )
+  const grid = "grid grid-cols-[minmax(120px,1.2fr)_90px_repeat(3,minmax(100px,1fr))] items-center gap-3"
 
-          return (
-            <div
-              key={dateStr}
-              className="hover:bg-muted/40 grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 px-2 py-2.5 text-xs transition-colors duration-150"
-            >
-              <span className="text-foreground font-semibold">{dayName}</span>
-              <div>
-                <Badge
-                  className={
-                    hasEaten
-                      ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                      : "border bg-gray-100 text-gray-400"
-                  }
-                >
-                  {hasEaten ? "Served" : "Skipped"}
-                </Badge>
-              </div>
-              <span className="text-muted-foreground font-mono">₦{hasEaten ? "2,200.00" : "0.00"}</span>
-              <span className="font-mono font-medium text-emerald-600">₦{hasEaten ? "1,100.00" : "0.00"}</span>
-              <span className={`font-mono font-bold ${hasEaten ? "text-red-600" : "text-muted-foreground"}`}>
-                ₦{hasEaten ? "1,100.00" : "0.00"}
-              </span>
-            </div>
-          )
-        })}
+  return (
+    <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+      <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-foreground text-sm font-semibold">
+            {row.full_name} · {formatWATDate(`${selectedMonth}-01`, { month: "long", year: "numeric" })}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {row.department || "No department"}
+            {row.employee_number ? ` · ${row.employee_number}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-success/15 text-success">{served} served</Badge>
+          <Badge variant="outline" className="font-normal">
+            {skipped} skipped
+          </Badge>
+          <Badge className="bg-danger/15 text-danger">Surcharge {formatNaira(totals.surcharge)}</Badge>
+        </div>
       </div>
+
+      {visibleCells.length === 0 ? (
+        <p className="text-muted-foreground p-4 text-sm">No lunch days are set up for this month.</p>
+      ) : (
+        <div className="overflow-x-auto p-4 lg:p-5">
+          <div className="min-w-[560px]">
+            <div
+              className={cn(
+                grid,
+                "text-muted-foreground border-b px-2 pb-2 text-xs font-semibold tracking-wide uppercase"
+              )}
+            >
+              <span>Day</span>
+              <span>Status</span>
+              <span className="text-right">Meal price</span>
+              <span className="text-right">Company subsidy</span>
+              <span className="text-right">Employee surcharge</span>
+            </div>
+            <div className="divide-border max-h-[320px] divide-y overflow-y-auto">
+              {visibleCells.map((dateStr) => {
+                const log = employeeLogs.find((l) => l.date === dateStr)
+                return (
+                  <div key={dateStr} className={cn(grid, "hover:bg-muted/30 px-2 py-2 text-sm transition-colors")}>
+                    <span className={cn("font-medium", !log && "text-muted-foreground")}>
+                      {formatDayShort(dateStr)}
+                    </span>
+                    <div>
+                      {log ? (
+                        <Badge className="bg-success/15 text-success">Served</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground font-normal">
+                          Skipped
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground text-right font-mono text-xs">
+                      {log ? formatNaira(log.cost) : "—"}
+                    </span>
+                    <span className="text-success text-right font-mono text-xs">
+                      {log ? formatNaira(log.company_subsidy) : "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-right font-mono text-xs",
+                        log ? "text-danger font-semibold" : "text-muted-foreground"
+                      )}
+                    >
+                      {log ? formatNaira(log.employee_deduction) : "—"}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className={cn(grid, "border-t px-2 pt-2.5 text-sm font-semibold")}>
+              <span>Month total</span>
+              <span className="text-muted-foreground text-xs font-normal">{served} meals</span>
+              <span className="text-right font-mono text-xs">{formatNaira(totals.cost)}</span>
+              <span className="text-success text-right font-mono text-xs">{formatNaira(totals.subsidy)}</span>
+              <span className="text-danger text-right font-mono text-xs">{formatNaira(totals.surcharge)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
