@@ -178,14 +178,24 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
           </div>
           <div className="min-w-0 flex-1 text-xs">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-foreground font-medium">Direct admin approval</span>
-              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
-                Approved
-              </Badge>
+              <span className="text-foreground font-medium">
+                {isApproved ? "Direct admin approval" : "Direct admin entry"}
+              </span>
+              {isApproved ? (
+                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
+                  Approved
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-600">
+                  Awaiting confirmation
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              {leave.approved_by_profile ? resolvePersonName(leave.approved_by_profile) : "Authorized Admin"}
-              {leave.approved_at && ` • ${formatWATDateTime(leave.approved_at)}`}
+              {resolvePersonName(leave.admin_entry_by_profile ?? leave.approved_by_profile) ||
+                "Admin (name not recorded)"}
+              {(leave.admin_entry_at || leave.approved_at) &&
+                ` • ${formatWATDateTime((leave.admin_entry_at || leave.approved_at) as string)}`}
             </p>
           </div>
         </div>
