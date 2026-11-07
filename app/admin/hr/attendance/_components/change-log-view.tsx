@@ -387,9 +387,6 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                     {r.department} · {daySpan(r)}
                     {r.days.length > 1 ? ` (${dayCount(r)})` : ""}
                   </p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    Changed by {r.actor_name} · {formatWATDateTime(r.changed_at)}
-                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={CATEGORY_CLASSES[r.category]}>{r.change_label}</Badge>
@@ -409,16 +406,31 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                 </div>
               </div>
 
-              <div className="space-y-4 p-4">
-                <div>
+              <div className="space-y-3 p-4">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="bg-muted/35 rounded-lg p-3">
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                      Changed by
+                    </span>
+                    <p className="mt-1 text-sm font-medium">{r.actor_name}</p>
+                  </div>
+                  <div className="bg-muted/35 rounded-lg p-3">
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                      Changed at
+                    </span>
+                    <p className="mt-1 text-sm font-medium">{formatWATDateTime(r.changed_at)}</p>
+                  </div>
+                </div>
+
+                <div className="bg-muted/35 rounded-lg p-4">
                   <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                     Comment
                   </span>
                   <p
                     className={
                       r.comment
-                        ? "text-foreground mt-1 text-sm leading-6 whitespace-pre-wrap"
-                        : "text-muted-foreground mt-1 text-sm italic"
+                        ? "text-foreground mt-2 text-sm leading-6 whitespace-pre-wrap"
+                        : "text-muted-foreground mt-2 text-sm italic"
                     }
                   >
                     {r.comment || "No comment was typed."}
@@ -426,22 +438,22 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                 </div>
 
                 {r.details && (
-                  <div>
+                  <div className="bg-muted/35 rounded-lg p-4">
                     <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                       Recorded by the system
                     </span>
-                    <p className="text-muted-foreground mt-1 text-sm leading-6 whitespace-pre-wrap">{r.details}</p>
+                    <p className="text-muted-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">{r.details}</p>
                   </div>
                 )}
 
                 {r.days.length > 1 && (
-                  <div>
+                  <div className="bg-muted/35 rounded-lg p-4">
                     <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                       Days changed · {r.days.length}
                     </span>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {r.days.map((day) => (
-                        <Badge key={day} variant="outline" className="font-normal">
+                        <Badge key={day} variant="outline" className="bg-background font-normal">
                           {formatWATDate(day, { weekday: "short", day: "numeric", month: "short" })}
                         </Badge>
                       ))}
@@ -450,11 +462,11 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                 )}
 
                 {r.appeal && (
-                  <div>
+                  <div className="bg-muted/35 rounded-lg p-4">
                     <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
                       Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
                     </span>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-2 text-sm">
                       Asked for <strong>{statusText(r.appeal.requested_status)}</strong>
                     </p>
                     {r.appeal.appeal_reason && (
