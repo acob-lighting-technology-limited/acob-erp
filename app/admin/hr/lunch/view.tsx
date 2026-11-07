@@ -2423,7 +2423,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
         .join(" + "),
     }))
 
-  // Flattened prep tallies (all groups, with a category label) for the table below.
+  // Flattened prep tallies (all groups, with a category label), most-ordered first.
   const prepRowsRaw = menu.groups.flatMap((group, index) =>
     menu.tallies
       .filter((t) => t.group_id === group.id && t.option_id !== NOT_EATING_OPTION_ID)
@@ -2434,10 +2434,6 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
   // day in progress actually wants.
   const [eaterSort, setEaterSort] = useState<{ key: "name" | "department" | "meal" | "voted_at"; dir: SortDir }>({
     key: "voted_at",
-    dir: "desc",
-  })
-  const [prepSort, setPrepSort] = useState<{ key: "category" | "dish" | "count"; dir: SortDir }>({
-    key: "count",
     dir: "desc",
   })
 
@@ -2461,17 +2457,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
     }
   })
 
-  const prepRows = [...prepRowsRaw].sort((a, b) => {
-    const dir = prepSort.dir === "asc" ? 1 : -1
-    switch (prepSort.key) {
-      case "category":
-        return dir * (a.category || "").localeCompare(b.category || "")
-      case "dish":
-        return dir * a.name.localeCompare(b.name)
-      case "count":
-        return dir * (a.count - b.count)
-    }
-  })
+  const prepRows = [...prepRowsRaw].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
 
   if (menu.groups.length === 0) {
     return <p className="text-muted-foreground text-xs">No dishes on this menu yet.</p>
@@ -2520,65 +2506,40 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
         ))}
       </div>
 
-      <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-5">
-        {/* 1 ── the menu, each dish with how many to prepare of it */}
-        <section className="bg-muted/35 min-w-0 space-y-1 rounded-lg p-3" aria-label="Dishes to prepare">
-          <p className="text-muted-foreground px-2 pb-1 text-xs font-semibold tracking-wide uppercase">To prepare</p>
-          <div
-            className={cn(
-              "text-muted-foreground grid items-center gap-3 px-2 text-xs font-semibold uppercase",
-              menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
-            )}
-          >
-            {menu.groups.length > 1 && (
-              <SortHeader
-                label="Category"
-                active={prepSort.key === "category"}
-                dir={prepSort.dir}
-                onClick={() => setPrepSort((s) => toggleSort(s, "category", "asc"))}
-              />
-            )}
-            <SortHeader
-              label="Dish"
-              active={prepSort.key === "dish"}
-              dir={prepSort.dir}
-              onClick={() => setPrepSort((s) => toggleSort(s, "dish", "asc"))}
-            />
-            <span className="flex justify-end">
-              <SortHeader
-                label="Count"
-                align="right"
-                active={prepSort.key === "count"}
-                dir={prepSort.dir}
-                onClick={() => setPrepSort((s) => toggleSort(s, "count", "desc"))}
-              />
-            </span>
-          </div>
-          {prepRows.map((tally) => (
-            <div
-              key={tally.option_id}
-              className={cn(
-                "hover:bg-muted/30 grid items-center gap-3 rounded px-2 py-1.5 text-sm",
-                menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
-              )}
-            >
-              {menu.groups.length > 1 && (
-                <span className="text-muted-foreground truncate text-xs">{tally.category}</span>
-              )}
-              <span className={cn(tally.count === 0 && "text-muted-foreground")}>{tally.name}</span>
-              <div className="flex justify-end">
+      <div className="space-y-5 p-4 lg:p-5">
+        {/* 1 ── each dish with how many to prepare of it: a compact strip, so the
+            serving list below gets the full width */}
+        <section aria-label="Dishes to prepare">
+          <p className="text-muted-foreground pb-2 text-xs font-semibold tracking-wide uppercase">To prepare</p>
+          <div className="flex flex-wrap gap-2">
+            {prepRows.map((tally) => (
+              <div
+                key={tally.option_id}
+                className={cn(
+                  "bg-muted/35 flex max-w-full items-center gap-3 rounded-lg border px-3 py-2",
+                  tally.count === 0 && "opacity-60"
+                )}
+              >
+                <div className="min-w-0">
+                  {tally.category && (
+                    <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                      {tally.category}
+                    </p>
+                  )}
+                  <p className="text-sm leading-5">{tally.name}</p>
+                </div>
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border-2 px-2.5 py-0.5 font-semibold",
-                    tally.count > 0 ? dishBadgeClass(tally.name) : "text-muted-foreground/50 border-muted-foreground/20"
+                    "shrink-0 border-2 px-2.5 py-0.5 font-semibold tabular-nums",
+                    tally.count > 0 ? dishBadgeClass(tally.name) : "text-muted-foreground border-muted-foreground/20"
                   )}
                 >
                   {tally.count}
                 </Badge>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
 
         {/* 2 ── the serving list, as a table matching the admin attendance day table */}
@@ -2593,7 +2554,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
             <p className="text-muted-foreground px-2 text-xs">Nobody has chosen a meal yet.</p>
           ) : (
             <>
-              <div className="text-muted-foreground grid min-w-[560px] grid-cols-[40px_1fr_140px_1fr_90px] items-center gap-3 px-2 text-xs font-semibold uppercase">
+              <div className="text-muted-foreground grid min-w-[560px] grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-xs font-semibold uppercase">
                 <span>S/N</span>
                 <SortHeader
                   label="Employee"
@@ -2626,7 +2587,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
               {eaters.map((eater, index) => (
                 <div
                   key={eater.user_id}
-                  className="hover:bg-muted/30 grid min-w-[560px] grid-cols-[40px_1fr_140px_1fr_90px] items-center gap-3 rounded px-2 py-1.5 text-sm"
+                  className="hover:bg-muted/30 grid min-w-[560px] grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 rounded px-2 py-1.5 text-sm"
                 >
                   <span className="text-muted-foreground text-xs">{index + 1}</span>
                   <span className="text-foreground truncate font-medium">{eater.full_name}</span>
