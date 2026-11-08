@@ -37,6 +37,12 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "Projects",
+        items: [
+          "Registered missing operational and under-construction mini-grid projects (Onipanu, Erinla, and Bondu) in the projects catalogue",
+        ],
+      },
+      {
         area: "UI & Badges",
         items: [
           "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
