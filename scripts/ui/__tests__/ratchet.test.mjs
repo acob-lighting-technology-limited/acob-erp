@@ -197,3 +197,22 @@ test("cli: a new file cannot pay for an old one, and a brand new violation fails
     fs.rmSync(p.dir, { recursive: true, force: true })
   }
 })
+
+test("cli: reports file-lines separately from violation counts", () => {
+  const p = project({
+    "components/a.tsx": '<p className="text-[10px] text-[11px]" />',
+    "components/big.tsx": "const a = 1\n".repeat(1100),
+  })
+  try {
+    p.run("--update", "--allow-increase")
+    p.write("components/a.tsx", '<p className="text-[10px]" />')
+    p.write("components/big.tsx", "const a = 1\n".repeat(1050))
+    const r = p.run()
+    assert.equal(r.status, 0)
+    assert.match(r.stdout, /1 fewer violation\(s\)/)
+    assert.doesNotMatch(r.stdout, /51 fewer violation\(s\)/)
+    assert.match(r.stdout, /file-lines: 50 fewer lines in files over 1,000 lines/)
+  } finally {
+    fs.rmSync(p.dir, { recursive: true, force: true })
+  }
+})
