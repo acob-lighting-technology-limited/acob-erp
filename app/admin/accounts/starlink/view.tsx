@@ -63,10 +63,24 @@ function kitStatus(kit: StarlinkKitListRow): string {
 }
 
 function MonthBadge({ kit }: { kit: StarlinkKitListRow }) {
-  if (!kit.is_active) return <Badge variant="secondary">Inactive</Badge>
-  if (!kit.latest_month) return <Badge variant="outline">No bills yet</Badge>
-  const m = MONTH_LABELS[kit.latest_month.status]
-  return <Badge className={cn("font-normal", m.className)}>{m.label}</Badge>
+  const status = !kit.is_active ? (
+    <Badge variant="secondary">Inactive</Badge>
+  ) : !kit.latest_month ? (
+    <Badge variant="outline">No bills yet</Badge>
+  ) : (
+    <Badge className={cn("font-normal", MONTH_LABELS[kit.latest_month.status].className)}>
+      {MONTH_LABELS[kit.latest_month.status].label}
+    </Badge>
+  )
+  if (!kit.service_end_date) return status
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {status}
+      <Badge variant="outline" className="font-normal text-amber-600">
+        Ends {formatDay(kit.service_end_date)}
+      </Badge>
+    </span>
+  )
 }
 
 export function StarlinkKitsPage() {

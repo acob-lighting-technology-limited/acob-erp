@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { addOneMonthISO, classifyStarlinkMail, htmlToText, parseStarlinkMail } from "../billing-mail"
+import { addOneMonthISO, BILLING_KINDS, classifyStarlinkMail, htmlToText, parseStarlinkMail } from "../billing-mail"
 
 // Text as it arrives in the ict mailbox (account numbers are real kit accounts).
 const REMINDER = `[Starlink]
@@ -68,4 +68,36 @@ test("adds a month, clamping to the last day", () => {
   assert.equal(addOneMonthISO("2026-04-03"), "2026-05-03")
   assert.equal(addOneMonthISO("2026-12-22"), "2027-01-22")
   assert.equal(addOneMonthISO("2026-01-31"), "2026-02-28")
+})
+
+const ENDING = `[Starlink]
+Service Ending Soon
+Your request to stop service has been processed. Service Ending Thursday December 3, 2026
+Your last day of service at Ulorin, Edo for ACC-DF-10220671-51752-35 is Thursday December 3, 2026.
+This message was sent to ajegunle@org.acoblighting.com for account ACC-DF-10220671-51752-35.`
+
+const ACTIVATED = `[Starlink]
+Activation Confirmation
+You've successfully activated your Starlink service! Your Starlink service is billed on activation. NGN 57,000.00
+This message was sent to bondu@org.acoblighting.com for account ACC-DF-10224272-87960-46.`
+
+test("classifies service emails as service kinds, not billing", () => {
+  assert.equal(classifyStarlinkMail("Service Activation Confirmation"), "activated")
+  assert.equal(classifyStarlinkMail("Service Ending Soon"), "ending")
+  assert.equal(BILLING_KINDS.has("activated"), false)
+  assert.equal(BILLING_KINDS.has("ending"), false)
+  assert.equal(BILLING_KINDS.has("reminder"), true)
+})
+
+test("reads the last day of service from a stop-service email", () => {
+  const parsed = parseStarlinkMail("ending", ENDING)
+  assert.equal(parsed.accountNumber, "ACC-DF-10220671-51752-35")
+  assert.equal(parsed.serviceEndDate, "2026-12-03")
+  assert.equal(parsed.amount, null)
+})
+
+test("reads the account from an activation email", () => {
+  const parsed = parseStarlinkMail("activated", ACTIVATED)
+  assert.equal(parsed.accountNumber, "ACC-DF-10224272-87960-46")
+  assert.equal(parsed.serviceEndDate, null)
 })
