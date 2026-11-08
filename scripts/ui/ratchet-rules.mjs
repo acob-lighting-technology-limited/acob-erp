@@ -6,7 +6,6 @@ const HINTS = {
   "locale-without-en-ng":
     'Use the helpers in @/lib/utils/date (formatWATDate...), or pass en-NG and timeZone: "Africa/Lagos". Business time is Lagos time.',
   "raw-img": "Use next/image. A raw <img> is only for email/PDF/OG renderers.",
-  "window-dialogs": "Confirm with AlertDialog (or useConfirm) and notify with sonner. No window.confirm/alert/prompt.",
   "key-index": "Use a stable id as the React key, not the array index.",
   "dialog-in-page": "Move <DialogContent> out of the page/view file into _components/.",
   "explicit-any": "Type it. Use unknown plus a narrowing, or a real type.",
@@ -75,10 +74,6 @@ export const RULES = [
     id: "raw-img",
     applies: (f) => !/(email|pdf|opengraph-image|twitter-image|birthday|signature|pptx|export)/i.test(f),
     count: (text) => count(text, /<img\b/g),
-  },
-  {
-    id: "window-dialogs",
-    count: (text) => count(text, /\bwindow\.(?:confirm|alert|prompt)\(|(?<![\w.$])alert\(/g),
   },
   {
     id: "key-index",

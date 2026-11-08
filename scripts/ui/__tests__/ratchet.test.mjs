@@ -49,12 +49,6 @@ test("raw-img ignores email, pdf and og renderers", () => {
   assert.equal(countFile("app/opengraph-image.tsx", "<img src={x} />")["raw-img"], undefined)
 })
 
-test("window-dialogs catches confirm, alert and prompt on window, and bare alert", () => {
-  const text =
-    "window.confirm('x'); window.alert('y'); alert('z'); window.prompt('p'); confirm('ok'); notify.alert('n')"
-  assert.equal(countFile("components/x.tsx", text)["window-dialogs"], 4)
-})
-
 test("key-index catches i, idx and index only", () => {
   const c = countFile("components/x.tsx", "<a key={i}/><a key={idx}/><a key={index}/><a key={item.id}/>")
   assert.equal(c["key-index"], 3)

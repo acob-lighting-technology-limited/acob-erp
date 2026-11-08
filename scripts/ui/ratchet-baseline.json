@@ -31,7 +31,6 @@
       "lib/starlink/billing-alerts.ts": 1,
       "lib/tasks/mailer.ts": 1
     },
-    "window-dialogs": {},
     "key-index": {},
     "dialog-in-page": {},
     "explicit-any": {

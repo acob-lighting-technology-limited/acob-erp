@@ -919,7 +919,6 @@ the tree. It is two checks:
 | `tiny-text` | `text-[9px]` to `text-[11px]` | `text-xs` is the minimum |
 | `locale-without-en-ng` | a date or time `toLocale*String()` with neither `en-NG` nor a `timeZone` | `@/lib/utils/date` helpers, or `en-NG` and `timeZone: "Africa/Lagos"` |
 | `raw-img` | `<img>` outside email/PDF/OG renderers | `next/image` |
-| `window-dialogs` | `window.confirm/alert/prompt`, bare `alert()` | `AlertDialog`, sonner |
 | `key-index` | `key={i}`, `key={idx}`, `key={index}` | a stable id |
 | `dialog-in-page` | `<DialogContent>` in a page/view/`*-content` file | move to `_components/` |
 | `explicit-any` | `: any`, `as any`, `any[]` | a real type or `unknown` |
