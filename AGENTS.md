@@ -933,6 +933,10 @@ the tree. It is two checks:
 | `page-missing-metadata` | server `page.tsx` without `metadata` | export a title |
 | `title-brand-suffix` | a page title that already ends in `| Matrix` or `| ACOB…` | the root layout adds the brand; write only the page name |
 | `file-lines` | a file over 1,000 lines, by its length | extract; never grow it |
+| `api-error-message` | `NextResponse.json({ error: <ident>.message` | log with logger, return generic message |
+| `route-without-zod` | API route calling `request.json()` with no zod validation | validate the body with zod |
+| `local-number-format` | `new Intl.NumberFormat` in app/components/hooks | use `@/lib/utils` shared formatters |
+| `hand-h1` | `<h1\b` outside allowlisted standalone pages | `PageHeader` |
 
 Working with it:
 

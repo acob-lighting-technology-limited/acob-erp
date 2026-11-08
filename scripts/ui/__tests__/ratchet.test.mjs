@@ -92,9 +92,18 @@ test("fixed-px-width ignores widths under 400px and responsive-prefixed ones", (
   assert.equal(c["fixed-px-width"], 2)
 })
 
-test("click-div flags a clickable div on one line", () => {
+test("click-div flags clickable divs on single line or across lines, and honors stopPropagation", () => {
   assert.equal(countFile("components/x.tsx", "<div className='a' onClick={go}>")["click-div"], 1)
+  assert.equal(countFile("components/x.tsx", "<div\n  className='a'\n  onClick={go}\n>")["click-div"], 1)
   assert.equal(countFile("components/x.tsx", "<button onClick={go}>")["click-div"], undefined)
+  assert.equal(
+    countFile("components/x.tsx", "<div onClick={(e) => e.stopPropagation()}>")["click-div"],
+    undefined
+  )
+  assert.equal(
+    countFile("components/x.tsx", "<div\n  onClick={() => event.stopPropagation()}\n>")["click-div"],
+    undefined
+  )
 })
 
 test("client-page and page-missing-metadata only apply to page.tsx and agree with each other", () => {
@@ -136,6 +145,52 @@ test("title-brand-suffix flags a hand-written brand suffix in app/ but not a pla
   assert.equal(countFile("app/hr/leave/page.tsx", good)["title-brand-suffix"], undefined)
   assert.equal(countFile("app/layout.tsx", 'title: "Matrix | Matrix"')["title-brand-suffix"], undefined)
   assert.equal(countFile("components/x.tsx", bad)["title-brand-suffix"], undefined)
+})
+
+test("api-error-message flags returning error.message in NextResponse.json", () => {
+  const bad1 = 'return NextResponse.json({ error: error.message }, { status: 500 })'
+  const bad2 = 'return NextResponse.json({ error: err.message }, { status: 400 })'
+  const bad3 = 'return NextResponse.json({ error: kitError?.message ?? "failed" })'
+  const good1 = 'return NextResponse.json({ error: "Something went wrong" })'
+  const good2 = 'return NextResponse.json({ error: parsed.error.issues[0]?.message })'
+  const good3 = 'logger.error(error.message)'
+  assert.equal(countFile("app/api/foo/route.ts", bad1)["api-error-message"], 1)
+  assert.equal(countFile("app/api/foo/route.ts", bad2)["api-error-message"], 1)
+  assert.equal(countFile("app/api/foo/route.ts", bad3)["api-error-message"], 1)
+  assert.equal(countFile("app/api/foo/route.ts", good1)["api-error-message"], undefined)
+  assert.equal(countFile("app/api/foo/route.ts", good2)["api-error-message"], undefined)
+  assert.equal(countFile("app/api/foo/route.ts", good3)["api-error-message"], undefined)
+  assert.equal(countFile("components/foo.tsx", bad1)["api-error-message"], undefined)
+})
+
+test("route-without-zod flags route.ts reading json body without zod validation", () => {
+  const bad1 = 'export async function POST(req) { const body = await req.json(); return ok() }'
+  const bad2 = 'export async function POST(request) { const data = await request.json() }'
+  const withImport = 'import { z } from "zod"; export async function POST(req) { const b = await req.json() }'
+  const withZObject = 'export async function POST(req) { const b = await req.json(); const schema = z.object({}) }'
+  const noJson = 'export async function GET(req) { return NextResponse.json({ ok: true }) }'
+  assert.equal(countFile("app/api/test/route.ts", bad1)["route-without-zod"], 1)
+  assert.equal(countFile("app/api/test/route.ts", bad2)["route-without-zod"], 1)
+  assert.equal(countFile("app/api/test/route.ts", withImport)["route-without-zod"], undefined)
+  assert.equal(countFile("app/api/test/route.ts", withZObject)["route-without-zod"], undefined)
+  assert.equal(countFile("app/api/test/route.ts", noJson)["route-without-zod"], undefined)
+  assert.equal(countFile("app/api/test/helper.ts", bad1)["route-without-zod"], undefined)
+})
+
+test("local-number-format flags new Intl.NumberFormat in app, components, hooks, but not lib/utils", () => {
+  const text = 'const fmt = new Intl.NumberFormat("en-NG")'
+  assert.equal(countFile("app/page.tsx", text)["local-number-format"], 1)
+  assert.equal(countFile("components/table.tsx", text)["local-number-format"], 1)
+  assert.equal(countFile("hooks/use-money.ts", text)["local-number-format"], 1)
+  assert.equal(countFile("lib/utils/format.ts", text)["local-number-format"], undefined)
+  assert.equal(countFile("lib/some-other-file.ts", text)["local-number-format"], undefined)
+})
+
+test("hand-h1 flags h1 tags in app except allowlisted standalone pages", () => {
+  const text = '<h1 className="title">Hello</h1>'
+  assert.equal(countFile("app/admin/dashboard/view.tsx", text)["hand-h1"], 1)
+  assert.equal(countFile("components/header.tsx", text)["hand-h1"], undefined)
+  assert.equal(countFile("app/birthday/page.tsx", text)["hand-h1"], undefined)
 })
 
 // --- the CLI, end to end, against a throwaway project ---------------------------------------
