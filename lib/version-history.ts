@@ -37,6 +37,14 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "Starlink & Payments",
+        items: [
+          "Populated missing states across Starlink accounts (Adewole, Bondu, Olooji, Sule) to match their community projects",
+          "Improved Starlink Kits table: added kit count to tab, displayed kit numbers alongside account IDs, and rearranged columns so status and schedule appear before monthly billing amounts",
+          "Converted payment details from an overlaid modal into a dedicated full page with return navigation to Starlink when opened via Open Payment",
+        ],
+      },
+      {
         area: "Projects",
         items: [
           "Registered missing operational and under-construction mini-grid projects (Onipanu, Erinla, and Bondu) in the projects catalogue",

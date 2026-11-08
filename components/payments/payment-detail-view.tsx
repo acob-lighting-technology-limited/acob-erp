@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,6 @@ import {
 } from "date-fns"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { ScheduleList } from "@/components/payments/schedule-list"
 import { PaymentEditDialog } from "@/components/payments/payment-edit-dialog"
 import { PaymentUploadDialog } from "@/components/payments/payment-upload-dialog"
@@ -94,7 +93,12 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
   const detailKey =
     scope === "admin" ? QUERY_KEYS.adminPaymentDetail(paymentId) : QUERY_KEYS.appPaymentDetail(paymentId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
+
+  const fromParam = searchParams.get("from")
+  const backHref = fromParam || basePath
+  const backLabel = fromParam?.includes("starlink") ? "Back to Starlink" : "Back to Payments"
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -222,7 +226,7 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
 
       if (response.ok) {
         toast.success("Payment deleted successfully")
-        router.push(basePath)
+        router.push(backHref)
       } else {
         const data = await response.json()
         toast.error(data.error || "Failed to delete payment")
@@ -407,8 +411,8 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Payment not found</p>
-        <Link href={basePath}>
-          <Button variant="outline">Back to Payments</Button>
+        <Link href={backHref}>
+          <Button variant="outline">{backLabel}</Button>
         </Link>
       </div>
     )
@@ -428,171 +432,159 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
   })()
 
   return (
-    <Dialog defaultOpen onOpenChange={(open) => !open && router.push(basePath, { scroll: false })}>
-      <DialogContent
-        className="max-h-[82vh] w-[96vw] max-w-3xl overflow-y-auto p-0"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-      >
-        <div className="from-background via-background to-muted/20 bg-gradient-to-br p-3 md:p-4">
-          <div className="mx-auto max-w-3xl space-y-4">
-            <PageHeader
-              title={payment.title}
-              description={
-                payment.payment_type === "recurring"
-                  ? `Repeats ${payment.recurrence_period}`
-                  : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`
-              }
-              backLink={{ href: basePath, label: "Back to Payments" }}
-              actions={
-                <div className="flex flex-wrap gap-2">
-                  <Badge className={getStatusColor(realStatus)}>{realStatus}</Badge>
-                  {payment.payment_type === "recurring" && payment.next_payment_due && (
-                    <Badge
-                      variant="outline"
-                      className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
-                    >
-                      Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
-                    </Badge>
-                  )}
-                  {(realStatus === "due" || realStatus === "overdue") && hasReceiptForMark && (
-                    <Button onClick={() => markAsPaid()}>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-label="More actions" variant="outline" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleEditClick}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Payment
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Download Receipt
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Payment
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              }
-            />
-
-            <div className="grid gap-6 md:grid-cols-3">
-              <div className="space-y-6 md:col-span-2">
-                {payment.payment_type === "recurring" && (
-                  <>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Calendar className="h-5 w-5" />
-                          Upcoming Schedule
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ScheduleList
-                          items={schedule.filter((i) => i.status !== "paid")}
-                          receiptsEnabled={paymentUsesReceipts(payment)}
-                          onUpload={handleUploadClick}
-                          onView={(_, doc) => downloadPaymentDocument(doc)}
-                          onMarkPaid={markAsPaid}
-                          onReplace={handleReplaceClick}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    {schedule.some((i) => i.status === "paid") && (
-                      <Card className="mt-6">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5" />
-                            Payment History
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ScheduleList
-                            items={schedule.filter((i) => i.status === "paid")}
-                            receiptsEnabled={paymentUsesReceipts(payment)}
-                            onUpload={handleUploadClick}
-                            onView={(_, doc) => downloadPaymentDocument(doc)}
-                            onReplace={handleReplaceClick}
-                          />
-                        </CardContent>
-                      </Card>
-                    )}
-                  </>
-                )}
-
-                <PaymentInfoCard payment={payment} formatCurrency={formatCurrency} />
-              </div>
-
-              <div className="space-y-6">
-                <PaymentMetaCard payment={payment} />
-              </div>
-            </div>
-          </div>
-
-          <PaymentEditDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            formData={editFormData}
-            onFormDataChange={setEditFormData}
-            onSubmit={handleUpdate}
-            updating={updating}
-            departments={departments}
-            categories={categories}
-            showPaymentTypeField={true}
-          />
-
-          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the payment record and remove it from our
-                  servers.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-                <Button variant="destructive" onClick={handleDelete} loading={deleteLoading}>
-                  Delete
+    <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6 md:px-6">
+      <PageHeader
+        title={payment.title}
+        description={
+          payment.payment_type === "recurring"
+            ? `Repeats ${payment.recurrence_period}`
+            : `One-time payment on ${payment.payment_date ? format(parseISO(payment.payment_date), "PPP") : "N/A"}`
+        }
+        backLink={{ href: backHref, label: backLabel }}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Badge className={getStatusColor(realStatus)}>{realStatus}</Badge>
+            {payment.payment_type === "recurring" && payment.next_payment_due && (
+              <Badge
+                variant="outline"
+                className="border-primary/20 text-primary bg-primary/5 border-2 px-2 py-0.5 text-sm font-medium"
+              >
+                Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
+              </Badge>
+            )}
+            {(realStatus === "due" || realStatus === "overdue") && hasReceiptForMark && (
+              <Button onClick={() => markAsPaid()}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {payment.payment_type === "recurring" ? "Mark Current Due as Paid" : "Mark as Paid"}
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button aria-label="More actions" variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEditClick}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Payment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Download Receipt
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Payment
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
+      />
 
-          <PaymentUploadDialog
-            open={uploadDialogOpen}
-            onOpenChange={(open) => {
-              setUploadDialogOpen(open)
-              if (!open) setReplaceDocumentId(null)
-            }}
-            uploadDate={uploadDate}
-            uploadType={uploadType}
-            uploading={uploading}
-            replaceDocumentId={replaceDocumentId}
-            onSubmit={handleFileUpload}
-          />
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="space-y-6 md:col-span-2">
+          {payment.payment_type === "recurring" && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Upcoming Schedule
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScheduleList
+                    items={schedule.filter((i) => i.status !== "paid")}
+                    receiptsEnabled={paymentUsesReceipts(payment)}
+                    onUpload={handleUploadClick}
+                    onView={(_, doc) => downloadPaymentDocument(doc)}
+                    onMarkPaid={markAsPaid}
+                    onReplace={handleReplaceClick}
+                  />
+                </CardContent>
+              </Card>
 
-          <PrintReceiptDialog
-            open={printDialogOpen}
-            onOpenChange={setPrintDialogOpen}
-            schedule={schedule}
-            onDownloadDocument={downloadPaymentDocument}
-          />
+              {schedule.some((i) => i.status === "paid") && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Payment History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScheduleList
+                      items={schedule.filter((i) => i.status === "paid")}
+                      receiptsEnabled={paymentUsesReceipts(payment)}
+                      onUpload={handleUploadClick}
+                      onView={(_, doc) => downloadPaymentDocument(doc)}
+                      onReplace={handleReplaceClick}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          <PaymentInfoCard payment={payment} formatCurrency={formatCurrency} />
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-6">
+          <PaymentMetaCard payment={payment} />
+        </div>
+      </div>
+
+      <PaymentEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        formData={editFormData}
+        onFormDataChange={setEditFormData}
+        onSubmit={handleUpdate}
+        updating={updating}
+        departments={departments}
+        categories={categories}
+        showPaymentTypeField={true}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the payment record and remove it from our
+              servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} loading={deleteLoading}>
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <PaymentUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => {
+          setUploadDialogOpen(open)
+          if (!open) setReplaceDocumentId(null)
+        }}
+        uploadDate={uploadDate}
+        uploadType={uploadType}
+        uploading={uploading}
+        replaceDocumentId={replaceDocumentId}
+        onSubmit={handleFileUpload}
+      />
+
+      <PrintReceiptDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        schedule={schedule}
+        onDownloadDocument={downloadPaymentDocument}
+      />
+    </div>
   )
 }
