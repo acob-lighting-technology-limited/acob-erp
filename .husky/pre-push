@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Read refs git passes on stdin before running checks (<local ref> <local sha> <remote ref> <remote sha>)
+pushed_refs=""
+if [ ! -t 0 ]; then
+  pushed_refs=$(cat)
+fi
+
 # Prevent direct pushes to main branch
 protected_branch='main'
 current_branch=$(git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
@@ -31,12 +37,35 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "Running UI guard (audit + ratchet) before push..."
-npm run ui:guard
+echo "Running UI guard (audit + ratchet) on pushed commit(s)..."
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_sha" ] && continue
+  case "$local_sha" in
+    *[!0]*)
+      tmp=$(mktemp -d)
+      if [ ! -d "$tmp" ]; then
+        echo "Failed to create temporary directory for UI guard."
+        exit 1
+      fi
 
-if [ $? -ne 0 ]; then
-  echo "UI guard failed! Push aborted."
-  exit 1
-fi
+      if ! git archive "$local_sha" | tar -x -C "$tmp"; then
+        echo "Failed to export commit $local_sha for UI guard."
+        rm -rf "$tmp"
+        exit 1
+      fi
+
+      (cd "$tmp" && node scripts/ui/audit-reusables.mjs && node scripts/ui/ratchet.mjs)
+      status=$?
+      rm -rf "$tmp"
+
+      if [ $status -ne 0 ]; then
+        echo "UI guard failed on commit $local_sha! Push aborted."
+        exit 1
+      fi
+      ;;
+  esac
+done <<EOF
+$pushed_refs
+EOF
 
 echo "Checks passed. Proceeding with push..."

@@ -1,7 +1,9 @@
 # UI Consistency Tooling
 
-Enforcement scripts for UI standards. `npm run ui:guard` runs `ui:audit` and `ui:ratchet`; it is part of the
-pre-push hook and of CI. The standards themselves are in `AGENTS.md` ("UI guard" and "Page Types Standard").
+Enforcement scripts for UI standards. In the pre-push hook, the UI guard checks the pushed commit
+(exported to a temp dir so working-tree work does not block pushes); in CI or locally, `npm run ui:guard`
+runs `ui:audit` and `ui:ratchet` on the tree. The standards themselves are in `AGENTS.md` ("UI guard" and
+"Page Types Standard").
 
 ## Scripts
 

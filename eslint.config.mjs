@@ -30,6 +30,7 @@ export default defineConfig([
       "import/no-anonymous-default-export": "off",
       "@next/next/no-img-element": "warn",
       "prefer-const": "error",
+      "no-alert": "error",
       "no-restricted-syntax": [
         "warn",
         {
@@ -105,5 +106,5 @@ export default defineConfig([
       "no-restricted-syntax": "off",
     },
   },
-  globalIgnores(["scripts/**"]),
+  globalIgnores(["scripts/**", "public/vendor/**"]),
 ])
