@@ -6,7 +6,11 @@
  * Pure parsing only — no I/O — so it can be tested against real email text.
  */
 
-export type StarlinkMailKind = "reminder" | "processed" | "failed"
+/**
+ * Billing kinds (reminder / processed / failed) move money; service kinds
+ * (activated / ending) only say whether a kit is still in service.
+ */
+export type StarlinkMailKind = "reminder" | "processed" | "failed" | "activated" | "ending"
 
 export type ParsedStarlinkMail = {
   kind: StarlinkMailKind
@@ -18,13 +22,34 @@ export type ParsedStarlinkMail = {
   /** Billing period, ISO dates. Only reminders state it. */
   periodStart: string | null
   periodEnd: string | null
+  /** The last day of service, ISO date. Only "Service Ending" emails state it. */
+  serviceEndDate: string | null
 }
 
 const SUBJECT_KINDS: Record<string, StarlinkMailKind> = {
   "automatic payment reminder": "reminder",
   "payment processed": "processed",
   "starlink payment failed": "failed",
+  "service activation confirmation": "activated",
+  "service ending soon": "ending",
 }
+
+const MONTHS = [
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+]
+
+export const BILLING_KINDS: ReadonlySet<StarlinkMailKind> = new Set(["reminder", "processed", "failed"])
 
 export const STARLINK_SENDER = "no-reply@starlink.com"
 
@@ -109,11 +134,28 @@ export function parseStarlinkMail(
     periodEnd = usDateToISO(period[4], period[5], period[6])
   }
 
+  // "Service Ending Thursday December 3, 2026": the last day of service.
+  let serviceEndDate: string | null = null
+  if (kind === "ending") {
+    const end = text.match(/Service Ending\s+[A-Za-z]+\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i)
+    const monthIndex = end ? MONTHS.indexOf(end[1].toLowerCase()) : -1
+    if (end && monthIndex >= 0) {
+      serviceEndDate = `${end[3]}-${String(monthIndex + 1).padStart(2, "0")}-${String(Number(end[2])).padStart(2, "0")}`
+    }
+  }
+
+  // Service emails carry no billing amount we file; an activation's price is shown for context.
   const amountLabel =
-    kind === "processed" ? /\bAmount\b/ : kind === "failed" ? /Payment Amount/ : /Statement Period|Current Balance/
+    kind === "processed"
+      ? /\bAmount\b/
+      : kind === "failed"
+        ? /Payment Amount/
+        : kind === "reminder"
+          ? /Statement Period|Current Balance/
+          : null
   // A reminder's amount follows its period on the same line, so skip past the dates.
   const amountSource = kind === "reminder" && period ? text.slice(text.indexOf(period[0]) + period[0].length) : text
-  const money = firstAmount(amountSource, kind === "reminder" && period ? null : amountLabel)
+  const money = kind === "ending" ? null : firstAmount(amountSource, kind === "reminder" && period ? null : amountLabel)
 
   return {
     kind,
@@ -123,6 +165,7 @@ export function parseStarlinkMail(
     invoiceNumber,
     periodStart,
     periodEnd,
+    serviceEndDate,
   }
 }
 

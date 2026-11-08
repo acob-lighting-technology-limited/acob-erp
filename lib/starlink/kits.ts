@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { BILLING_KINDS, type StarlinkMailKind } from "@/lib/starlink/billing-mail"
 import { classifyStarlinkMonths, type StarlinkMonth } from "@/lib/starlink/billing-schedule"
 
 /** A Starlink kit as the kits page lists it. `serial_number` is the ACC-... account. */
@@ -10,6 +11,8 @@ export type StarlinkKitListRow = {
   kit_number: string | null
   email: string | null
   is_active: boolean
+  /** Last day of service after a "Service Ending" email; null while in service. */
+  service_end_date: string | null
   project: { id: string; project_name: string } | null
   payment: {
     id: string
@@ -41,7 +44,7 @@ type KitDbRow = Omit<StarlinkKitListRow, "project" | "payment" | "latest_month">
 }
 
 type EventDbRow = {
-  kind: "reminder" | "processed" | "failed"
+  kind: StarlinkMailKind
   received_at: string
   site_id: string | null
   account_number: string | null
@@ -61,7 +64,9 @@ export async function loadStarlinkKits(supabase: SupabaseClient): Promise<Starli
   const [kitsRes, paymentsRes, eventsRes] = await Promise.all([
     supabase
       .from("starlink_sites")
-      .select("id, site_name, state, serial_number, kit_number, email, is_active, project:projects(id, project_name)")
+      .select(
+        "id, site_name, state, serial_number, kit_number, email, is_active, service_end_date, project:projects(id, project_name)"
+      )
       .order("site_name"),
     supabase
       .from("department_payments")
@@ -111,12 +116,14 @@ export async function loadStarlinkKits(supabase: SupabaseClient): Promise<Starli
   const now = new Date()
   const kits: StarlinkKitListRow[] = ((kitsRes.data || []) as KitDbRow[]).map((kit) => {
     const months = classifyStarlinkMonths(
-      (eventsBySite.get(kit.id) ?? []).map((e) => ({
-        kind: e.kind,
-        receivedAt: e.received_at,
-        periodStart: e.period_start,
-        waiting: e.outcome === "waiting",
-      })),
+      (eventsBySite.get(kit.id) ?? [])
+        .filter((e) => BILLING_KINDS.has(e.kind))
+        .map((e) => ({
+          kind: e.kind,
+          receivedAt: e.received_at,
+          periodStart: e.period_start,
+          waiting: e.outcome === "waiting",
+        })),
       now
     )
     return {
