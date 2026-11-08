@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Check, Copy, Edit, FileSignature, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { DetailList, SectionHeading } from "@/components/ui/detail-list"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -18,14 +19,21 @@ import { EmployeeEditForm } from "./employee-edit-form"
 import type { EmployeeProfileSheetProps } from "./EmployeeProfileSheet"
 import { useDepartments } from "@/hooks/use-departments"
 import { useOfficeLocations } from "@/hooks/use-office-locations"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import type { EmployeeMailboxActions } from "@/lib/employees/mailbox-state"
+
+function formatEmploymentType(type: "full_time" | "part_time" | "contract" | null | undefined) {
+  if (!type) return "Employee"
+  return type.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
 
 export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
   const { employee, modalViewMode, setModalViewMode, onOpenChange, isOpen, canManageUsers } = props
   const { departments } = useDepartments()
   const { officeLocations } = useOfficeLocations()
+  const staffAvatars = useStaffAvatars()
   const supabase = createClient()
   const [copied, setCopied] = useState(false)
   const name = employee ? `${formatName(employee.first_name)} ${formatName(employee.last_name)}` : "Employee"
@@ -80,6 +88,9 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
     onOpenChange(false)
     setModalViewMode("profile")
   }
+  const employmentType = formatEmploymentType(employee.employment_type)
+  const leadingDepartments = employee.lead_departments ?? []
+  const isDepartmentLead = employee.is_department_lead || leadingDepartments.length > 0
 
   return (
     <>
@@ -87,14 +98,28 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
         open={isOpen && (modalViewMode === "profile" || modalViewMode === "employment")}
         onOpenChange={(open) => !open && close()}
         title={name}
-        leading={<StaffAvatar name={name} profileId={employee.id} size="md" className="border" />}
+        titleAside={<Badge variant="secondary">{employmentType}</Badge>}
+        leading={
+          <StaffAvatar
+            name={name}
+            src={staffAvatars[employee.id] ?? employee.avatar_url}
+            profileId={employee.id}
+            size="xl"
+            className="border-background border-2 shadow-sm"
+          />
+        }
         description={
           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
             <span>{employee.designation || "Employee"}</span>
             {employee.department && <span className="text-muted-foreground">· {employee.department}</span>}
           </span>
         }
-        badges={<EmployeeStatusBadge status={employee.employment_status || "active"} />}
+        badges={
+          <>
+            <EmployeeStatusBadge status={employee.employment_status || "active"} />
+            {isDepartmentLead && <Badge variant="outline">Department lead</Badge>}
+          </>
+        }
         footer={
           <>
             <Button
@@ -119,14 +144,37 @@ export function EmployeeProfileSheetView(props: EmployeeProfileSheetProps) {
       >
         {modalViewMode === "profile" ? (
           <>
+            <section className="bg-muted/30 rounded-lg border p-3.5">
+              <SectionHeading title="Employment at a glance" />
+              <DetailList
+                className="mt-3"
+                items={[
+                  { label: "Employee ID", value: employee.employee_number },
+                  {
+                    label: "Classification",
+                    value: employee.contract_categories?.name || employmentType,
+                  },
+                  { label: "Started", value: formatDDMMYYYY(employee.employment_date) },
+                  {
+                    label: "Confirmation",
+                    value: formatDDMMYYYY(employee.confirmation_date) || "Pending",
+                  },
+                ]}
+              />
+            </section>
             <section className="space-y-3">
-              <SectionHeading title="Work" />
+              <SectionHeading title="Work & organisation" />
               <DetailList
                 items={[
                   { label: "Department", value: employee.department },
                   { label: "Designation", value: employee.designation },
                   { label: "Office", value: employee.office_location },
                   { label: "Role", value: employee.role },
+                  {
+                    label: "Leading departments",
+                    value: leadingDepartments.length ? leadingDepartments.join(", ") : null,
+                    wide: true,
+                  },
                 ]}
               />
             </section>
