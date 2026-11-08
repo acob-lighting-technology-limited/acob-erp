@@ -903,7 +903,9 @@ the expected stats count, tabs, filter count, action count, and table density.
 
 ### UI guard — audit and ratchet
 
-`npm run ui:guard` runs in the pre-push hook and in CI. It is two checks:
+The pre-push hook runs the UI guard against the pushed commit (exporting its tree to a temp dir
+so uncommitted working-tree work does not block a push); in CI and locally `npm run ui:guard` checks
+the tree. It is two checks:
 
 - **`ui:audit`** (`scripts/ui/audit-reusables.mjs`): every page has a `loading.tsx` (a page that only
   redirects is exempt), uses the shared page header, and tables, stat cards and dialogs use the shared
