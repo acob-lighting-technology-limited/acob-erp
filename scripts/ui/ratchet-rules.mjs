@@ -181,7 +181,10 @@ export const RULES = [
     applies: (f) => f.startsWith("app/api/") && /(^|\/)route\.ts$/.test(f),
     count: (text) => {
       const hasJson = /\b(?:req|request)\.json\(\)/.test(text)
-      const hasZod = /from\s+["']zod["']/.test(text) || /\bz\.object\b/.test(text)
+      // A route may define its own zod schema, or validate with a shared one from lib/ (`Schema.safeParse(...)`).
+      // JSON.parse is not validation, so it does not count.
+      const hasZod =
+        /from\s+["']zod["']/.test(text) || /\bz\.object\b/.test(text) || /(?<!JSON)\.(?:safeParse|parse)\(/.test(text)
       return hasJson && !hasZod ? 1 : 0
     },
   },

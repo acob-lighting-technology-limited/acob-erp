@@ -174,6 +174,11 @@ test("route-without-zod flags route.ts reading json body without zod validation"
   assert.equal(countFile("app/api/test/route.ts", withImport)["route-without-zod"], undefined)
   assert.equal(countFile("app/api/test/route.ts", withZObject)["route-without-zod"], undefined)
   assert.equal(countFile("app/api/test/route.ts", noJson)["route-without-zod"], undefined)
+  // A shared schema from lib/ counts as validation; JSON.parse does not.
+  const sharedSchema = 'import { ThingSchema } from "@/lib/x"\nexport async function POST(request) {\n  const parsed = ThingSchema.safeParse(await request.json())\n}'
+  assert.equal(countFile("app/api/test/route.ts", sharedSchema)["route-without-zod"], undefined)
+  const jsonParse = "export async function POST(request) {\n  const body = JSON.parse(await request.text())\n  const x = await request.json()\n}"
+  assert.equal(countFile("app/api/test/route.ts", jsonParse)["route-without-zod"], 1)
   assert.equal(countFile("app/api/test/helper.ts", bad1)["route-without-zod"], undefined)
 })
 
