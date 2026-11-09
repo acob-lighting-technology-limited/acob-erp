@@ -136,7 +136,7 @@ test("IT pages resolve to it.main on both the old and the new paths", () => {
 })
 
 test("API edit routes: mailbox, starlink, HR sections; appeals and unguarded paths are exempt", () => {
-  assert.equal(resolveApiEditRouteKeyV2("/api/admin/mailboxes/password"), "it.main")
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/mailboxes/quota"), "it.main")
   assert.equal(resolveApiEditRouteKeyV2("/api/starlink/kits"), "it.main")
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/attendance/records"), "hr.attendance")
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/leave/manual"), "hr.leave")
