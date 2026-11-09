@@ -58,7 +58,7 @@ export function AddOwnerDialog({ open, onOpenChange, options, onAdded }: AddOwne
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add an owner</DialogTitle>
           <DialogDescription>
