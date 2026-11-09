@@ -4,7 +4,8 @@ import {
   canAccessRouteV2,
   canEditRouteV2,
   isEditOwnerV2,
-  editOwnerDepartmentsFor,
+  editAreaFor,
+  EDIT_AREA_LABELS,
   type AccessContextV2,
   type AdminRouteKeyV2,
   EDIT_OWNER_DEPARTMENTS,
@@ -37,6 +38,8 @@ const ADMIN_LIKE = ["admin", "super_admin", "developer"]
 function umbrella(route: AdminRouteKeyV2): AdminRouteKeyV2 | null {
   if (route.startsWith("hr.") || route === "jobdescriptions.main") return "hr.main"
   if (route === "it.main" || route.startsWith("security.")) return "it.main"
+  if (route === "scorecard.main") return "scorecard.main"
+  if (route === "mddesk.main") return "mddesk.main"
   return null
 }
 
@@ -45,7 +48,7 @@ function umbrella(route: AdminRouteKeyV2): AdminRouteKeyV2 | null {
  *
  *  - Nobody grants or delegates to themselves.
  *  - Only a person with the admin role can hold an /admin grant.
- *  - "grant": the lead of the owning department only (see EDIT_OWNER_DEPARTMENTS).
+ *  - "grant" (an override): an owner of the area only (edit_area_owners).
  *  - "delegate": the actor must own the route (lead of the owning department) or hold
  *    an explicit grant on it — never a delegation, so access cannot be passed along
  *    a chain — and the delegation must end within MAX_DELEGATION_DAYS.
@@ -63,11 +66,12 @@ export function checkEditGrantRequest(request: EditGrantRequest): string | null 
   if (validUntil && validUntil.getTime() <= now.getTime()) return "The end date must be in the future."
 
   if (request.mode === "grant") {
-    // Standing edit is the area owner's call: HR's is the Admin and HR / Corporate Services lead's, IT's
-    // is the IT and Communications lead's. Being a super admin elsewhere gives no say over another area.
+    // Standing edit (an override) is the area owner's call, whatever role the giver has: being a super
+    // admin or developer gives no say over an area you do not own.
     const notOwned = request.routes.find((route) => !isEditOwnerV2(request.actorContext, route))
     if (notOwned) {
-      return `Only the lead of ${editOwnerDepartmentsFor(notOwned).join(" or ")} can give edit access to this area.`
+      const area = editAreaFor(notOwned)
+      return `Only an owner of ${area ? EDIT_AREA_LABELS[area] : "this area"} can give edit access to it.`
     }
   } else {
     if (!validUntil) return "A delegation needs an end date."

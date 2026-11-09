@@ -17,7 +17,6 @@ export const MD_DESK_SECTIONS = [
   { slug: "activities", name: "Activities" },
   { slug: "reports", name: "Reports" },
   { slug: "self-approved", name: "Self-approved Appeals" },
-  { slug: "delegates", name: "Delegates" },
 ] as const
 
 export function mdDeskNavChildren(basePath: string): { name: string; href: string }[] {

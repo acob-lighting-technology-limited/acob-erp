@@ -4,8 +4,9 @@ import { getEventsSession } from "@/lib/events/server"
 import { loadMdDeskAccess } from "@/lib/md-desk/server"
 
 /**
- * Every MD's Desk page is limited to the MD, md_desk_delegates, super admins and
- * developers (see MdDeskAccess.canView). Middleware
+ * Every MD's Desk page is limited to the MD, people acting for the MD or holding an override
+ * (admin_edit_grants on mddesk.main), and, for now, super admins and developers looking only
+ * (see MdDeskAccess.canView). Middleware
  * lets any admin-shell user reach /admin/md-desk/* (mddesk.main), so this is the
  * real gate; `fallback` is where non-members are sent.
  */

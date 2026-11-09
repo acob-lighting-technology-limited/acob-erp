@@ -6,6 +6,8 @@ import {
   canEditRouteV2,
   HR_EDIT_ROUTES,
   IT_EDIT_ROUTES,
+  CS_EDIT_ROUTES,
+  MD_EDIT_ROUTES,
   isEditOwnerV2,
   type AdminRouteKeyV2,
 } from "@/lib/admin/policy-v2"
@@ -16,15 +18,15 @@ import { logger } from "@/lib/logger"
 const log = logger("api/admin/access/people")
 export const dynamic = "force-dynamic"
 
-type Group = "hr" | "it"
+type Group = "hr" | "it" | "cs" | "md"
 type Level = "edit" | "view" | "none"
 /** Where a person's edit comes from; null when they only view. */
-type Via = "lead" | "grant" | "delegation" | "some" | null
+type Via = "owner" | "override" | "delegation" | "some" | null
 
 export interface AccessCell {
   level: Level
   via: Via
-  /** Explicit (non-delegated) grant rows in this group: withdrawing them turns edit back into view. */
+  /** Standing override rows in this group: withdrawing them turns edit back into view. */
   grantIds: string[]
   /** Plain-language note, e.g. "Delegated by Onyekachukwu until 30 Nov". */
   note: string | null
@@ -50,9 +52,11 @@ type GrantRow = {
   valid_until: string | null
 }
 
-const GROUP_KEYS: Record<Group, { umbrella: AdminRouteKeyV2; routes: AdminRouteKeyV2[] }> = {
-  hr: { umbrella: "hr.main", routes: HR_EDIT_ROUTES },
-  it: { umbrella: "it.main", routes: IT_EDIT_ROUTES },
+const GROUP_KEYS: Record<Group, { umbrella: AdminRouteKeyV2; routes: AdminRouteKeyV2[]; area: string }> = {
+  hr: { umbrella: "hr.main", routes: HR_EDIT_ROUTES, area: "hr" },
+  it: { umbrella: "it.main", routes: IT_EDIT_ROUTES, area: "it" },
+  cs: { umbrella: "scorecard.main", routes: CS_EDIT_ROUTES, area: "corporate_services" },
+  md: { umbrella: "mddesk.main", routes: MD_EDIT_ROUTES, area: "md_desk" },
 }
 
 function nameOf(row: Pick<ProfileRow, "full_name" | "first_name" | "last_name"> | undefined) {
@@ -71,9 +75,15 @@ export async function GET() {
   const { scope, supabase } = auth
   const actorContext = buildAccessContextV2(scope)
   // What this person may change: only the areas they own as lead. Others see the list, read only.
-  const canChange = { hr: isEditOwnerV2(actorContext, "hr.main"), it: isEditOwnerV2(actorContext, "it.main") }
+  const canChange = {
+    hr: isEditOwnerV2(actorContext, "hr.main"),
+    it: isEditOwnerV2(actorContext, "it.main"),
+    cs: isEditOwnerV2(actorContext, "scorecard.main"),
+    md: isEditOwnerV2(actorContext, "mddesk.main"),
+  }
   const isDevOrSuper = scope.role === "developer" || scope.role === "super_admin"
-  if (!isDevOrSuper && !canChange.hr && !canChange.it) {
+  // Any admin-role person may look at the list; only owners can change their own areas.
+  if (!isDevOrSuper && !scope.isAdminLike) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -96,6 +106,13 @@ export async function GET() {
     .returns<GrantRow[]>()
   if (grantError) return serverError(log, grantError)
 
+  const { data: ownerRows } = await client
+    .from("edit_area_owners")
+    .select("area, user_id")
+    .returns<Array<{ area: string; user_id: string }>>()
+  const ownedBy = new Map<string, string[]>()
+  for (const row of ownerRows ?? []) ownedBy.set(row.user_id, [...(ownedBy.get(row.user_id) ?? []), row.area])
+
   const now = Date.now()
   const live = (grants ?? []).filter((grant) => !grant.valid_until || new Date(grant.valid_until).getTime() > now)
   const nameById = new Map((people ?? []).map((person) => [person.id, nameOf(person)]))
@@ -113,6 +130,10 @@ export async function GET() {
       department: person.department,
       leadDepartments: person.lead_departments ?? [],
       editRoutes: mine.map((grant) => grant.route_key as AdminRouteKeyV2),
+      editOverrideRoutes: mine
+        .filter((grant) => !grant.delegated_from)
+        .map((grant) => grant.route_key as AdminRouteKeyV2),
+      ownedAreas: ownedBy.get(person.id) ?? [],
     })
 
     const cell = (group: Group): AccessCell => {
@@ -131,7 +152,7 @@ export async function GET() {
         }
       }
       if (isEditOwnerV2(context, umbrella)) {
-        return { level: "edit", via: "lead", grantIds, note: "Leads the owning department" }
+        return { level: "edit", via: "owner", grantIds, note: "Owner" }
       }
       if (canEditRouteV2(context, umbrella)) {
         const delegated = groupGrants.find((grant) => grant.delegated_from && grant.route_key === umbrella)
@@ -144,7 +165,7 @@ export async function GET() {
             note: `Delegated by ${nameById.get(delegated.delegated_from ?? "") ?? "a lead"}${until}`,
           }
         }
-        return { level: "edit", via: "grant", grantIds, note: null }
+        return { level: "edit", via: "override", grantIds, note: "Override" }
       }
       if (groupGrants.length > 0) {
         return { level: "edit", via: "some", grantIds, note: "Edit on some areas only" }
@@ -160,6 +181,8 @@ export async function GET() {
       is_self: person.id === scope.userId,
       hr: cell("hr"),
       it: cell("it"),
+      cs: cell("cs"),
+      md: cell("md"),
     }
   })
 

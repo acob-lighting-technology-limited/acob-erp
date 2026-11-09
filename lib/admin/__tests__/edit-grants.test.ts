@@ -11,15 +11,15 @@ import {
 const NOW = new Date("2026-11-09T09:00:00Z")
 const IN_30_DAYS = new Date("2026-12-09T09:00:00Z")
 
-function lead(dept: string) {
+function owner(area: string) {
   return buildAccessContextV2({
     role: "super_admin",
-    isDepartmentLead: true,
+    isDepartmentLead: false,
     isAdminLike: true,
     adminRoutes: null,
     scopeMode: "global",
     managedDepartments: [],
-    leadDepartments: [dept],
+    ownedAreas: [area],
   })
 }
 
@@ -39,7 +39,7 @@ function request(overrides: Partial<EditGrantRequest> = {}): EditGrantRequest {
     mode: "delegate",
     actorId: "lead-1",
     actorRole: "super_admin",
-    actorContext: lead("Admin and HR"),
+    actorContext: owner("hr"),
     actorOwnGrantRoutes: [],
     targetId: "rafiat",
     targetRole: "admin",
@@ -74,7 +74,7 @@ test("the end date must be in the future", () => {
 })
 
 test("a lead cannot delegate an area they do not own", () => {
-  const msg = checkEditGrantRequest(request({ actorContext: lead("Accounts"), routes: ["hr.attendance"] }))
+  const msg = checkEditGrantRequest(request({ actorContext: owner("it"), routes: ["hr.attendance"] }))
   assert.match(msg ?? "", /hold yourself/)
 })
 
@@ -105,14 +105,14 @@ test("a holder of an explicit grant may delegate that route", () => {
   assert.equal(checkEditGrantRequest(request({ actorContext: holder, actorOwnGrantRoutes: ["hr.attendance"] })), null)
 })
 
-test("standing edit is granted only by the lead who owns the area, and may have no end date", () => {
-  const owner = request({
+test("standing edit is granted only by an owner of the area, and may have no end date", () => {
+  const ownerRequest = request({
     mode: "grant",
-    actorContext: lead("Admin and HR"),
+    actorContext: owner("hr"),
     routes: ["hr.attendance"],
     validUntil: null,
   })
-  assert.equal(checkEditGrantRequest(owner), null)
+  assert.equal(checkEditGrantRequest(ownerRequest), null)
 })
 
 test("a super admin who does not own the area cannot grant it, even though they hold the role", () => {
@@ -120,18 +120,18 @@ test("a super admin who does not own the area cannot grant it, even though they 
   const hrLeadGrantingIt = request({
     mode: "grant",
     actorRole: "super_admin",
-    actorContext: lead("Admin and HR"),
+    actorContext: owner("hr"),
     routes: ["it.main"],
     targetAdminRoutes: ["it.main"] as AdminRouteKeyV2[],
   })
-  assert.match(checkEditGrantRequest(hrLeadGrantingIt) ?? "", /Only the lead of IT and Communications/)
+  assert.match(checkEditGrantRequest(hrLeadGrantingIt) ?? "", /Only an owner of IT/)
   const developer = request({
     mode: "grant",
     actorRole: "developer",
     actorContext: ctxNoLead(),
     routes: ["hr.attendance"],
   })
-  assert.match(checkEditGrantRequest(developer) ?? "", /Only the lead of/)
+  assert.match(checkEditGrantRequest(developer) ?? "", /Only an owner of/)
 })
 
 test("edit never exceeds view", () => {

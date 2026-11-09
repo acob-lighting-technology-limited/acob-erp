@@ -21,6 +21,12 @@ export interface AccessScopeInputV2 {
   leadDepartments?: string[]
   /** Active edit grants / delegations (admin_edit_grants), already filtered for expiry. */
   editRoutes?: AdminRouteKeyV2[]
+  /** The subset of editRoutes that are standing overrides rather than a delegation. */
+  editOverrideRoutes?: AdminRouteKeyV2[]
+  /** For delegated routes, who lent them (route key to the owner's user id). */
+  editDelegators?: Record<string, string>
+  /** Guarded areas this person owns (edit_area_owners). */
+  ownedAreas?: string[]
 }
 
 export type ActingContextV2 = "global_admin" | "department_lead"
@@ -133,6 +139,12 @@ export interface AccessContextV2 {
   ledDepartments?: string[]
   /** Active edit grants / delegations on the edit-guarded routes. */
   editRoutes?: AdminRouteKeyV2[]
+  /** The subset of editRoutes that are standing overrides (no delegator), not someone acting for an owner. */
+  editOverrideRoutes?: AdminRouteKeyV2[]
+  /** For delegated routes, who lent them (route key to the owner's user id). */
+  editDelegators?: Record<string, string>
+  /** The guarded areas this person owns (edit_area_owners). */
+  ownedAreas?: string[]
 }
 
 /**
@@ -158,9 +170,26 @@ export const HR_EDIT_ROUTES: AdminRouteKeyV2[] = [
   "jobdescriptions.main",
 ]
 export const IT_EDIT_ROUTES: AdminRouteKeyV2[] = ["it.main", "security.networkActivity", "security.bypassOverride"]
-export const EDIT_GUARDED_ROUTES: AdminRouteKeyV2[] = [...HR_EDIT_ROUTES, ...IT_EDIT_ROUTES]
+export const CS_EDIT_ROUTES: AdminRouteKeyV2[] = ["scorecard.main"]
+export const MD_EDIT_ROUTES: AdminRouteKeyV2[] = ["mddesk.main"]
+export const EDIT_GUARDED_ROUTES: AdminRouteKeyV2[] = [
+  ...HR_EDIT_ROUTES,
+  ...IT_EDIT_ROUTES,
+  ...CS_EDIT_ROUTES,
+  ...MD_EDIT_ROUTES,
+]
 
-/** Who owns each guarded group, by department. Looked up from lead_departments, never by name of person. */
+/** The guarded areas. Each has owners (edit_area_owners) who decide who may change things there. */
+export type EditArea = "hr" | "it" | "corporate_services" | "md_desk"
+export const EDIT_AREAS: EditArea[] = ["hr", "it", "corporate_services", "md_desk"]
+export const EDIT_AREA_LABELS: Record<EditArea, string> = {
+  hr: "HR",
+  it: "IT",
+  corporate_services: "Corporate Services",
+  md_desk: "MD's Desk",
+}
+
+/** Departments whose leads may only be changed by a developer or super admin (they hold appeal approvals). */
 export const EDIT_OWNER_DEPARTMENTS = {
   hr: [DEPT_ADMIN_HR, DEPT_CORPORATE_SERVICES],
   it: [DEPT_ITC],
@@ -182,16 +211,21 @@ export const GRANTABLE_EDIT_ROUTES: AdminRouteKeyV2[] = [
   "it.main",
   "security.networkActivity",
   "security.bypassOverride",
+  "scorecard.main",
+  "mddesk.main",
 ]
 
 export function isEditGuardedRoute(route: AdminRouteKeyV2): boolean {
   return EDIT_GUARDED_ROUTES.includes(route)
 }
 
-export function editOwnerDepartmentsFor(route: AdminRouteKeyV2): readonly string[] {
-  if (HR_EDIT_ROUTES.includes(route)) return EDIT_OWNER_DEPARTMENTS.hr
-  if (IT_EDIT_ROUTES.includes(route)) return EDIT_OWNER_DEPARTMENTS.it
-  return []
+/** The guarded area a route belongs to, or null for an unguarded route. */
+export function editAreaFor(route: AdminRouteKeyV2): EditArea | null {
+  if (HR_EDIT_ROUTES.includes(route)) return "hr"
+  if (IT_EDIT_ROUTES.includes(route)) return "it"
+  if (CS_EDIT_ROUTES.includes(route)) return "corporate_services"
+  if (MD_EDIT_ROUTES.includes(route)) return "md_desk"
+  return null
 }
 
 export interface RoutePolicyV2 {
@@ -237,6 +271,9 @@ export function buildAccessContextV2(scope: AccessScopeInputV2): AccessContextV2
     managedDepartments: normalizeDepartmentList(scope.managedDepartments || []),
     ledDepartments,
     editRoutes: scope.editRoutes ?? [],
+    editOverrideRoutes: scope.editOverrideRoutes ?? [],
+    editDelegators: scope.editDelegators ?? {},
+    ownedAreas: scope.ownedAreas ?? [],
   }
 }
 
@@ -525,14 +562,38 @@ export function canAccessRouteV2(context: AccessContextV2, route: AdminRouteKeyV
 function editUmbrellaFor(route: AdminRouteKeyV2): AdminRouteKeyV2 | null {
   if (HR_EDIT_ROUTES.includes(route)) return "hr.main"
   if (IT_EDIT_ROUTES.includes(route)) return "it.main"
+  if (CS_EDIT_ROUTES.includes(route)) return "scorecard.main"
+  if (MD_EDIT_ROUTES.includes(route)) return "mddesk.main"
   return null
 }
 
-/** Leads the owning department of an edit-guarded route. Pure lead status; never a name. */
+/** Owns the area this route belongs to (edit_area_owners). Never inferred from who leads a department. */
 export function isEditOwnerV2(context: AccessContextV2, route: AdminRouteKeyV2): boolean {
-  const owners = editOwnerDepartmentsFor(route)
-  if (owners.length === 0) return false
-  return (context.ledDepartments ?? []).some((led) => owners.some((owner) => isSameDepartment(led, owner)))
+  const area = editAreaFor(route)
+  return area !== null && (context.ownedAreas ?? []).includes(area)
+}
+
+/** Who lent this person edit on the route (or its umbrella), when they are acting for an owner. */
+export function editDelegatorV2(context: AccessContextV2, route: AdminRouteKeyV2): string | null {
+  const map = context.editDelegators ?? {}
+  const umbrella = editUmbrellaFor(route)
+  return map[route] ?? (umbrella ? (map[umbrella] ?? null) : null)
+}
+
+/** How a person is allowed to change things on a route: as its owner, for the owner, or as an override. */
+export type EditModeV2 = "owner" | "delegate" | "override"
+
+export function editModeV2(context: AccessContextV2, route: AdminRouteKeyV2): EditModeV2 | null {
+  if (!canEditRouteV2(context, route)) return null
+  if (!isEditGuardedRoute(route)) return null
+  if (isEditOwnerV2(context, route)) return "owner"
+  const umbrella = editUmbrellaFor(route)
+  const covers = (list: AdminRouteKeyV2[] | undefined) =>
+    (list ?? []).includes(route) || (umbrella !== null && (list ?? []).includes(umbrella))
+  // Acting for an owner wins over an override held at the same time.
+  const viaDelegation = (context.editRoutes ?? []).filter((key) => !(context.editOverrideRoutes ?? []).includes(key))
+  if (covers(viaDelegation)) return "delegate"
+  return covers(context.editOverrideRoutes) ? "override" : null
 }
 
 /**
@@ -540,11 +601,10 @@ export function isEditOwnerV2(context: AccessContextV2, route: AdminRouteKeyV2):
  *
  * Routes without an edit level behave as before: viewing implies editing. On the
  * HR and IT routes edit needs to be one of:
- *   - the lead of the owning department (HR: Admin and HR, Corporate Services;
- *     IT: IT and Communications),
+ *   - an owner of the area (edit_area_owners),
  *   - an active edit grant or delegation on the route, or on its group's umbrella
- *     key (hr.main / it.main).
- * Developer and super_admin get no automatic edit there, only view.
+ *     key (hr.main / it.main / scorecard.main).
+ * Admin, super_admin and developer get no automatic edit there, only view.
  */
 export function canEditRouteV2(context: AccessContextV2, route: AdminRouteKeyV2): boolean {
   if (!canAccessRouteV2(context, route)) return false
@@ -588,6 +648,19 @@ export function resolveApiEditRouteKeyV2(pathname: string): AdminRouteKeyV2 | nu
   if (p.startsWith("/api/admin/hr/fleet")) return "hr.fleet"
   if (p.startsWith("/api/admin/job-descriptions")) return "jobdescriptions.main"
   if (p.startsWith("/api/admin/hr")) return "hr.main"
+  // Corporate Services management. Staff also read the scorecard from their KPI page, so only the
+  // management endpoints are guarded; entering actuals is left to its own rules.
+  const scorecardManagement = ["kpis", "assignments", "goals", "register", "departments"]
+  if (
+    scorecardManagement.some(
+      (name) => p === `/api/corporate-scorecard/${name}` || p.startsWith(`/api/corporate-scorecard/${name}/`)
+    )
+  ) {
+    return "scorecard.main"
+  }
+  if (p.startsWith("/api/corporate-services")) return "scorecard.main"
+  // MD's Desk: the database decides who can write its data; this stops everyone else at the door.
+  if (p.startsWith("/api/md-desk")) return "mddesk.main"
   return null
 }
 

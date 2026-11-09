@@ -26,19 +26,9 @@ export type MdDeskQueue = {
   counts: Record<MdDeskQueueKind, number>
 }
 
-export type MdDeskDelegate = {
-  profile_id: string
-  name: string
-  department: string | null
-  can_edit: boolean
-  granted_by_name: string | null
-  created_at: string
-}
-
 export type MdDeskAccessDto = {
   isMember: boolean
   canView: boolean
   canEdit: boolean
   isMd: boolean
-  canManageDelegates: boolean
 }

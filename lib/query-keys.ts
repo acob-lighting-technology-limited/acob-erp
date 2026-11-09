@@ -185,6 +185,7 @@ export const QUERY_KEYS = {
   adminAccessGrants: () => ["admin-access-grants"],
   adminAccessPeople: () => ["admin-access-people"],
   deptDelegations: (deptId: string) => ["dept-delegations", deptId],
+  devAreaOwners: () => ["dev-area-owners"],
 
   // Inventory pages
   adminInventoryDashboard: () => ["admin-inventory-dashboard"],
@@ -263,7 +264,6 @@ export const QUERY_KEYS = {
   pendingRsvpCount: () => ["pending-rsvp-count"],
   calendarBadgeData: () => ["calendar-badge-data"],
   mdDeskOverview: () => ["md-desk-overview"],
-  mdDeskDelegates: () => ["md-desk-delegates"],
   mdDeskTaskReviews: () => ["md-desk-task-reviews"],
 
   // Security

@@ -64,12 +64,19 @@ export const DEPT_DELEGABLE_PAGES: DelegablePage[] = [
   },
   { key: "accounts.requisitions", label: "Requisitions", group: "Accounts", paths: ["/accounts/requisitions"] },
   { key: "accounts.assets", label: "Assets", group: "Accounts", paths: ["/assets"] },
-  { key: "cs.scorecard", label: "Scorecard", group: "Corporate Services", paths: ["/corporate-services/scorecard"] },
+  {
+    key: "cs.scorecard",
+    label: "Scorecard",
+    group: "Corporate Services",
+    paths: ["/corporate-services/scorecard"],
+    adminRoutes: ["scorecard.main"],
+  },
   {
     key: "cs.risk-register",
     label: "Risk Register",
     group: "Corporate Services",
     paths: ["/corporate-services/risk-register"],
+    adminRoutes: ["scorecard.main"],
   },
   { key: "tasks", label: "Tasks", group: "Operations", paths: ["/tasks"] },
   { key: "help-desk", label: "Help Desk", group: "Operations", paths: ["/help-desk"] },
@@ -99,6 +106,7 @@ export const ADMIN_ONLY_PAGES: AdminOnlyPage[] = [
   { key: "it.main", label: "IT pages (Mailboxes, Starlink, Onboarding, Mail)", group: "IT, admin side only" },
   { key: "security.networkActivity", label: "Network Activity", group: "IT, admin side only" },
   { key: "security.bypassOverride", label: "Bypass & Override", group: "IT, admin side only" },
+  { key: "mddesk.main", label: "MD's Desk", group: "MD's Desk" },
 ]
 
 export const CONSOLE_PAGE_KEYS = DEPT_DELEGABLE_PAGES.map((page) => page.key)

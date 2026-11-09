@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
@@ -103,6 +104,7 @@ export interface CorporateScorecardRegisterProps {
  * this view is the plan, with administrative CRUD to add, edit, and archive KPIs.
  */
 export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: CorporateScorecardRegisterProps = {}) {
+  const canEditCs = useCanEdit("scorecard.main")
   const queryClient = useQueryClient()
   // null = let the server pick (current year, or the latest loaded plan).
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -266,10 +268,12 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Corporate KPI
-          </Button>
+          {canEditCs && (
+            <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Corporate KPI
+            </Button>
+          )}
         </div>
       }
       stats={
@@ -313,11 +317,15 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         emptyTitle="No KPIs Found"
         emptyDescription="The corporate scorecard hasn't been imported yet."
         emptyIcon={Target}
-        rowActions={[
-          { label: "Edit KPI", icon: Edit, onClick: (r) => setEditingRow(r) },
-          { label: "Manage Departments", icon: UserCog, onClick: (r) => setManagingRow(r) },
-          { label: "Archive KPI", icon: Trash2, onClick: (r) => setArchivingRow(r), variant: "destructive" },
-        ]}
+        rowActions={
+          canEditCs
+            ? [
+                { label: "Edit KPI", icon: Edit, onClick: (r) => setEditingRow(r) },
+                { label: "Manage Departments", icon: UserCog, onClick: (r) => setManagingRow(r) },
+                { label: "Archive KPI", icon: Trash2, onClick: (r) => setArchivingRow(r), variant: "destructive" },
+              ]
+            : []
+        }
         expandable={{
           render: (r) => {
             const pacing = r.pacing
@@ -522,12 +530,12 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
               {r.core_departments.length} depts
             </Badge>
           ),
-          onSelect: (r) => setEditingRow(r),
+          onSelect: canEditCs ? (r) => setEditingRow(r) : undefined,
         }}
         cardRenderer={(r) => (
           <div
             className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
-            onClick={() => setEditingRow(r)}
+            onClick={() => canEditCs && setEditingRow(r)}
           >
             <div className="flex items-start justify-between">
               <div>
