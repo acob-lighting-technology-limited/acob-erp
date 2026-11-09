@@ -9,6 +9,9 @@ import {
   buildAccessContextV2,
   canAccessRouteV2,
   canEditRouteV2,
+  editModeV2,
+  editDelegatorV2,
+  editAreaFor,
   resolveAdminRouteKeyV2,
   resolveApiEditRouteKeyV2,
 } from "@/lib/admin/policy-v2"
@@ -222,6 +225,27 @@ export async function updateSession(request: NextRequest) {
           // Strip any client-supplied value first (anti-spoofing)
           forwardedHeaders.delete("x-admin-scope")
           forwardedHeaders.set("x-admin-scope", encoded)
+          // How this person is allowed to change things here (override / delegate), so the audit log can
+          // mark the change without every route having to know. Always overwritten, never trusted from the client.
+          forwardedHeaders.delete("x-edit-mode")
+          const editMode =
+            guardedEditRoute && scope.isAdminLike && !readDeptContextId(request.headers)
+              ? editModeV2(buildAccessContextV2(scope), guardedEditRoute)
+              : null
+          forwardedHeaders.delete("x-edit-area")
+          forwardedHeaders.delete("x-edit-on-behalf-of")
+          if (editMode === "override" || editMode === "delegate") {
+            forwardedHeaders.set("x-edit-mode", editMode)
+            const area = editAreaFor(guardedEditRoute as NonNullable<typeof guardedEditRoute>)
+            if (area) forwardedHeaders.set("x-edit-area", area)
+            if (editMode === "delegate") {
+              const delegator = editDelegatorV2(
+                buildAccessContextV2(scope),
+                guardedEditRoute as NonNullable<typeof guardedEditRoute>
+              )
+              if (delegator) forwardedHeaders.set("x-edit-on-behalf-of", delegator)
+            }
+          }
           // Rebuild supabaseResponse with the updated forwarded request headers
           // so that headers() in server components / API routes can read it
           supabaseResponse = NextResponse.next({ request: { headers: forwardedHeaders } })

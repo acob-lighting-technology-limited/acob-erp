@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -102,12 +103,15 @@ export function DepartmentCascadeContent({
   initialDepartment,
   lockedDepartment,
   backLink,
-  isReadOnly,
+  isReadOnly: readOnlyProp,
   tabs,
   activeTab,
   onTabChange,
   onDepartmentChange,
 }: DepartmentCascadeContentProps) {
+  // View-only people (no edit on Corporate Services) get the same read-only screen as before.
+  const canEditCs = useCanEdit("scorecard.main")
+  const isReadOnly = readOnlyProp || !canEditCs
   const queryClient = useQueryClient()
   const activeDepartment = lockedDepartment || initialDepartment || departments[0] || ""
   const [department, setDepartment] = useState(activeDepartment)

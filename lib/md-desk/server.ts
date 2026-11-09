@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import type { EventsSession } from "@/lib/events/server"
-import type { MdDeskDelegate, MdDeskQueue, MdDeskQueueItem } from "@/lib/md-desk/types"
+import type { MdDeskQueue, MdDeskQueueItem } from "@/lib/md-desk/types"
 import type { Task, TaskPersonSummary } from "@/types/task"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { isLeadForTaskDepartment } from "@/lib/tasks/rating-authority"
@@ -26,21 +26,19 @@ function displayName(row: DirectoryRow | undefined): string {
 
 export type MdDeskAccess = {
   isMember: boolean
-  /** May open MD's Desk pages: the MD, delegates, and (for now) super admins and developers. */
+  /** May open MD's Desk pages: the MD, people acting for or overriding the MD, and (for now) super admins and developers. */
   canView: boolean
   canEdit: boolean
   isMd: boolean
-  canManageDelegates: boolean
 }
 
 /** Same database helpers the RLS policies use, so page gates and data rules agree. */
 export async function loadMdDeskAccess(session: EventsSession): Promise<MdDeskAccess> {
   const { supabase } = session
-  const [member, edit, md, admin, superAdmin] = await Promise.all([
+  const [member, edit, md, superAdmin] = await Promise.all([
     supabase.rpc("is_md_desk_member"),
     supabase.rpc("can_edit_md_desk"),
     supabase.rpc("is_md"),
-    supabase.rpc("is_admin_like"),
     // has_role('super_admin') is true for super_admin and developer.
     supabase.rpc("has_role", { required_role: "super_admin" }),
   ])
@@ -53,7 +51,6 @@ export async function loadMdDeskAccess(session: EventsSession): Promise<MdDeskAc
     canView: isMember || superAdmin.data === true,
     canEdit: edit.data === true,
     isMd,
-    canManageDelegates: isMd || admin.data === true,
   }
 }
 
@@ -365,29 +362,6 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
       task_rating: selfTasks.length,
     },
   }
-}
-
-export async function loadDelegates(session: EventsSession): Promise<MdDeskDelegate[]> {
-  const { data, error } = await session.supabase
-    .from("md_desk_delegates")
-    .select("profile_id, can_edit, granted_by, created_at")
-    .order("created_at", { ascending: true })
-  if (error) throw error
-  const rows = (data ?? []) as {
-    profile_id: string
-    can_edit: boolean
-    granted_by: string | null
-    created_at: string
-  }[]
-  const names = await resolveNames(session, [...rows.map((r) => r.profile_id), ...rows.map((r) => r.granted_by || "")])
-  return rows.map((r) => ({
-    profile_id: r.profile_id,
-    name: displayName(names.get(r.profile_id)),
-    department: names.get(r.profile_id)?.department ?? null,
-    can_edit: r.can_edit,
-    granted_by_name: r.granted_by ? displayName(names.get(r.granted_by)) : null,
-    created_at: r.created_at,
-  }))
 }
 
 export type MdTaskReviews = {

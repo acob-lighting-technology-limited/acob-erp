@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAuditRpcParams, isCriticalAuditAction, type AuditPayload } from "@/lib/audit/core"
 import { getAuditRequestContext } from "@/lib/audit/request-context"
+import { resolveOnBehalfOf } from "@/lib/audit/on-behalf-of"
 
 import { logger } from "@/lib/logger"
 
@@ -30,6 +31,7 @@ export async function writeAuditLog(
   // Callers rarely have the request to hand, so IP/user-agent are filled from
   // the ambient request here. An explicit value on the payload always wins.
   const requestContext = await getAuditRequestContext()
+  const onBehalfOf = await resolveOnBehalfOf(supabase, requestContext, payload.context.actorId)
   const enrichedPayload: AuditPayload = {
     ...payload,
     context: {
@@ -37,6 +39,17 @@ export async function writeAuditLog(
       ipAddress: payload.context.ipAddress ?? requestContext.ipAddress,
       userAgent: payload.context.userAgent ?? requestContext.userAgent,
     },
+    // A change made as an override, or on behalf of an owner, is marked as such.
+    ...(requestContext.editMode || onBehalfOf
+      ? {
+          metadata: {
+            ...payload.metadata,
+            ...(requestContext.editMode ? { edit_mode: requestContext.editMode } : {}),
+            ...(requestContext.editArea ? { edit_area: requestContext.editArea } : {}),
+            ...(onBehalfOf ? { on_behalf_of: onBehalfOf } : {}),
+          },
+        }
+      : {}),
   }
 
   const params = buildAuditRpcParams(enrichedPayload)

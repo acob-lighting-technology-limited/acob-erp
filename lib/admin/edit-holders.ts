@@ -1,12 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { editOwnerDepartmentsFor, type AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
-import { isSameDepartment, getDepartmentAliases } from "@/shared/departments"
+import { EDIT_AREA_LABELS, editAreaFor, type AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
 export interface EditHolder {
   userId: string
   name: string
-  /** "lead" = leads the owning department; "grant" = explicit grant; "delegate" = delegated by someone. */
-  via: "lead" | "grant" | "delegate"
+  /** "owner" = owns the area; "delegate" = lent it by an owner; "override" = standing edit given by an owner. */
+  via: "owner" | "delegate" | "override"
   /** For a delegate: who delegated, and until when. */
   delegatedFromName?: string | null
   validUntil?: string | null
@@ -20,32 +19,44 @@ function displayName(p: ProfileName | undefined): string {
 }
 
 /**
- * Who can currently change things on an edit-guarded route: the lead(s) of the owning
- * department(s), plus anyone with an active grant or delegation on the route or its
- * group's umbrella key. Read live, so the "view only" notice stays right when a lead
- * changes. `client` must be a service-role client (profiles RLS hides other people).
+ * Who can currently change things on an edit-guarded route: the owners of its area, plus anyone with
+ * an active grant or delegation on the route or its group's umbrella key. Read live, so the view-only
+ * notice stays right when an owner changes. `client` must be a service-role client (profiles RLS hides
+ * other people).
  */
 export async function loadEditHolders(client: SupabaseClient, route: AdminRouteKeyV2): Promise<EditHolder[]> {
   const holders = new Map<string, EditHolder>()
 
-  const ownerDepartments = editOwnerDepartmentsFor(route)
-  if (ownerDepartments.length > 0) {
-    const { data: leads } = await client
-      .from("profiles")
-      .select("id, full_name, first_name, last_name, department, lead_departments")
-      .eq("is_department_lead", true)
-      .neq("employment_status", "exited")
-      .returns<Array<ProfileName & { department: string | null; lead_departments: string[] | null }>>()
-    for (const lead of leads ?? []) {
-      const led = lead.lead_departments && lead.lead_departments.length > 0 ? lead.lead_departments : [lead.department]
-      const owns = led.some((dept) => ownerDepartments.some((owner) => isSameDepartment(dept, owner)))
-      if (owns) holders.set(lead.id, { userId: lead.id, name: displayName(lead), via: "lead" })
+  const area = editAreaFor(route)
+  if (area) {
+    const { data: owners } = await client
+      .from("edit_area_owners")
+      .select("user_id")
+      .eq("area", area)
+      .returns<Array<{ user_id: string }>>()
+    const ownerIds = (owners ?? []).map((row) => row.user_id)
+    if (ownerIds.length > 0) {
+      const { data: people } = await client
+        .from("profiles")
+        .select("id, full_name, first_name, last_name")
+        .in("id", ownerIds)
+        .neq("employment_status", "exited")
+        .returns<ProfileName[]>()
+      for (const person of people ?? []) {
+        holders.set(person.id, { userId: person.id, name: displayName(person), via: "owner" })
+      }
     }
   }
 
-  const keys = Array.from(
-    new Set<string>([route, route.startsWith("it.") || route.startsWith("security.") ? "it.main" : "hr.main"])
-  )
+  const umbrella =
+    route.startsWith("it.") || route.startsWith("security.")
+      ? "it.main"
+      : route === "scorecard.main"
+        ? "scorecard.main"
+        : route === "mddesk.main"
+          ? "mddesk.main"
+          : "hr.main"
+  const keys = Array.from(new Set<string>([route, umbrella]))
   const { data: grants } = await client
     .from("admin_edit_grants")
     .select("user_id, route_key, delegated_from, valid_until")
@@ -70,7 +81,7 @@ export async function loadEditHolders(client: SupabaseClient, route: AdminRouteK
     holders.set(grant.user_id, {
       userId: grant.user_id,
       name: displayName(names.get(grant.user_id)),
-      via: grant.delegated_from ? "delegate" : "grant",
+      via: grant.delegated_from ? "delegate" : "override",
       delegatedFromName: grant.delegated_from ? displayName(names.get(grant.delegated_from)) : null,
       validUntil: grant.valid_until,
     })
@@ -79,8 +90,8 @@ export async function loadEditHolders(client: SupabaseClient, route: AdminRouteK
   return Array.from(holders.values())
 }
 
-/** Department-lead profiles that own `route`, as department names for display. */
-export function ownerDepartmentLabel(route: AdminRouteKeyV2): string {
-  const owners = editOwnerDepartmentsFor(route)
-  return owners.map((owner) => getDepartmentAliases(owner)[0] ?? owner).join(" and ")
+/** The area's name for display, for example "HR" or "Corporate Services". */
+export function ownerAreaLabel(route: AdminRouteKeyV2): string {
+  const area = editAreaFor(route)
+  return area ? EDIT_AREA_LABELS[area] : ""
 }

@@ -359,6 +359,7 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Login Logs", href: "/admin/dev/login-logs" },
       { name: "Role Escalations", href: "/admin/dev/role-escalations" },
+      { name: "Area Owners", href: "/admin/dev/area-owners" },
       { name: "Security Events", href: "/admin/dev/security-events" },
       { name: "Impersonation", href: "/admin/dev/impersonation" },
       { name: "Error Monitor", href: "/admin/dev/ui-errors" },

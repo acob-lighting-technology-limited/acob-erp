@@ -1,4 +1,5 @@
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { confirmDestructiveIfOverride } from "@/lib/override-confirm"
 // Plain module on purpose, not "use client": it has no React in it and guards every browser global,
 // and lib code that is shared with route handlers imports it. Calling it on the server just sends a
 // plain fetch.
@@ -46,6 +47,13 @@ export function readDeptContext(): string | null {
  */
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const method = (init.method || "GET").toUpperCase()
+  // Someone acting as an override gets one more "are you sure" before anything that cannot be undone.
+  if (!(await confirmDestructiveIfOverride(method, String(input)))) {
+    return new Response(JSON.stringify({ error: "Cancelled" }), {
+      status: 499,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
   const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null
   const deptContext = readDeptContext()
 

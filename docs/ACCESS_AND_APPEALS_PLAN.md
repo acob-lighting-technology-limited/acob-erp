@@ -172,5 +172,29 @@ department's console pages to someone, until a date.
   the IT pages). Those grants point at the delegation (`admin_edit_grants.dept_delegation_id`) so withdrawing it, or its
   end date, removes both. A delegate without the admin role gets the department pages only, and the dialog says so.
   Settings > Delegation no longer exists; Settings > Access stays for developers and super admins to grant edit outright.
-- **Not built**: "on behalf of" in the audit log for actions a delegate takes; delegations do not end on their own
-  when the lead changes (a new lead withdraws them from the same dialog).
+- **Not built**: delegations do not end on their own when the lead changes (a new lead withdraws them from the
+  same dialog).
+
+## Area owners, delegates and overrides (10 Nov 2026)
+
+Supersedes "owners are the leads of the owning department" above.
+
+- **Owners** of each guarded area (HR, IT, Corporate Services; MD's Desk for delegate management) are named in
+  `edit_area_owners`, from the developer area (`/admin/dev/area-owners`). Who leads a department no longer decides
+  ownership. HCS is not an owner of HR.
+- **Three kinds of person** on a guarded page: the owner; a delegate (lent it by an owner, with an end date, acting for
+  them); an override (standing Edit given by an owner on the Access page). Anyone else is view only. Role names
+  (admin, super admin, developer) make no difference. Only an owner gives either kind. View comes first: an admin
+  without the route shows "No access" until Settings > Users gives it.
+- **Override is visible**: a warning banner on the page, a confirm before anything that cannot be undone (any DELETE,
+  suspend, reset, bulk exit), an `edit_mode: override` tag and `edit_area` on every audit row (set by middleware), and
+  a monthly in-app list to the area's owners (cron `app-access-override-monthly`, 1st of the month).
+- **On behalf of**: a delegate's audit rows carry `on_behalf_of: { id, name }`, from the middleware header for /admin
+  delegates and from the live department delegation for department-console delegates.
+- **Corporate Services** (`scorecard.main`) is guarded like HR and IT. Only the management endpoints are checked
+  centrally; staff entering their own actuals is not.
+- **MD's Desk** follows the same pattern, with no separate delegates page: the MD owns it (taken from the head of the MD
+  department and named in the owners form), a delegation from the MD is made in the same Delegate access dialog (an
+  admin-side page, "MD's Desk"), an override is given on the Access page. The database functions `is_md_desk_member` and
+  `can_edit_md_desk` follow `edit_area_owners` and `admin_edit_grants` on `mddesk.main`. The old `md_desk_delegates`
+  table is kept but no longer read. Super admins and developers who hold none of these still see it read-only.

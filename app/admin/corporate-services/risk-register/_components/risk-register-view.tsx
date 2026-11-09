@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -86,10 +87,13 @@ export function RiskRegisterView({
   staff,
   raisableDepartments,
   currentUserId,
-  isAdminLike,
+  isAdminLike: adminLikeProp,
   lockedDepartment,
   backLink,
 }: RiskRegisterViewProps) {
+  // Admin-wide changes need edit on Corporate Services; a lead raising risks for their own department is separate.
+  const canEditCs = useCanEdit("scorecard.main")
+  const isAdminLike = adminLikeProp && canEditCs
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("register")
   const [formOpen, setFormOpen] = useState(false)

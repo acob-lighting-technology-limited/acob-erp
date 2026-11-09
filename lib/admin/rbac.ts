@@ -61,6 +61,12 @@ export interface AdminScope {
    * expiry already applied. Separate from adminRoutes, which is VIEW.
    */
   editRoutes?: AdminRouteKeyV2[]
+  /** The subset of editRoutes held as a standing override (no delegator). */
+  editOverrideRoutes?: AdminRouteKeyV2[]
+  /** For delegated routes, who lent them (route key to the owner's user id). */
+  editDelegators?: Record<string, string>
+  /** Guarded areas this person owns (edit_area_owners). */
+  ownedAreas?: string[]
   /** Acting through a department delegation. Such a scope can use delegated pages but never hands access on. */
   delegated?: boolean
   scopeMode: AdminScopeMode
@@ -243,21 +249,41 @@ async function resolveManagedOffices(
  * table not existing yet) returns none: edit then falls back to department-lead
  * ownership only, which fails closed rather than open.
  */
-export async function loadActiveEditRoutes(supabase: SupabaseClient, userId: string): Promise<AdminRouteKeyV2[]> {
+export async function loadActiveEditRoutes(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ routes: AdminRouteKeyV2[]; overrideRoutes: AdminRouteKeyV2[]; delegators: Record<string, string> }> {
   const { data, error } = await supabase
     .from("admin_edit_grants")
-    .select("route_key, valid_until")
+    .select("route_key, valid_until, delegated_from")
     .eq("user_id", userId)
     .is("revoked_at", null)
-    .returns<Array<{ route_key: string; valid_until: string | null }>>()
-  if (error || !data) return []
+    .returns<Array<{ route_key: string; valid_until: string | null; delegated_from: string | null }>>()
+  if (error || !data) return { routes: [], overrideRoutes: [], delegators: {} }
   const now = Date.now()
-  const keys = data
-    .filter((row) => !row.valid_until || new Date(row.valid_until).getTime() > now)
-    .map((row) => row.route_key)
-  return Array.from(new Set(keys)).filter((key): key is AdminRouteKeyV2 =>
-    GRANTABLE_EDIT_ROUTES.includes(key as AdminRouteKeyV2)
-  )
+  const live = data.filter((row) => !row.valid_until || new Date(row.valid_until).getTime() > now)
+  const grantable = (key: string): key is AdminRouteKeyV2 => GRANTABLE_EDIT_ROUTES.includes(key as AdminRouteKeyV2)
+  return {
+    routes: Array.from(new Set(live.map((row) => row.route_key))).filter(grantable),
+    delegators: Object.fromEntries(
+      live.filter((row) => row.delegated_from).map((row) => [row.route_key, row.delegated_from as string])
+    ),
+    // A grant with no delegator is a standing override; one lent by an owner is "acting for".
+    overrideRoutes: Array.from(new Set(live.filter((row) => !row.delegated_from).map((row) => row.route_key))).filter(
+      grantable
+    ),
+  }
+}
+
+/** The guarded areas the person owns. Fails closed: no table, no owners. */
+export async function loadOwnedAreas(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("edit_area_owners")
+    .select("area")
+    .eq("user_id", userId)
+    .returns<Array<{ area: string }>>()
+  if (error || !data) return []
+  return Array.from(new Set(data.map((row) => row.area)))
 }
 
 export async function resolveAdminScope(supabase: SupabaseClient, userId: string): Promise<AdminScope | null> {
@@ -311,7 +337,18 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
   if (normalizedRole === "admin" && (!adminRoutes || adminRoutes.length === 0) && !isDepartmentLead) {
     return null
   }
-  const editRoutes = isAdminLike ? await loadActiveEditRoutes(supabase, userId) : []
+  const {
+    routes: editRoutes,
+    overrideRoutes: editOverrideRoutes,
+    delegators: editDelegators,
+  } = isAdminLike
+    ? await loadActiveEditRoutes(supabase, userId)
+    : {
+        routes: [] as AdminRouteKeyV2[],
+        overrideRoutes: [] as AdminRouteKeyV2[],
+        delegators: {} as Record<string, string>,
+      }
+  const ownedAreas = isAdminLike ? await loadOwnedAreas(supabase, userId) : []
 
   return {
     userId,
@@ -327,6 +364,9 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     isAdminLike,
     adminRoutes,
     editRoutes,
+    editOverrideRoutes,
+    editDelegators,
+    ownedAreas,
     scopeMode,
   }
 }
