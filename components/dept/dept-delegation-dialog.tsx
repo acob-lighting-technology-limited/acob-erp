@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { usePathname } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { UserCheck } from "lucide-react"
 import { toast } from "sonner"
@@ -18,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { apiFetch } from "@/lib/api-client"
 import { ADMIN_ONLY_PAGES, DEPT_DELEGABLE_PAGES } from "@/lib/dept/delegated-pages"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -293,4 +295,16 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
       </Dialog>
     </>
   )
+}
+
+/**
+ * The header version: finds the department from the URL and shows only to the department's lead
+ * (nothing on /admin, and nothing for a delegate, who cannot delegate onward).
+ */
+export function DeptDelegationAction() {
+  const pathname = usePathname()
+  const scope = useAdminScopeOptional()
+  const deptId = pathname?.split("/")[1] === "dept" ? pathname.split("/")[2] : undefined
+  if (!deptId || scope?.delegated) return null
+  return <DeptDelegationButton deptId={deptId} />
 }

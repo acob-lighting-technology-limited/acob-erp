@@ -4,7 +4,6 @@ import { AcoBot } from "@/components/acobot/acobot"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { DeptDelegationButton } from "@/components/dept/dept-delegation-dialog"
 import { DEPT_DELEGABLE_PAGES } from "@/lib/dept/delegated-pages"
 import { formatWATDate } from "@/lib/utils/date"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -51,6 +50,7 @@ export default async function DeptLayoutPage({ children, params }: DeptLayoutPag
     managedDepartmentIds: [scope.deptId],
     isDepartmentLead: true,
     isAdminLike: scope.isAdminLike,
+    delegated: Boolean(scope.delegation),
   }
 
   // Profile shape for AdminSidebar — augment with lead info so the sidebar
@@ -83,12 +83,6 @@ export default async function DeptLayoutPage({ children, params }: DeptLayoutPag
       <div className="bg-muted/50 text-muted-foreground mx-4 mt-4 rounded-lg border p-3 text-sm md:mx-6">
         You are acting for <span className="text-foreground font-medium">{fromName}</span> in {scope.deptName} until{" "}
         {formatWATDate(delegation.validUntil)}. You can use: {labels.join(", ")}.
-      </div>
-    )
-  } else {
-    banner = (
-      <div className="flex justify-end px-4 pt-3 md:px-6">
-        <DeptDelegationButton deptId={scope.deptId} />
       </div>
     )
   }

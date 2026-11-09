@@ -1,11 +1,13 @@
 "use client"
 
 import type { Employee, EmployeeGender, UserProfile } from "./_components/employee-types"
+import { DeptDelegationAction } from "@/components/dept/dept-delegation-dialog"
 import {
   deriveLeadDepartments,
   getRoleBadgeLabel,
   isContractStaff,
   roleList,
+  genderFilterOptions,
   ELEVATED_ROLES,
 } from "./_components/employee-helpers"
 import { useCanEdit } from "@/components/admin/edit-access-context"
@@ -86,13 +88,6 @@ import { EmployeeAvatar } from "./_components/employee-avatar"
 export type { Employee, UserProfile } from "./_components/employee-types"
 
 const log = logger("hr-employees-admin-employee-content")
-
-const genderFilterOptions: { value: EmployeeGender; label: string }[] = [
-  { value: "male", label: "Male" },
-  { value: "female", label: "Female" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-  { value: "unspecified", label: "Unspecified" },
-]
 
 async function fetchAllEmployees(): Promise<Employee[]> {
   const response = await apiFetch("/api/admin/employees", { cache: "no-store" })
@@ -1061,6 +1056,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}
       actions={
         <div className="flex items-center gap-2">
+          <DeptDelegationAction />
           {(canManageUsers || canReviewApplications) && (
             <Button onClick={() => setManageUsersOpen(true)} variant="default" size="sm" className="h-8 gap-2">
               <Settings2 className="h-4 w-4" />

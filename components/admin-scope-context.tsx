@@ -15,6 +15,8 @@ export interface ClientAdminScope {
   managedDepartmentIds: string[]
   isDepartmentLead: boolean
   isAdminLike: boolean
+  /** Acting through a department delegation: cannot delegate onward. */
+  delegated?: boolean
 }
 
 const AdminScopeContext = createContext<ClientAdminScope | null>(null)

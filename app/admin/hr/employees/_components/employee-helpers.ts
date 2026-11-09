@@ -1,6 +1,7 @@
 import { getRoleDisplayName } from "@/lib/permissions"
 import { normalizeDepartmentName } from "@/shared/departments"
 import type { UserRole } from "@/types/database"
+import type { EmployeeGender } from "./employee-types"
 
 export function deriveLeadDepartments(
   department: string,
@@ -34,3 +35,10 @@ export function isContractStaff(employee: {
     !employee.company_email
   )
 }
+
+export const genderFilterOptions: { value: EmployeeGender; label: string }[] = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+  { value: "unspecified", label: "Unspecified" },
+]
