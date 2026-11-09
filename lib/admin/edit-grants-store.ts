@@ -43,7 +43,8 @@ export async function upsertEditGrants(
           delegated_from: params.delegatedFrom,
           granted_by: params.grantedBy,
           valid_until: validUntil,
-          dept_delegation_id: params.deptDelegationId ?? null,
+          // Only written for a department delegation, so a plain grant works before that column exists.
+          ...(params.deptDelegationId ? { dept_delegation_id: params.deptDelegationId } : {}),
         })
     if (error) return { error }
   }
