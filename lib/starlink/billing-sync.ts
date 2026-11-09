@@ -5,6 +5,7 @@ import { getOneDriveService } from "@/lib/onedrive"
 import { buildPaymentDocumentFolderPathByType, buildPaymentDocumentPath } from "@/lib/payments/document-storage"
 import {
   STARLINK_SENDER,
+  BILLING_KINDS,
   classifyStarlinkMail,
   htmlToText,
   parseStarlinkMail,
@@ -327,6 +328,30 @@ export async function syncStarlinkBilling(
       const payment = kit ? paymentsBySite.get(kit.id) : undefined
       if (!kit) {
         result = { outcome: "unmatched", detail: `No kit has account ${parsed.accountNumber ?? "(none)"}` }
+      } else if (kind === "activated" || kind === "ending") {
+        // Service emails only update the kit's service dates; billing is untouched.
+        const detail =
+          kind === "activated"
+            ? `Service activated for ${kit.site_name}`
+            : parsed.serviceEndDate
+              ? `${kit.site_name} service ends ${parsed.serviceEndDate}`
+              : null
+        if (kind === "ending" && !parsed.serviceEndDate) {
+          result = { outcome: "error", siteId: kit.id, detail: "No end date in the service email" }
+        } else {
+          result = { outcome: "applied", siteId: kit.id, paymentId: payment?.id ?? null, detail: detail ?? undefined }
+          if (!dryRun) {
+            const { error: kitError } = await supabase
+              .from("starlink_sites")
+              .update({
+                // A new activation clears any earlier end date; a stop request sets it.
+                service_end_date: kind === "ending" ? parsed.serviceEndDate : null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", kit.id)
+            if (kitError) throw new Error(kitError.message)
+          }
+        }
       } else if (!payment) {
         result = { outcome: "unmatched", siteId: kit.id, detail: `Kit ${kit.site_name} has no Starlink payment` }
       } else {
@@ -389,6 +414,7 @@ export async function syncStarlinkBilling(
   const bySite = new Map<string, BillingEventForSchedule[]>()
   for (const event of events.values()) {
     if (!event.site_id || event.outcome === "unmatched" || event.outcome === "error") continue
+    if (!BILLING_KINDS.has(event.kind)) continue
     const list = bySite.get(event.site_id) ?? []
     list.push({
       kind: event.kind,

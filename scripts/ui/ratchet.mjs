@@ -131,8 +131,18 @@ async function main() {
     process.exit(1)
   }
 
-  const fixed = improved.reduce((a, r) => a + (r.was - r.now), 0)
-  console.log(`UI ratchet ok.${fixed ? ` ${fixed} fewer violation(s) than the baseline: run "npm run ui:ratchet:update" and commit it.` : ""}`)
+  const fixed = improved.filter((r) => r.rule !== "file-lines").reduce((a, r) => a + (r.was - r.now), 0)
+  const lineDelta = improved.filter((r) => r.rule === "file-lines").reduce((a, r) => a + (r.was - r.now), 0)
+
+  const updateHint = ': run "npm run ui:ratchet:update" and commit it.'
+  const successSuffix = fixed ? ` ${fixed} fewer violation(s) than the baseline` : ""
+  const runOnFirst = fixed ? updateHint : ""
+  const runOnSecond = !fixed && lineDelta ? updateHint : ""
+
+  console.log(`UI ratchet ok.${successSuffix}${runOnFirst}`)
+  if (lineDelta) {
+    console.log(`file-lines: ${lineDelta} fewer lines in files over 1,000 lines${runOnSecond}`)
+  }
 }
 
 main().catch((error) => {

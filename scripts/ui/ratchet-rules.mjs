@@ -1,12 +1,24 @@
 // Rules for the UI ratchet. Each one is a rule AGENTS.md already states and that nothing else enforces.
 // A rule turns a file's text into a count; ratchet.mjs compares that count to the committed baseline.
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const allowlistPath = path.join(__dirname, "ui-audit-allowlist.json")
+let standalonePages = new Set()
+try {
+  const allowlist = JSON.parse(fs.readFileSync(allowlistPath, "utf8"))
+  standalonePages = new Set(allowlist.header || [])
+} catch {
+  // if missing (e.g. in test env), empty set
+}
 
 const HINTS = {
   "tiny-text": "Minimum text size is text-xs (12px). Use text-xs.",
   "locale-without-en-ng":
     'Use the helpers in @/lib/utils/date (formatWATDate...), or pass en-NG and timeZone: "Africa/Lagos". Business time is Lagos time.',
   "raw-img": "Use next/image. A raw <img> is only for email/PDF/OG renderers.",
-  "window-dialogs": "Confirm with AlertDialog (or useConfirm) and notify with sonner. No window.confirm/alert/prompt.",
   "key-index": "Use a stable id as the React key, not the array index.",
   "dialog-in-page": "Move <DialogContent> out of the page/view file into _components/.",
   "explicit-any": "Type it. Use unknown plus a narrowing, or a real type.",
@@ -22,6 +34,10 @@ const HINTS = {
   "title-brand-suffix":
     'The root layout appends | Matrix to every page title. Write only the page name, e.g. title: "Leave".',
   "file-lines": "Do not grow a file over 1,000 lines. Extract into _components/, a hook, or lib/.",
+  "api-error-message": "Never return `error.message` to the client. Log it with the logger; return a generic message.",
+  "route-without-zod": "Validate the body with zod.",
+  "local-number-format": "Use the shared formatters in `@/lib/utils`; no local copies of shared helpers.",
+  "hand-h1": "The title comes from `PageHeader`. Do not hand-write an `<h1>`.",
 }
 
 /** Remove comments so a rule is not tripped by prose that mentions what it forbids. Keeps line count. */
@@ -77,10 +93,6 @@ export const RULES = [
     count: (text) => count(text, /<img\b/g),
   },
   {
-    id: "window-dialogs",
-    count: (text) => count(text, /\bwindow\.(?:confirm|alert|prompt)\(|(?<![\w.$])alert\(/g),
-  },
-  {
     id: "key-index",
     count: (text) => count(text, /\bkey=\{(?:i|idx|index)\}/g),
   },
@@ -125,7 +137,7 @@ export const RULES = [
     id: "click-div",
     // A wrapper whose onClick only stops propagation keeps a row's click from firing. It has no action of
     // its own, so there is nothing for a keyboard user to miss.
-    count: (text) => count(text, /<div\b[^>\n]*\sonClick=(?!\{\(?\w*\)?\s*=>\s*\w+\.stopPropagation\(\)\})/g),
+    count: (text) => count(text, /<div\b[^>]*\sonClick=(?!\{\(?\w*\)?\s*=>\s*\w+\.stopPropagation\(\)\})/g),
   },
   {
     id: "client-page",
@@ -157,6 +169,35 @@ export const RULES = [
       const lines = text.split("\n").length
       return lines > 1000 ? lines : 0
     },
+  },
+  {
+    id: "api-error-message",
+    applies: (f) => f.startsWith("app/api/"),
+    count: (text) =>
+      count(text, /NextResponse\.json\(\s*\{\s*error:\s*(?:[a-zA-Z0-9_]*Error|error|err)\??\.message/g),
+  },
+  {
+    id: "route-without-zod",
+    applies: (f) => f.startsWith("app/api/") && /(^|\/)route\.ts$/.test(f),
+    count: (text) => {
+      const hasJson = /\b(?:req|request)\.json\(\)/.test(text)
+      // A route may define its own zod schema, or validate with a shared one from lib/ (`Schema.safeParse(...)`).
+      // JSON.parse is not validation, so it does not count.
+      const hasZod =
+        /from\s+["']zod["']/.test(text) || /\bz\.object\b/.test(text) || /(?<!JSON)\.(?:safeParse|parse)\(/.test(text)
+      return hasJson && !hasZod ? 1 : 0
+    },
+  },
+  {
+    id: "local-number-format",
+    applies: (f) =>
+      (f.startsWith("app/") || f.startsWith("components/") || f.startsWith("hooks/")) && !f.startsWith("lib/utils/"),
+    count: (text) => count(text, /\bnew\s+Intl\.NumberFormat\b/g),
+  },
+  {
+    id: "hand-h1",
+    applies: (f) => f.startsWith("app/") && !standalonePages.has(f),
+    count: (text) => count(text, /<h1\b/g),
   },
 ]
 

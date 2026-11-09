@@ -299,7 +299,15 @@ export async function sendStarlinkBillingAlerts(
     for (const event of pending) {
       const key = `${event.site_id}|${event.period_start}`
       const kit = kits.get(event.site_id)
-      if (config.failed.enabled && recipients.length > 0 && !alerted.has(key) && kit && event.payment_id) {
+      // An inactive kit (service stopped or replaced) gets no failure alerts.
+      if (
+        config.failed.enabled &&
+        recipients.length > 0 &&
+        !alerted.has(key) &&
+        kit &&
+        kit.is_active &&
+        event.payment_id
+      ) {
         await deliver(
           supabase,
           {

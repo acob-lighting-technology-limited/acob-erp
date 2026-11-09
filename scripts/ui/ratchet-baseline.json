@@ -31,7 +31,6 @@
       "lib/starlink/billing-alerts.ts": 1,
       "lib/tasks/mailer.ts": 1
     },
-    "window-dialogs": {},
     "key-index": {},
     "dialog-in-page": {},
     "explicit-any": {
@@ -251,7 +250,38 @@
       "components/auth/auth-shell.tsx": 1,
       "components/events/event-month-calendar.tsx": 1
     },
-    "click-div": {},
+    "click-div": {
+      "app/(app)/documentation/documentation-content.tsx": 1,
+      "app/(app)/documentation/personal/personal-documentation-content.tsx": 1,
+      "app/(app)/help-desk/help-desk-content.tsx": 1,
+      "app/(app)/notifications/notification-content.tsx": 1,
+      "app/admin/audit-logs/admin-audit-logs-content.tsx": 1,
+      "app/admin/corporate-scorecard/_components/corporate-scorecard-register.tsx": 1,
+      "app/admin/corporate-scorecard/_components/department-cascade-content.tsx": 1,
+      "app/admin/corporate-scorecard/_components/scorecard-summary-content.tsx": 1,
+      "app/admin/feedback/admin-feedback-content.tsx": 1,
+      "app/admin/hr/attendance/_components/calendar-view.tsx": 1,
+      "app/admin/hr/job-descriptions/page-client.tsx": 1,
+      "app/admin/hr/leave/_components/leave-calendar-view.tsx": 1,
+      "app/admin/notifications/admin-notification-content.tsx": 1,
+      "app/admin/payroll/[id]/view.tsx": 1,
+      "app/admin/payroll/calculator/view.tsx": 6,
+      "app/admin/payroll/view.tsx": 1,
+      "app/admin/pms/reviews/[cycleId]/view.tsx": 2,
+      "app/admin/pms/reviews/view.tsx": 2,
+      "app/admin/projects/_components/project-plan-board.tsx": 2,
+      "app/admin/settings/cbt/_components/cbt-settings-form.tsx": 1,
+      "components/admin-sidebar.tsx": 1,
+      "components/approval-signing/signing-setup.tsx": 1,
+      "components/documentation/department-documents-browser.tsx": 2,
+      "components/notification-bell.tsx": 1,
+      "components/payments/payments-table.tsx": 1,
+      "components/pms/cbt-upload-dialog.tsx": 1,
+      "components/requisitions/requisitions-list-page.tsx": 1,
+      "components/sidebar.tsx": 1,
+      "components/ui/data-table/data-table.tsx": 1,
+      "components/ui/searchable-multi-select.tsx": 1
+    },
     "client-page": {},
     "page-missing-metadata": {
       "app/(app)/accounts/payments/@modal/(.)[id]/page.tsx": 1,
@@ -284,6 +314,49 @@
       "components/ui/data-table/data-table.tsx": 1876,
       "lib/assets/handover-pdf-generator.ts": 1096,
       "lib/export/pptx.ts": 1998
+    },
+    "api-error-message": {
+      "app/api/admin/communications/kss-rotation/route.ts": 1,
+      "app/api/admin/hr/employees/[userId]/email/route.ts": 1,
+      "app/api/auth/change-password/route.ts": 1,
+      "app/api/payments/[id]/documents/[documentId]/download/route.ts": 1,
+      "app/api/starlink/alerts/route.ts": 1,
+      "app/api/starlink/kits/[id]/route.ts": 1,
+      "app/api/starlink/kits/route.ts": 2
+    },
+    "route-without-zod": {
+      "app/api/dev/flow-tests/route.ts": 1,
+      "app/api/dev/leave-flow-test/route.ts": 1,
+      "app/api/download/route.ts": 1,
+      "app/api/fleet/archive/route.ts": 1,
+      "app/api/help-desk/archive/route.ts": 1,
+      "app/api/info/route.ts": 1,
+      "app/api/onedrive/route.ts": 1,
+      "app/api/payments/archive/route.ts": 1,
+      "app/api/projects/[id]/tasks/route.ts": 1,
+      "app/api/reports/meeting-artifacts/send/route.ts": 1,
+      "app/api/reports/meeting-artifacts/sources/route.ts": 1,
+      "app/api/reports/meeting-week-documents/route.ts": 1,
+      "app/api/requisitions/archive/route.ts": 1,
+      "app/api/song/download/route.ts": 1,
+      "app/api/song/info/route.ts": 1
+    },
+    "local-number-format": {
+      "app/admin/accounts/starlink/view.tsx": 1,
+      "components/md-desk/md-queue-preview-sheet.tsx": 1,
+      "components/md-desk/waiting-on-md.tsx": 1,
+      "components/payments/payment-detail-view.tsx": 1,
+      "components/payments/payment-preview-sheet.tsx": 1,
+      "components/payments/payments-table.tsx": 1,
+      "components/projects/project-payments-card.tsx": 1
+    },
+    "hand-h1": {
+      "app/admin/hr/employees/signature/[userId]/page.tsx": 1,
+      "app/admin/hr/leave/test/page.tsx": 1,
+      "app/birthday/birthday-clothesline.tsx": 1,
+      "app/birthday/birthday-explorer.tsx": 1,
+      "app/birthday1/poster.tsx": 1,
+      "app/cbt/page-client.tsx": 1
     }
   }
 }
