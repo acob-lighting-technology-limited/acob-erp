@@ -92,7 +92,7 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
   const [until, setUntil] = useState("")
 
   const queryKey = QUERY_KEYS.deptDelegations(deptId)
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey,
     queryFn: async (): Promise<DelegationData> => {
       const res = await apiFetch(`/api/dept/${deptId}/delegations`, { cache: "no-store" })
@@ -159,7 +159,7 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
     onError: (error: Error) => toast.error(error.message),
   })
 
-  const canSubmit = Boolean(personId) && pages.length > 0 && Boolean(until)
+  const canSubmit = !isError && Boolean(personId) && pages.length > 0 && Boolean(until)
 
   function toggleGroup(options: PageOption[], on: boolean) {
     const keys = options.map((option) => option.key)
@@ -184,6 +184,11 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
           </DialogHeader>
 
           <div className="space-y-5">
+            {isError && (
+              <p className="text-destructive rounded-lg border p-3 text-sm">
+                Could not load the people and pages you can delegate. Nothing has been saved. Try again shortly.
+              </p>
+            )}
             <section className="space-y-2">
               <Label>1. Who will act for you?</Label>
               <SearchableSelect
