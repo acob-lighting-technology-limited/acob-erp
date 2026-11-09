@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -210,6 +211,7 @@ function CycleCard({ row, onView }: { row: CycleRow; onView?: (row: CycleRow) =>
 const EMPTY_CBT: CbtPayload = { users: [], cycles: [], scores: [] }
 
 export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
+  const canEditCbt = useCanEdit("hr.pms.cbt.manage")
   const isLeadView = Boolean(deptId)
   const basePath = deptId ? `/dept/${deptId}/pms/cbt` : "/admin/hr/pms/cbt"
   const router = useRouter()
@@ -627,23 +629,27 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     },
   ]
 
-  const cycleRowActions: RowAction<CycleRow>[] = [
-    {
-      label: "Manage Questions",
-      icon: Eye,
-      onClick: (row) => router.push(`${basePath}/question?cycleId=${encodeURIComponent(row.id)}`),
-    },
-  ]
+  const cycleRowActions: RowAction<CycleRow>[] = canEditCbt
+    ? [
+        {
+          label: "Manage Questions",
+          icon: Eye,
+          onClick: (row) => router.push(`${basePath}/question?cycleId=${encodeURIComponent(row.id)}`),
+        },
+      ]
+    : []
 
-  const individualRowActions: RowAction<IndividualRow>[] = [
-    {
-      label: "Reset CBT Attempt",
-      icon: RotateCcw,
-      variant: "destructive",
-      hidden: (row) => row.cbt_score === null,
-      onClick: (row) => setResetConfirmRow(row),
-    },
-  ]
+  const individualRowActions: RowAction<IndividualRow>[] = canEditCbt
+    ? [
+        {
+          label: "Reset CBT Attempt",
+          icon: RotateCcw,
+          variant: "destructive",
+          hidden: (row) => row.cbt_score === null,
+          onClick: (row) => setResetConfirmRow(row),
+        },
+      ]
+    : []
 
   async function handleResetAttempt() {
     if (!resetConfirmRow) return
@@ -700,12 +706,14 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
               </Button>
             </Link>
           ) : null}
-          <Link href={`${basePath}/question`}>
-            <Button size="sm">
-              <span className="hidden sm:inline">Create Test</span>
-              <span className="sm:hidden">Create</span>
-            </Button>
-          </Link>
+          {canEditCbt ? (
+            <Link href={`${basePath}/question`}>
+              <Button size="sm">
+                <span className="hidden sm:inline">Create Test</span>
+                <span className="sm:hidden">Create</span>
+              </Button>
+            </Link>
+          ) : null}
         </div>
       }
       stats={

@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { BookOpen, Eye, Pencil, Plus, Target, TrendingUp, Users } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
@@ -100,11 +101,13 @@ function normalizeCycleValue(value: string) {
 
 function PlanCard({
   plan,
+  canEdit,
   cycleName,
   onView,
   onEdit,
 }: {
   plan: DevelopmentPlan
+  canEdit: boolean
   cycleName: string
   onView: (plan: DevelopmentPlan) => void
   onEdit: (plan: DevelopmentPlan) => void
@@ -141,15 +144,18 @@ function PlanCard({
         <Button size="sm" variant="outline" onClick={() => onView(plan)}>
           View
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>
-          Edit
-        </Button>
+        {canEdit && (
+          <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>
+            Edit
+          </Button>
+        )}
       </div>
     </div>
   )
 }
 
 export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
   const { profiles: employees } = useHrProfiles<Profile>()
   const { cycles } = usePerformanceCycles<Cycle>()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -448,11 +454,15 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
       icon: Eye,
       onClick: (plan) => setViewingPlan(plan),
     },
-    {
-      label: "Edit",
-      icon: Pencil,
-      onClick: (plan) => openEdit(plan),
-    },
+    ...(canEditPms
+      ? [
+          {
+            label: "Edit",
+            icon: Pencil,
+            onClick: (plan: DevelopmentPlan) => openEdit(plan),
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -462,10 +472,12 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
       icon={BookOpen}
       backLink={{ href: backLinkHref ?? "/admin/hr/pms", label: "Back to PMS" }}
       actions={
-        <Button onClick={openCreate} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New Plan</span>
-        </Button>
+        canEditPms ? (
+          <Button onClick={openCreate} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Plan</span>
+          </Button>
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -568,6 +580,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         cardRenderer={(plan) => (
           <PlanCard
             plan={plan}
+            canEdit={canEditPms}
             cycleName={cycleNameMap.get(plan.review_cycle_id || "") || "-"}
             onView={setViewingPlan}
             onEdit={openEdit}

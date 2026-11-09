@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { BookOpen, Pencil, Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
@@ -71,11 +72,13 @@ function CompetencyStatusBadge({ isActive }: { isActive: boolean }) {
 
 function CompetencyCard({
   competency,
+  canEdit,
   onEdit,
   onToggle,
   onDelete,
 }: {
   competency: Competency
+  canEdit: boolean
   onEdit: (competency: Competency) => void
   onToggle: (competency: Competency) => void
   onDelete: (competency: Competency) => void
@@ -103,22 +106,25 @@ function CompetencyCard({
           <p>{formatDate(competency.created_at)}</p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => onEdit(competency)}>
-          Edit
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => onToggle(competency)}>
-          {competency.is_active ? "Deactivate" : "Activate"}
-        </Button>
-        <Button size="sm" variant="destructive" onClick={() => onDelete(competency)}>
-          Delete
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => onEdit(competency)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onToggle(competency)}>
+            {competency.is_active ? "Deactivate" : "Activate"}
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => onDelete(competency)}>
+            Delete
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
 
 export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -402,11 +408,13 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
       description="Manage the scoring competencies used across performance reviews."
       icon={BookOpen}
       actions={
-        <Button onClick={openCreate} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Add Competency</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
+        canEditPms ? (
+          <Button onClick={openCreate} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Competency</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -461,7 +469,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
         isLoading={isLoading}
         error={error}
         onRetry={() => void load()}
-        rowActions={rowActions}
+        rowActions={canEditPms ? rowActions : []}
         expandable={{
           render: (competency) => (
             <div className="grid gap-4 text-sm sm:grid-cols-3">
@@ -493,6 +501,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
         cardRenderer={(competency) => (
           <CompetencyCard
             competency={competency}
+            canEdit={canEditPms}
             onEdit={openEdit}
             onToggle={(item) => void handleToggleActive(item)}
             onDelete={openDelete}

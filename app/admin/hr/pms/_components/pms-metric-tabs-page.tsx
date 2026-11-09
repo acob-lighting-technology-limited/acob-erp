@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { BarChart3, CheckCircle2, Clock3, Download, Loader2, Plus, ShieldCheck, Target, Users } from "lucide-react"
@@ -622,8 +623,9 @@ export function PmsMetricTabsPage({
     return result
   }, [tab, data, cycleId, cycleType, setCycleType, isRefreshing])
 
+  const canEditPms = useCanEdit("hr.pms")
   const tableRowActions = useMemo<RowAction<Record<string, unknown>>[] | undefined>(() => {
-    if (tab === "individual" && (metric === "attendance" || metric === "behaviour")) {
+    if (tab === "individual" && (metric === "attendance" || (metric === "behaviour" && canEditPms))) {
       return [
         {
           label: metric === "attendance" ? "Manage Attendance" : "Edit",
@@ -641,7 +643,7 @@ export function PmsMetricTabsPage({
       ]
     }
     return undefined
-  }, [tab, metric, router, attendanceBasePath])
+  }, [tab, metric, router, attendanceBasePath, canEditPms])
 
   const expandedRowsByGroup = useMemo(() => {
     const individuals = (data?.rows.individual || []) as Record<string, unknown>[]
@@ -733,7 +735,7 @@ export function PmsMetricTabsPage({
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
           </Button>
-          {metric === "behaviour" ? (
+          {metric === "behaviour" && canEditPms ? (
             <Button className="h-8 gap-2" size="sm" onClick={() => setIsModalOpen(true)}>
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Behaviour</span>

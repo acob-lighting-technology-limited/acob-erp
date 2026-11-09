@@ -1,5 +1,12 @@
 "use client"
 
+import {
+  deriveLeadDepartments,
+  getRoleBadgeLabel,
+  isContractStaff,
+  roleList,
+  ELEVATED_ROLES,
+} from "./_components/employee-helpers"
 import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -153,31 +160,6 @@ interface AdminEmployeeContentProps {
  * selection is preserved; the home department is only used as a fallback when
  * nothing has been chosen yet.
  */
-function deriveLeadDepartments(department: string, isDepartmentLead: boolean, selected?: string[] | null): string[] {
-  if (!isDepartmentLead) return []
-  const source = selected?.length ? selected : [department]
-  return Array.from(new Set(source.map((name) => normalizeDepartmentName(name)).filter(Boolean)))
-}
-
-const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
-const ELEVATED_ROLES: UserRole[] = ["super_admin", "admin", "developer"]
-
-function getRoleBadgeLabel(role: UserRole): string {
-  if (role === "super_admin") return "S. Admin"
-  return getRoleDisplayName(role)
-}
-
-/**
- * Field contractors on payroll (CTR group without company email). Contract personnel
- * with company email addresses are active platform employees and appear under Employees.
- */
-function isContractStaff(employee: Employee): boolean {
-  return (
-    ((employee.employment_status || "").toLowerCase() === "contract" || employee.employment_type === "contract") &&
-    !employee.company_email
-  )
-}
-
 type EmployeeProfileRecord = EmployeeProfile & {
   contract_categories?: { code?: string } | null
   separation_reason?: string | null
@@ -298,7 +280,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   const canEditHr = useCanEdit("hr.main")
   const canManageUsers = canEditHr && ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
-  const canReviewApplications = canManageUsers || Boolean(userProfile?.is_department_lead)
+  const canReviewApplications = canEditHr && (canManageUsers || Boolean(userProfile?.is_department_lead))
 
   const {
     data: employees = [],
@@ -1138,10 +1120,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setBirthdayManagerOpen(true)}>
-                <Cake className="mr-2 h-4 w-4" />
-                Birthday Manager
-              </DropdownMenuItem>
+              {canEditHr && (
+                <DropdownMenuItem onClick={() => setBirthdayManagerOpen(true)}>
+                  <Cake className="mr-2 h-4 w-4" />
+                  Birthday Manager
+                </DropdownMenuItem>
+              )}
               {(canManageUsers || canReviewApplications) && (
                 <DropdownMenuItem onClick={() => setCategoriesDialogOpen(true)}>
                   <Tags className="mr-2 h-4 w-4" />

@@ -286,7 +286,7 @@
       "app/lunch/_components/lunch-share-view.tsx": 1
     },
     "file-lines": {
-      "app/(app)/hr/attendance/attendance-content.tsx": 1144,
+      "app/(app)/hr/attendance/attendance-content.tsx": 1133,
       "app/(app)/hr/leave/leave-content.tsx": 1254,
       "app/(app)/hr/lunch/lunch-content.tsx": 1112,
       "app/(app)/reports/action-tracker/page-client.tsx": 1095,
@@ -296,10 +296,10 @@
       "app/admin/communications/_components/communications-composer.tsx": 1033,
       "app/admin/dev/login-logs/dev-login-logs-content.tsx": 1263,
       "app/admin/hr/attendance/_components/attendance-manager-dialog.tsx": 2590,
-      "app/admin/hr/attendance/view.tsx": 1191,
-      "app/admin/hr/employees/admin-employee-content.tsx": 1526,
-      "app/admin/hr/lunch/view.tsx": 2685,
-      "app/admin/hr/pms/reviews/view.tsx": 1094,
+      "app/admin/hr/attendance/view.tsx": 1159,
+      "app/admin/hr/employees/admin-employee-content.tsx": 1516,
+      "app/admin/hr/lunch/view.tsx": 2651,
+      "app/admin/hr/pms/reviews/view.tsx": 1087,
       "app/admin/reports/action-tracker/action-tracker-content.tsx": 1181,
       "components/admin-sidebar.tsx": 1113,
       "components/documentation/department-documents-browser.tsx": 1827,

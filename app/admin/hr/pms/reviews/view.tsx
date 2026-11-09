@@ -1,5 +1,7 @@
 "use client"
 
+import { formatMetric, isCompletedReview, isSubmittedReview } from "./_components/review-helpers"
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useMemo, useState } from "react"
 import { pickCanonicalReview } from "@/lib/pms/reviews"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -80,18 +82,6 @@ type CycleRow = {
 type TabMode = "individual" | "department" | "cycle" | "calibration"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatMetric(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, "") : "-"
-}
-
-function isSubmittedReview(r: ReviewRow) {
-  return ["submitted", "completed"].includes(String(r.status ?? "").toLowerCase())
-}
-
-function isCompletedReview(r: ReviewRow) {
-  return String(r.status ?? "").toLowerCase() === "completed"
-}
 
 /** A review's status on the shared badge; no status yet shows a dash. */
 function ReviewStatus({ status }: { status: string | null }) {
@@ -268,6 +258,7 @@ export function AdminPmsReviewsPage({
   backLinkHref,
   reviewCycleBasePath,
 }: { backLinkHref?: string; reviewCycleBasePath?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
   const router = useRouter()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<TabMode>("individual")
@@ -789,11 +780,13 @@ export function AdminPmsReviewsPage({
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button size="sm" className="h-8 gap-2" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Review</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          {canEditPms && (
+            <Button size="sm" className="h-8 gap-2" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Review</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
       stats={
@@ -868,7 +861,7 @@ export function AdminPmsReviewsPage({
               onClick: (row) => {
                 if (row.review_cycle_id) goToIndividualCycle(row.review_cycle_id)
               },
-              hidden: (row) => !row.review_cycle_id,
+              hidden: (row) => !canEditPms || !row.review_cycle_id,
             },
           ]}
           viewToggle

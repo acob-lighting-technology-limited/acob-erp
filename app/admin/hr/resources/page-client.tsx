@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -44,6 +45,7 @@ const TABS: DataTableTab[] = [
 ]
 
 export default function AdminFleetPage() {
+  const canEditFleet = useCanEdit("hr.fleet")
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("bookings")
 
@@ -376,7 +378,7 @@ export default function AdminFleetPage() {
         </StatGrid>
       }
       actions={
-        tab === "resources" ? (
+        tab === "resources" && canEditFleet ? (
           <Button size="sm" onClick={() => setIsResourceDialogOpen(true)}>
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Add Resource</span>
@@ -444,7 +446,7 @@ export default function AdminFleetPage() {
             title: (r) => `${r.resource?.name || "Resource"} · ${r.requester?.full_name || "Employee"}`,
             subtitle: (r) => `${formatDateTime(r.start_at)} - ${formatDateTime(r.end_at)} · ${r.reason || "No reason"}`,
             trailing: (r) => <StatusBadge status={r.status} className="text-xs" />,
-            onSelect: (r) => openReview(r),
+            onSelect: canEditFleet ? (r) => openReview(r) : undefined,
           }}
           cardRenderer={(r) => (
             <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
@@ -461,12 +463,16 @@ export default function AdminFleetPage() {
               </div>
             </div>
           )}
-          rowActions={[
-            {
-              label: "Review",
-              onClick: openReview,
-            },
-          ]}
+          rowActions={
+            canEditFleet
+              ? [
+                  {
+                    label: "Review",
+                    onClick: openReview,
+                  },
+                ]
+              : []
+          }
         />
       ) : (
         <DataTable<FleetResource>
@@ -499,18 +505,22 @@ export default function AdminFleetPage() {
               <p className="text-muted-foreground text-xs">{r.description || "No description"}</p>
             </div>
           )}
-          rowActions={[
-            {
-              label: "Activate",
-              onClick: toggleResource,
-              hidden: (row) => row.is_active,
-            },
-            {
-              label: "Deactivate",
-              onClick: toggleResource,
-              hidden: (row) => !row.is_active,
-            },
-          ]}
+          rowActions={
+            canEditFleet
+              ? [
+                  {
+                    label: "Activate",
+                    onClick: toggleResource,
+                    hidden: (row) => row.is_active,
+                  },
+                  {
+                    label: "Deactivate",
+                    onClick: toggleResource,
+                    hidden: (row) => !row.is_active,
+                  },
+                ]
+              : []
+          }
         />
       )}
 

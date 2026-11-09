@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { pickCanonicalReview } from "@/lib/pms/reviews"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -105,6 +106,7 @@ function statusBadge(status: string | null) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
   const params = useParams<{ cycleId: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -605,18 +607,20 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button
-            onClick={() => {
-              setEditingTarget(null)
-              setIsDialogOpen(true)
-            }}
-            className="h-8 gap-2"
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Review</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          {canEditPms && (
+            <Button
+              onClick={() => {
+                setEditingTarget(null)
+                setIsDialogOpen(true)
+              }}
+              className="h-8 gap-2"
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Review</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
     >
@@ -631,7 +635,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           error={error}
           onRetry={() => void loadReviews()}
           skeletonRows={6}
-          rowActions={individualRowActions}
+          rowActions={canEditPms ? individualRowActions : []}
           searchPlaceholder="Search employee, department or status…"
           searchFn={(r, q) => {
             const name = `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.toLowerCase()
@@ -680,15 +684,18 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
             subtitle: (r) =>
               `${r.user?.department || "No dept"} · KPI: ${fmt(r.kpi_score)} · Final: ${fmt(r.final_score)}`,
             trailing: (r) => statusBadge(r.status),
-            onSelect: (r) => {
-              setEditingTarget(r)
-              setIsDialogOpen(true)
-            },
+            onSelect: canEditPms
+              ? (r) => {
+                  setEditingTarget(r)
+                  setIsDialogOpen(true)
+                }
+              : undefined,
           }}
           cardRenderer={(r) => (
             <div
               className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
               onClick={() => {
+                if (!canEditPms) return
                 setEditingTarget(r)
                 setIsDialogOpen(true)
               }}

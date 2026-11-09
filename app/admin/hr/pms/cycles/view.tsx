@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { Calendar, CheckCircle2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
@@ -77,14 +78,16 @@ function StatusBadge({ status }: { status: CycleStatus | null }) {
 
 function CycleCard({
   cycle,
+  canEdit,
   onAdvance,
   onDelete,
 }: {
   cycle: ReviewCycle
+  canEdit: boolean
   onAdvance: (cycle: ReviewCycle, nextStatus: CycleStatus) => void
   onDelete: (cycle: ReviewCycle) => void
 }) {
-  const nextStatuses = STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus] || []
+  const nextStatuses = canEdit ? STATUS_TRANSITIONS[(cycle.status || "planned") as CycleStatus] || [] : []
 
   return (
     <div className="space-y-3 rounded-xl border p-4">
@@ -116,7 +119,7 @@ function CycleCard({
             {status === "active" && cycle.status === "closed" ? "Reopen" : `Mark ${STATUS_LABELS[status]}`}
           </Button>
         ))}
-        {!["active", "locked"].includes(String(cycle.status)) ? (
+        {canEdit && !["active", "locked"].includes(String(cycle.status)) ? (
           <Button size="sm" variant="destructive" onClick={() => onDelete(cycle)}>
             Delete
           </Button>
@@ -127,6 +130,7 @@ function CycleCard({
 }
 
 export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
   const { cycles, isLoading, error: cyclesError, refetch } = usePerformanceCycles<ReviewCycle>()
   const error = cyclesError?.message ?? null
   const loadCycles = () => refetch()
@@ -322,10 +326,12 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
       description="Create and manage performance review cycles. Only one cycle can be active at a time."
       icon={RefreshCw}
       actions={
-        <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New Cycle</span>
-        </Button>
+        canEditPms ? (
+          <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Cycle</span>
+          </Button>
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -381,7 +387,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         isLoading={isLoading}
         error={error}
         onRetry={() => void loadCycles()}
-        rowActions={rowActions}
+        rowActions={canEditPms ? rowActions : []}
         expandable={{
           render: (cycle) => (
             <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
@@ -417,6 +423,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         cardRenderer={(cycle) => (
           <CycleCard
             cycle={cycle}
+            canEdit={canEditPms}
             onAdvance={(item, next) => {
               setStatusTarget({ cycle: item, newStatus: next })
             }}

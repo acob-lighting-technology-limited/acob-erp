@@ -1,5 +1,6 @@
 "use client"
 
+import { countPermissionDaysInMonth } from "@/lib/hr/permission-days"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
@@ -284,24 +285,10 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   const [editAppeal, setEditAppeal] = useState<AppealRecord | null>(null)
   const [cancelAppealId, setCancelAppealId] = useState<string | null>(null)
   const [isCancellingAppeal, setIsCancellingAppeal] = useState(false)
-  const currentMonthLwpAwpCount = useMemo(() => {
-    const currentYM = toLocalYearMonth()
-    // A day whose appeal ended "resolved" (device failure, or Admin & HR corrected it) is not a permission used.
-    const resolvedDates = new Set(appeals.filter((a) => a.status === "resolved").map((a) => a.appeal_date))
-    let count = 0
-    for (const day of unifiedDays ?? []) {
-      if (day.date.startsWith(currentYM) && !resolvedDates.has(day.date)) {
-        if (
-          day.status === "lateness_with_permission" ||
-          day.status === "incomplete_with_permission" ||
-          day.status === "absent_with_permission"
-        ) {
-          count++
-        }
-      }
-    }
-    return count
-  }, [unifiedDays, appeals])
+  const currentMonthLwpAwpCount = useMemo(
+    () => countPermissionDaysInMonth(unifiedDays ?? [], appeals, toLocalYearMonth()),
+    [unifiedDays, appeals]
+  )
 
   const fetchAttendanceData = useCallback(() => void daysQuery.refetch(), [daysQuery])
   const fetchAppeals = useCallback(() => void appealsQuery.refetch(), [appealsQuery])
