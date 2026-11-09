@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { archiveHelpDeskTicketToSharePoint, sweepResolvedTicketsForArchive } from "@/lib/help-desk/archive"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { denyUnlessTicketInScope } from "@/lib/admin/target-scope"
 
 /**
  * POST /api/help-desk/archive
@@ -38,10 +39,16 @@ export async function POST(request: NextRequest) {
   const ticketId = typeof body?.ticket_id === "string" ? body.ticket_id.trim() : null
 
   if (ticketId) {
+    const denied = await denyUnlessTicketInScope(dataClient, scope, ticketId)
+    if (denied) return denied
     const result = await archiveHelpDeskTicketToSharePoint(dataClient, ticketId)
     return NextResponse.json({ data: result })
   }
 
+  // The sweep archives resolved tickets from every department, so it is not a lead's to run.
+  if (!scope.isAdminLike) {
+    return NextResponse.json({ error: "Forbidden: sweeping every department needs an admin" }, { status: 403 })
+  }
   const sweepResult = await sweepResolvedTicketsForArchive(dataClient, 25)
   return NextResponse.json({ data: sweepResult })
 }

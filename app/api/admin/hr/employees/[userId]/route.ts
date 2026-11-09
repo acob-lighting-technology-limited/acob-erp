@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { denyUnlessEmployeeInScope } from "@/lib/admin/target-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic"
@@ -14,6 +15,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { userId } = await params
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessEmployeeInScope(db, scope, userId)
+  if (denied) return denied
 
   const { data: profileData, error: profileError } = await db.from("profiles").select("*").eq("id", userId).single()
   if (profileError || !profileData) {

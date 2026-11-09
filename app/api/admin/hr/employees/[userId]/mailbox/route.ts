@@ -3,6 +3,7 @@ import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { loadEmployeeMailboxState } from "@/lib/employees/mailbox-offboarding"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { denyUnlessEmployeeInScope } from "@/lib/admin/target-scope"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +25,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ userId: st
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const state = await loadEmployeeMailboxState(getServiceRoleClientOrFallback(supabase), String(userId || "").trim())
+  const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessEmployeeInScope(db, scope, String(userId || "").trim())
+  if (denied) return denied
+
+  const state = await loadEmployeeMailboxState(db, String(userId || "").trim())
   return NextResponse.json({ data: state })
 }

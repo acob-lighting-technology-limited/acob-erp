@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { denyUnlessAssetInScope } from "@/lib/admin/target-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
@@ -23,6 +24,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { id: assetId } = await params
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessAssetInScope(db, scope, assetId)
+  if (denied) return denied
   const { data, error } = await db
     .from("asset_issues")
     .select("*")
@@ -46,6 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 })
   }
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessAssetInScope(db, scope, assetId)
+  if (denied) return denied
   const { error } = await db.from("asset_issues").insert({
     asset_id: assetId,
     description: parsed.data.description.trim(),
