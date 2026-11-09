@@ -412,13 +412,13 @@ export function AdminTasksContent({
             <span className="text-foreground line-clamp-2 font-medium">{r.title}</span>
             <RecurringTaskBadge task={r} onOpen={setOpenSeriesId} />
             {r.project_name && (
-              <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
+              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                 <FolderKanban className="h-3 w-3 shrink-0" />
                 <span className="line-clamp-1">{r.project_name}</span>
               </span>
             )}
             {r.portfolio_name && (
-              <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
+              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                 <Layers className="h-3 w-3 shrink-0" />
                 <span className="line-clamp-1">{r.portfolio_name}</span>
               </span>

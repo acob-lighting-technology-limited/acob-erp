@@ -111,7 +111,7 @@ export interface LeaveItem {
     full_name?: string | null
     company_email?: string | null
   } | null
-  leave_type?: { name: string }
+  leave_type?: { name: string; code?: string | null }
   current_approver?: { id: string; full_name: string; company_email: string; role?: string | null } | null
   approvals?: Array<{
     id: string

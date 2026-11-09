@@ -55,8 +55,12 @@ interface KpiOption {
 }
 
 const taskFormSchema = z.object({
-  title: z.string().min(1, "Task title is required"),
-  description: z.string().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Task title must be at least 3 characters")
+    .max(200, "Task title must be at most 200 characters"),
+  description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional(),
   priority: z.string().default("medium"),
   status: z.string().default("pending"),
   assigned_to: z.string().optional(),
@@ -278,6 +282,7 @@ export function TaskFormDialog({
   const portfolioId = watch("portfolio_id")
   const weightValue = watch("weight")
   const titleValue = watch("title")
+  const descriptionValue = watch("description")
   const statusValue = watch("status")
   const startDateValue = watch("task_start_date")
   const dueDateValue = watch("due_date")
@@ -539,12 +544,16 @@ export function TaskFormDialog({
 
           <FormSection title="What">
             <div>
-              <Label htmlFor="title" className="text-xs font-semibold">
-                Task Title <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="title" className="text-xs font-semibold">
+                  Task Title <span className="text-destructive">*</span>
+                </Label>
+                <span className="text-muted-foreground text-xs font-normal">{(titleValue || "").length}/200</span>
+              </div>
               <Input
                 id="title"
                 {...register("title")}
+                maxLength={200}
                 placeholder="e.g. Prepare monthly revenue reconciliation report"
                 className="mt-1"
               />
@@ -552,16 +561,23 @@ export function TaskFormDialog({
             </div>
 
             <div>
-              <Label htmlFor="description" className="text-xs font-semibold">
-                Description
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="description" className="text-xs font-semibold">
+                  Description
+                </Label>
+                <span className="text-muted-foreground text-xs font-normal">
+                  {(descriptionValue || "").length}/5000
+                </span>
+              </div>
               <Textarea
                 id="description"
                 {...register("description")}
+                maxLength={5000}
                 placeholder="Describe expected scope, deliverables, and instructions..."
                 rows={3}
                 className="mt-1"
               />
+              {errors.description && <p className="text-destructive mt-1 text-xs">{errors.description.message}</p>}
             </div>
           </FormSection>
 
@@ -837,6 +853,9 @@ export function TaskFormDialog({
             disabled={
               isSaving ||
               !titleValue ||
+              titleValue.trim().length < 3 ||
+              titleValue.trim().length > 200 ||
+              Boolean(descriptionValue && descriptionValue.length > 5000) ||
               Boolean(deadlineError) ||
               repeatUnchosen ||
               isMissingDueDate ||

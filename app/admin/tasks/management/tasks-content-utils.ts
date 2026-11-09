@@ -73,7 +73,13 @@ export function applyTaskFilters(
 }
 
 export function validateTaskForm(form: TaskFormState): string | null {
-  if (!form.title.trim()) return "Please enter a task title"
+  const trimmedTitle = form.title.trim()
+  if (!trimmedTitle) return "Please enter a task title"
+  if (trimmedTitle.length < 3) return "Task title must be at least 3 characters"
+  if (trimmedTitle.length > 200) return "Task title must be at most 200 characters"
+  if (form.description && form.description.trim().length > 5000) {
+    return "Task description cannot exceed 5,000 characters"
+  }
   if (!form.kpi_id?.trim()) return "Please select a Corporate KPI for this task"
   const hasAssignee = form.assigned_to || (form.assigned_users && form.assigned_users.length > 0)
   if (!hasAssignee) {

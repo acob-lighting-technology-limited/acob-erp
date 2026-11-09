@@ -122,6 +122,7 @@ export async function GET(request: NextRequest) {
     const filterUserId = searchParams.get("user_id") || null
     const filterLeaveTypeId = searchParams.get("leave_type_id") || null
     const filterStatus = searchParams.get("status") || null
+    const includeLwop = searchParams.get("include_lwop") === "true"
 
     if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
       return NextResponse.json({ error: "Invalid year_month format (expected YYYY-MM)" }, { status: 400 })
@@ -196,6 +197,17 @@ export async function GET(request: NextRequest) {
     }
     if (filterLeaveTypeId) {
       leaveQuery = leaveQuery.eq("leave_type_id", filterLeaveTypeId)
+    } else if (!includeLwop) {
+      const lwopTypeIds = leaveTypes
+        .filter((lt) => {
+          const norm = (lt.name || "").toLowerCase()
+          const code = (lt.code || "").toLowerCase()
+          return norm.includes("unpaid") || norm.includes("lwop") || code === "lwop"
+        })
+        .map((lt) => lt.id)
+      if (lwopTypeIds.length > 0) {
+        leaveQuery = leaveQuery.not("leave_type_id", "in", `(${lwopTypeIds.map((id) => `"${id}"`).join(",")})`)
+      }
     }
     if (filterStatus && filterStatus !== "all") {
       if (filterStatus === "approved") {
