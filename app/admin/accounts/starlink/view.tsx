@@ -112,11 +112,15 @@ export function StarlinkKitsPage() {
         sortable: true,
         accessor: (k) => k.site_name,
         resizable: true,
-        initialWidth: 200,
+        initialWidth: 220,
         render: (k) => (
           <div className="space-y-0.5">
             <p className="font-medium">{k.site_name}</p>
-            <p className="text-muted-foreground font-mono text-xs">{k.serial_number ?? "-"}</p>
+            <div className="text-muted-foreground font-mono text-xs">
+              {k.kit_number ? <span className="text-foreground/80 font-semibold">{k.kit_number}</span> : null}
+              {k.kit_number && k.serial_number ? <span> · </span> : null}
+              <span>{k.serial_number ?? "-"}</span>
+            </div>
           </div>
         ),
       },
@@ -142,12 +146,11 @@ export function StarlinkKitsPage() {
         accessor: (k) => k.state || "-",
       },
       {
-        key: "amount",
-        label: "Monthly",
+        key: "status",
+        label: "This month",
         sortable: true,
-        hideOnMobile: true,
-        accessor: (k) => k.payment?.amount ?? 0,
-        render: (k) => (k.payment ? formatMoney(k.payment.amount, k.payment.currency) : "-"),
+        accessor: (k) => kitStatus(k),
+        render: (k) => <MonthBadge kit={k} />,
       },
       {
         key: "next_due",
@@ -157,11 +160,12 @@ export function StarlinkKitsPage() {
         render: (k) => formatDay(k.payment?.next_payment_due),
       },
       {
-        key: "status",
-        label: "This month",
+        key: "amount",
+        label: "Monthly",
         sortable: true,
-        accessor: (k) => kitStatus(k),
-        render: (k) => <MonthBadge kit={k} />,
+        hideOnMobile: true,
+        accessor: (k) => k.payment?.amount ?? 0,
+        render: (k) => (k.payment ? formatMoney(k.payment.amount, k.payment.currency) : "-"),
       },
       {
         key: "email",
@@ -280,7 +284,11 @@ export function StarlinkKitsPage() {
       title="Starlink Kits"
       description="Each Starlink kit, the project it serves and how its bills stand. Bills are read from the ict mailbox every hour."
       icon={Satellite}
-      tabs={TABS.map((t) => (t.key === "new" ? { ...t, label: `New accounts (${unmatched.length})` } : t))}
+      tabs={TABS.map((t) => {
+        if (t.key === "kits") return { ...t, label: `Kits (${kits.length})` }
+        if (t.key === "new") return { ...t, label: `New accounts (${unmatched.length})` }
+        return t
+      })}
       activeTab={tab}
       onTabChange={(next) => router.replace(next === "new" ? "?tab=new" : "?", { scroll: false })}
       actions={
@@ -350,7 +358,11 @@ export function StarlinkKitsPage() {
             {
               label: "Open payment",
               icon: CreditCard,
-              onClick: (k) => k.payment && router.push(`/admin/accounts/payments/${k.payment.id}`),
+              onClick: (k) =>
+                k.payment &&
+                router.push(
+                  `/admin/accounts/payments/${k.payment.id}?from=${encodeURIComponent("/admin/accounts/starlink")}`
+                ),
             },
           ]}
           viewToggle
@@ -373,9 +385,23 @@ export function StarlinkKitsPage() {
                 <MonthBadge kit={k} />
               </div>
               <div className="grid gap-1 text-sm">
+                {k.kit_number ? (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Kit #</span>
+                    <span className="font-mono text-xs">{k.kit_number}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Account</span>
                   <span className="font-mono text-xs">{k.serial_number ?? "-"}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">State</span>
+                  <span>{k.state || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Monthly</span>
+                  <span>{k.payment ? formatMoney(k.payment.amount, k.payment.currency) : "-"}</span>
                 </div>
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Next due</span>

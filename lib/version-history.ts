@@ -37,6 +37,20 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "Starlink & Payments",
+        items: [
+          "Populated missing states across Starlink accounts (Adewole, Bondu, Olooji, Sule) to match their community projects",
+          "Improved Starlink Kits table: added kit count to tab, displayed kit numbers alongside account IDs, and rearranged columns so status and schedule appear before monthly billing amounts",
+          "Converted payment details from an overlaid modal into a dedicated full page with return navigation to Starlink when opened via Open Payment",
+        ],
+      },
+      {
+        area: "Projects",
+        items: [
+          "Registered missing operational and under-construction mini-grid projects (Onipanu, Erinla, and Bondu) in the projects catalogue",
+        ],
+      },
+      {
         area: "UI & Badges",
         items: [
           "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
@@ -46,8 +60,9 @@ export const RELEASES: Release[] = [
         ],
       },
       {
-        area: "Tasks & Workflows",
+        area: "Tasks",
         items: [
+          "New tasks default to 'Does not repeat' with start date and 5-working-day deadline displayed and automatically selected",
           "Enforced a 3 to 200 character limit on task titles with live counter feedback, and capped task descriptions at 5,000 characters to keep lists and table views clean and scannable",
           "Differentiated recurring cadence badges from linked project and portfolio metadata with neutral styling to keep action buttons distinct from structural context",
           "The User Task Plan table now automatically seeds its time period filter to the current week on load, showing active weekly tasks immediately without manual filtering",
