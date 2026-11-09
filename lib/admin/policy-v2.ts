@@ -246,6 +246,12 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/settings/mailboxes")) return "it.main"
   if (pathname.startsWith("/admin/settings/mail")) return "it.main"
   if (pathname.startsWith("/admin/accounts/starlink")) return "it.main"
+  // Payroll, Inventory and Assets moved under /admin/accounts but keep their own keys. These
+  // must stay above the /admin/accounts rule below; the old top-level paths resolve the same.
+  if (pathname.startsWith("/admin/accounts/payroll")) return "payroll.main"
+  if (pathname.startsWith("/admin/accounts/inventory")) return "inventory.main"
+  if (pathname.startsWith("/admin/accounts/assets/issues")) return "assets.issues"
+  if (pathname.startsWith("/admin/accounts/assets")) return "assets.main"
   if (pathname.startsWith("/admin/settings")) return "settings.main"
   if (pathname.startsWith("/admin/communications/meetings")) return "communications.meetings"
   if (pathname.startsWith("/admin/communications/broadcast")) return "communications.broadcast"

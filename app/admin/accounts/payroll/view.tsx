@@ -133,7 +133,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       label: "Worksheet",
       render: (row: PayrollPeriod) => (
         <Button asChild size="sm" variant={row.status === "completed" ? "outline" : "default"}>
-          <Link href={`/admin/payroll/${row.id}`}>
+          <Link href={`/admin/accounts/payroll/${row.id}`}>
             {row.status === "completed" ? "View Published Payslips" : "Open Worksheet"}
           </Link>
         </Button>
@@ -325,7 +325,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
     <div className="flex flex-wrap items-center gap-2">
       <ManageGrossSalaryDialog />
       <Button asChild variant="outline" size="sm">
-        <Link href="/admin/payroll/calculator">
+        <Link href="/admin/accounts/payroll/calculator">
           <Calculator className="mr-1.5 h-4 w-4" /> Payroll Calculator
         </Link>
       </Button>
@@ -368,12 +368,12 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
             trailing: (row) => <StatusBadge status={row.status} className="text-xs" />,
-            onSelect: (row) => router.push(`/admin/payroll/${row.id}`),
+            onSelect: (row) => router.push(`/admin/accounts/payroll/${row.id}`),
           }}
           cardRenderer={(row) => (
             <div
               className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
-              onClick={() => router.push(`/admin/payroll/${row.id}`)}
+              onClick={() => router.push(`/admin/accounts/payroll/${row.id}`)}
             >
               <div className="flex items-start justify-between">
                 <div>

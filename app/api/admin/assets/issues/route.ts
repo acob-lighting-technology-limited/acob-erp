@@ -20,7 +20,7 @@ type AssetRow = {
 type ProfileNameRow = { first_name: string; last_name: string; department?: string | null }
 
 // All asset issues, enriched with asset/creator/resolver/assignment details.
-// Shared between /admin/assets/issues (org-wide) and /dept/[id]/assets/issues
+// Shared between /admin/accounts/assets/issues (org-wide) and /dept/[id]/assets/issues
 // (department-scoped via getScopedDepartments — no client-side lock filter).
 export async function GET() {
   const scopeResult = await requireApiAdminScope()

@@ -9,7 +9,7 @@ import {
   type Asset,
   type Employee,
   type UserProfile,
-} from "@/app/admin/assets/admin-assets-content"
+} from "@/app/admin/accounts/assets/admin-assets-content"
 
 export const metadata: Metadata = { title: "Dept Assets" }
 import type { Metadata } from "next"

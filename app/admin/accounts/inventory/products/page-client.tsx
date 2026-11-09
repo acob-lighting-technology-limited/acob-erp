@@ -291,7 +291,7 @@ export default function ProductsPage() {
           {
             label: "View Stock",
             icon: Eye,
-            onClick: (product) => router.push(`/admin/inventory/products/${product.id}`),
+            onClick: (product) => router.push(`/admin/accounts/inventory/products/${product.id}`),
           },
           {
             label: "Edit",

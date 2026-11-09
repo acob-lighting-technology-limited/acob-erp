@@ -96,10 +96,10 @@ export default function InventoryDashboard() {
               <CardDescription>Manage your product catalog</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/inventory/products">
+              <Link href="/admin/accounts/inventory/products">
                 <Button className="w-full">View Products ({stats.totalProducts})</Button>
               </Link>
-              <Link href="/admin/inventory/products?openCreate=1">
+              <Link href="/admin/accounts/inventory/products?openCreate=1">
                 <Button className="w-full" variant="outline">
                   Add Product
                 </Button>
@@ -122,7 +122,7 @@ export default function InventoryDashboard() {
               <CardDescription>Organize products by category</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/inventory/categories">
+              <Link href="/admin/accounts/inventory/categories">
                 <Button className="w-full">View Categories ({stats.totalCategories})</Button>
               </Link>
             </CardContent>
@@ -143,7 +143,7 @@ export default function InventoryDashboard() {
               <CardDescription>Manage storage locations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/admin/inventory/warehouses">
+              <Link href="/admin/accounts/inventory/warehouses">
                 <Button className="w-full">View Warehouses ({stats.totalWarehouses})</Button>
               </Link>
             </CardContent>
@@ -164,7 +164,7 @@ export default function InventoryDashboard() {
               <CardDescription>Track stock in and out</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/inventory/movements">
+              <Link href="/admin/accounts/inventory/movements">
                 <Button className="w-full" variant="outline">
                   View Movements
                 </Button>

@@ -23,7 +23,7 @@ import {
   printHandoverPolicyPDF,
   type HandoverPolicyData,
 } from "@/lib/assets/handover-pdf-generator"
-import type { Asset, UserProfile, Employee } from "@/app/admin/assets/admin-assets-content"
+import type { Asset, UserProfile, Employee } from "@/app/admin/accounts/assets/admin-assets-content"
 
 type ExtendedEmployee = Employee & {
   designation?: string

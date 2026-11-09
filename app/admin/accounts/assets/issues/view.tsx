@@ -67,7 +67,7 @@ interface AssetIssue {
 }
 
 async function fetchAssetIssues(): Promise<AssetIssue[]> {
-  // Department scoping is resolved server-side (shared between /admin/assets/issues
+  // Department scoping is resolved server-side (shared between /admin/accounts/assets/issues
   // and /dept/[id]/assets/issues via getScopedDepartments) — no client-side lock.
   const res = await apiFetch("/api/admin/assets/issues", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load asset issues")
@@ -317,7 +317,7 @@ export function AssetIssuesPage({
       title="Asset Issues"
       description="Track and manage asset issues across the organization."
       icon={AlertCircle}
-      backLink={{ href: backLinkHref ?? "/admin/assets", label: "Back to Assets" }}
+      backLink={{ href: backLinkHref ?? "/admin/accounts/assets", label: "Back to Assets" }}
       stats={
         <StatGrid>
           <StatCard

@@ -125,7 +125,7 @@ export function AdminAssetsContent({
   lockedDepartment,
 }: AdminAssetsContentProps) {
   const shell = useShellBase()
-  const issuesHref = shell.href("/admin/assets/issues")
+  const issuesHref = shell.href("/admin/accounts/assets/issues")
   const router = useRouter()
   const normalizedRole = String(userProfile?.role || "")
     .trim()

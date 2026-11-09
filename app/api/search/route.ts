@@ -353,7 +353,9 @@ export async function GET(request: NextRequest) {
     for (const a of (assetsRes?.data || []) as Array<Record<string, unknown>>) {
       const id = String(a.id)
       const href =
-        tier === "admin" ? `/admin/assets?assetId=${id}` : `/dept/${leadDeptId(scope, a.department as string)}/assets`
+        tier === "admin"
+          ? `/admin/accounts/assets?assetId=${id}`
+          : `/dept/${leadDeptId(scope, a.department as string)}/assets`
       results.push({
         id,
         type: "asset",

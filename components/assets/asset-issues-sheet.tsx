@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { AlertCircle, CheckCircle2, Calendar, Package, Plus, X } from "lucide-react"
-import type { Asset } from "@/app/admin/assets/admin-assets-content"
+import type { Asset } from "@/app/admin/accounts/assets/admin-assets-content"
 import { formatWATDate } from "@/lib/utils/date"
 
 interface AssetIssue {

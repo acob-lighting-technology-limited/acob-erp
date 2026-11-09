@@ -9,7 +9,7 @@ import { shellBackHref, shellBaseFromPathname, shellHref } from "@/lib/dept/shel
  * instead of writing `/admin/…` literals, so a department lead's links stay inside their console.
  *
  *   const shell = useShellBase()
- *   const issues = shell.href("/admin/assets/issues")        // string, or null if the console has no such page
+ *   const issues = shell.href("/admin/accounts/assets/issues")        // string, or null if the console has no such page
  *   backLink={{ href: shell.backHref("/admin/hr"), label: "Back to HR" }}
  *
  * The object is stable while the shell is, so it is safe in dependency arrays.

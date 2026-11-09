@@ -343,20 +343,20 @@ const adminNavigation: NavItem[] = [
     icon: Landmark,
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Payroll", href: "/admin/payroll" },
+      { name: "Payroll", href: "/admin/accounts/payroll" },
       {
         name: "Inventory",
-        href: "/admin/inventory",
+        href: "/admin/accounts/inventory",
         children: [
-          { name: "Products", href: "/admin/inventory/products" },
-          { name: "Categories", href: "/admin/inventory/categories" },
-          { name: "Warehouses", href: "/admin/inventory/warehouses" },
-          { name: "Movements", href: "/admin/inventory/movements" },
+          { name: "Products", href: "/admin/accounts/inventory/products" },
+          { name: "Categories", href: "/admin/accounts/inventory/categories" },
+          { name: "Warehouses", href: "/admin/accounts/inventory/warehouses" },
+          { name: "Movements", href: "/admin/accounts/inventory/movements" },
         ],
       },
       {
         name: "Assets",
-        href: "/admin/assets",
+        href: "/admin/accounts/assets",
       },
     ],
   },

@@ -61,7 +61,7 @@ export default function ProductDetailPage() {
       <PageHeader
         title={product.name}
         description={product.sku}
-        backLink={{ href: "/admin/inventory/products", label: "Back to Products" }}
+        backLink={{ href: "/admin/accounts/inventory/products", label: "Back to Products" }}
         actions={
           <Button onClick={() => setIsEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />

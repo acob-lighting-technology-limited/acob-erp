@@ -207,7 +207,7 @@ export function AdminActivityTabs({
       payments: { href: shell.href("/admin/accounts/payments") ?? shell.base, label: "View all payments" },
       leave: { href: shell.href("/admin/hr/leave") ?? shell.base, label: "View all leave" },
       attendance: { href: shell.href("/admin/hr/attendance") ?? shell.base, label: "View all attendance" },
-      assets: { href: shell.href("/admin/assets") ?? shell.base, label: "View all assets" },
+      assets: { href: shell.href("/admin/accounts/assets") ?? shell.base, label: "View all assets" },
     }
     return map[activeTab] ?? map.assets
   }, [activeTab, shell])
@@ -277,7 +277,7 @@ export function AdminActivityTabs({
             {assets.length > 0 ? (
               <ul className={listClass}>
                 {assets.map((a) => (
-                  <ItemRow key={a.id} href="/admin/assets">
+                  <ItemRow key={a.id} href="/admin/accounts/assets">
                     <p className="truncate text-sm font-medium">
                       {a.asset_type}
                       {a.asset_model ? ` — ${a.asset_model}` : ""}

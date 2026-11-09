@@ -627,7 +627,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
       title={`Worksheet: ${period.name}`}
       description={`Disbursement schedule for payroll cycle from ${period.start_date} to ${period.end_date}.`}
       icon={FileText}
-      backLink={{ href: "/admin/payroll", label: "Back to Payroll List" }}
+      backLink={{ href: "/admin/accounts/payroll", label: "Back to Payroll List" }}
       stats={stats}
       actions={actions}
     >
@@ -646,7 +646,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
           // The period filter navigates rather than filtering — each period is its own
           // worksheet route. Mirrors the attendance report's month filter.
           const nextPeriod = selected.period?.[0]
-          if (nextPeriod && nextPeriod !== period.id) router.push(`/admin/payroll/${nextPeriod}`)
+          if (nextPeriod && nextPeriod !== period.id) router.push(`/admin/accounts/payroll/${nextPeriod}`)
         }}
         viewToggle
         contactsView

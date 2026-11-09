@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { DetailTimeline, DetailTimelineEntry } from "@/components/ui/detail-dialog"
 import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, FileText } from "lucide-react"
-import type { Asset } from "@/app/admin/assets/admin-assets-content"
+import type { Asset } from "@/app/admin/accounts/assets/admin-assets-content"
 import { formatDateTime } from "@/lib/format"
 import { EmptyState } from "@/components/ui/patterns/empty-state"
 

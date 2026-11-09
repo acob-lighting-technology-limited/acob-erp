@@ -346,7 +346,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
       title="Payroll Gross Salary Calculator"
       description="Interactively adjust gross salary, simulate payroll calculations, compare baseline vs altered pay, and preview approval figures."
       icon={Calculator}
-      backLink={{ href: "/admin/payroll", label: "Back to Payroll" }}
+      backLink={{ href: "/admin/accounts/payroll", label: "Back to Payroll" }}
       stats={
         <StatGrid>
           <StatCard
