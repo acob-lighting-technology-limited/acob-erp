@@ -32,7 +32,7 @@ async function getAdminContext(employeeId: string, mutating = false) {
   if (!scope || !canAccessAdminSection(scope, "hr")) {
     return { error: "Forbidden", status: 403 } as const
   }
-  if (mutating && !scopeCanEditRoute(scope, "hr.main")) {
+  if (mutating && !scopeCanEditRoute(scope, "hr.employees")) {
     return { error: "View only. Changing an employee's status needs HR edit access.", status: 403 } as const
   }
 

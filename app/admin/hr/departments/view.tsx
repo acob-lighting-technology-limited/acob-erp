@@ -181,7 +181,7 @@ export function DepartmentsPage({
 
   const departments = useMemo(() => data?.departments ?? [], [data?.departments])
   const departmentEmployees = useMemo(() => data?.departmentEmployees ?? {}, [data?.departmentEmployees])
-  const canEditHr = useCanEdit("hr.main")
+  const canEditHr = useCanEdit("hr.departments")
   const canManageDepartments = canEditHr && (data?.canManageDepartments ?? false)
 
   const filteredDepartments = useMemo(() => {

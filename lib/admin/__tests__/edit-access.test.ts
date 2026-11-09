@@ -140,11 +140,39 @@ test("API edit routes: mailbox, starlink, HR sections; appeals and unguarded pat
   assert.equal(resolveApiEditRouteKeyV2("/api/starlink/kits"), "it.main")
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/attendance/records"), "hr.attendance")
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/leave/manual"), "hr.leave")
-  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/employees/abc/profile"), "hr.main")
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/employees/abc/profile"), "hr.employees")
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/performance/cbt/attempts"), "hr.pms.cbt.manage")
   // Appeals are decided by stage rules, not page edit.
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/attendance/appeals"), null)
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/department-leads"), null)
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/assets"), null)
   assert.equal(resolveApiEditRouteKeyV2("/api/v1/hr/employees/x/status"), null)
+})
+
+test("a delegate holding only Employees can change employees, not departments or lunch", () => {
+  const c = ctx({ adminRoutes: ["hr.main"], editRoutes: ["hr.employees"] })
+  assert.equal(canEditRouteV2(c, "hr.employees"), true)
+  assert.equal(canEditRouteV2(c, "hr.departments"), false)
+  assert.equal(canEditRouteV2(c, "hr.lunch"), false)
+})
+
+test("editing the whole of HR covers the single pages, and the owning lead edits every page", () => {
+  const all = ctx({ adminRoutes: ["hr.main"], editRoutes: ["hr.main"] })
+  for (const route of ["hr.employees", "hr.departments", "hr.lunch", "hr.offices"] as const) {
+    assert.equal(canEditRouteV2(all, route), true)
+  }
+  const lead = ctx({
+    role: "super_admin",
+    isDepartmentLead: true,
+    adminRoutes: null,
+    leadDepartments: ["Admin and HR"],
+  })
+  assert.equal(canEditRouteV2(lead, "hr.offices"), true)
+})
+
+test("the HR page APIs map to their own edit area", () => {
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/employees"), "hr.employees")
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/departments"), "hr.departments")
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/lunch/menus/1"), "hr.lunch")
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/office-locations"), "hr.offices")
 })

@@ -230,7 +230,7 @@ export function LunchRegisterPage({
   todayDate,
 }: LunchRegisterPageProps) {
   const router = useRouter()
-  const canEditHr = useCanEdit("hr.main")
+  const canEditHr = useCanEdit("hr.lunch")
   const [activeTab, setActiveTab] = useState<LunchTab>("menus")
   const [reviews, setReviews] = useState<LunchReviewSummary[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)

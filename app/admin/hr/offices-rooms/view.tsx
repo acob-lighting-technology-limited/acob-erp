@@ -158,7 +158,7 @@ export function OfficeLocationsPage({
 
   const locations = data?.locations ?? []
   const locationEmployees = data?.locationEmployees ?? {}
-  const canEditHr = useCanEdit("hr.main")
+  const canEditHr = useCanEdit("hr.offices")
   const canManageLocations = canEditHr && (data?.canManageLocations ?? false)
   const departments = data?.departments ?? []
 

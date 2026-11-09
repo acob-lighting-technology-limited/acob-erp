@@ -1,5 +1,7 @@
 "use client"
 
+import { DelegateAccessButton } from "@/components/admin/delegate-access-button"
+import type { Employee, EmployeeGender, UserProfile } from "./_components/employee-types"
 import {
   deriveLeadDepartments,
   getRoleBadgeLabel,
@@ -82,9 +84,9 @@ import { describeExitBlockers, type ExitBlockers } from "@/lib/hr/exit-blockers"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { EmployeeAvatar } from "./_components/employee-avatar"
-const log = logger("hr-employees-admin-employee-content")
+export type { Employee, UserProfile } from "./_components/employee-types"
 
-type EmployeeGender = "male" | "female" | "prefer_not_to_say" | "unspecified"
+const log = logger("hr-employees-admin-employee-content")
 
 const genderFilterOptions: { value: EmployeeGender; label: string }[] = [
   { value: "male", label: "Male" },
@@ -101,53 +103,6 @@ async function fetchAllEmployees(): Promise<Employee[]> {
   }
   const payload = (await response.json()) as { data: Employee[] }
   return payload.data || []
-}
-
-export interface Employee {
-  id: string
-  employee_number: string | null
-  first_name: string
-  last_name: string
-  other_names: string | null
-  company_email: string
-  additional_email: string | null
-  personal_email: string | null
-  department: string
-  designation: string | null
-  role: UserRole
-  admin_routes?: string[] | null
-  phone_number: string | null
-  additional_phone: string | null
-  gender?: EmployeeGender | null
-  residential_address: string | null
-  office_location: string | null
-  device_key?: string | null
-  date_of_birth: string | null
-  birthday: string | null
-  employment_date: string | null
-  confirmation_date?: string | null
-  separation_date?: string | null
-  is_admin: boolean
-  is_department_lead: boolean
-  lead_departments: string[]
-  employment_status: EmploymentStatus
-  employment_type?: "full_time" | "part_time" | "contract"
-  contract_category_id?: string | null
-  contract_categories?: { id: string; name: string; code: string } | null
-  avatar_path?: string | null
-  avatar_url?: string | null
-  created_at: string
-  mailbox_credentials_sent_at?: string | null
-  /** cPanel mailbox provisioning outcome: "created" | "failed" | null (not attempted by Matrix) */
-  mailbox_status?: string | null
-  mailbox_error?: string | null
-  nysc_cds_day?: string | null
-}
-
-export interface UserProfile {
-  role: UserRole
-  is_department_lead?: boolean
-  managed_departments?: string[]
 }
 
 interface AdminEmployeeContentProps {
@@ -278,7 +233,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     nysc_cds_day: "",
   })
 
-  const canEditHr = useCanEdit("hr.main")
+  const canEditHr = useCanEdit("hr.employees")
   const canManageUsers = canEditHr && ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
   const canReviewApplications = canEditHr && (canManageUsers || Boolean(userProfile?.is_department_lead))
 
@@ -1107,6 +1062,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}
       actions={
         <div className="flex items-center gap-2">
+          <DelegateAccessButton />
           {(canManageUsers || canReviewApplications) && (
             <Button onClick={() => setManageUsersOpen(true)} variant="default" size="sm" className="h-8 gap-2">
               <Settings2 className="h-4 w-4" />

@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
-import { editRouteLabel } from "@/lib/admin/edit-route-labels"
+import { EDIT_GROUP_UMBRELLA, editRouteGroup, editRouteLabel, sortEditRoutes } from "@/lib/admin/edit-route-labels"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
 
@@ -51,6 +51,10 @@ interface EditAccessManagerProps {
   routes: string[]
   /** Shown in the empty state and above the table. */
   emptyText?: string
+  /** Render only the form dialog, driven by `open` / `onOpenChange` (used from the department console). */
+  dialogOnly?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 function formatDate(value: string | null) {
@@ -63,15 +67,25 @@ function endOfDayWat(date: string) {
   return `${date}T23:59:59+01:00`
 }
 
-export function EditAccessManager({ mode, routes, emptyText }: EditAccessManagerProps) {
+export function EditAccessManager({
+  mode,
+  routes,
+  emptyText,
+  dialogOnly,
+  open: openProp,
+  onOpenChange,
+}: EditAccessManagerProps) {
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = onOpenChange ?? setOpenState
   const [userId, setUserId] = useState("")
   const [selected, setSelected] = useState<string[]>([])
   const [until, setUntil] = useState("")
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminAccessGrants(),
+    enabled: !dialogOnly,
     queryFn: async (): Promise<EditGrantRowView[]> => {
       const res = await apiFetch("/api/admin/access/grants", { cache: "no-store" })
       const json = await res.json()
@@ -179,6 +193,133 @@ export function EditAccessManager({ mode, routes, emptyText }: EditAccessManager
 
   const canSubmit = Boolean(userId) && selected.length > 0 && (mode === "grant" || Boolean(until))
 
+  const groups = (["hr", "it"] as const)
+    .map((id) => {
+      const umbrella = EDIT_GROUP_UMBRELLA[id]
+      return {
+        id,
+        umbrella,
+        title: id === "hr" ? "HR" : "IT",
+        hasUmbrella: routes.includes(umbrella),
+        pages: sortEditRoutes(routes.filter((route) => route !== umbrella && editRouteGroup(route) === id)),
+      }
+    })
+    .filter((group) => group.hasUmbrella || group.pages.length > 0)
+
+  /** "Everything" replaces any single pages picked in the group; unticking it clears them. */
+  function toggleEverything(group: { umbrella: string; pages: string[] }, on: boolean) {
+    setSelected((prev) => {
+      const rest = prev.filter((key) => key !== group.umbrella && !group.pages.includes(key))
+      return on ? [...rest, group.umbrella] : rest
+    })
+  }
+
+  const dialog = (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" />
+            {mode === "grant" ? "Grant edit access" : "Delegate your access"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "grant"
+              ? "Choose who may change things, and where. They must already have the admin role and view access."
+              : "Let someone do your work on the pages you choose, for the dates you choose. You stay responsible; you can take it back any time."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <section className="space-y-2">
+            <Label>1. Who will act for you?</Label>
+            <SearchableSelect
+              value={userId}
+              onValueChange={setUserId}
+              placeholder="Choose a person"
+              searchPlaceholder="Search people..."
+              options={candidates.map((person) => ({
+                value: person.id,
+                label: `${person.name} (${person.role.replace("_", " ")})`,
+              }))}
+            />
+            <p className="text-muted-foreground text-xs">They must already be an admin who can open these pages.</p>
+          </section>
+
+          <section className="space-y-3">
+            <Label>2. What can they change?</Label>
+            {groups.map((group) => {
+              const everything = selected.includes(group.umbrella)
+              return (
+                <div key={group.id} className="space-y-2 rounded-lg border p-3">
+                  <p className="text-sm font-semibold">{group.title}</p>
+                  {group.hasUmbrella && (
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={everything}
+                        onCheckedChange={(checked) => toggleEverything(group, Boolean(checked))}
+                      />
+                      <span>
+                        {editRouteLabel(group.umbrella)}
+                        <span className="text-muted-foreground block text-xs">
+                          Every {group.title} page, including ones added later.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                  {group.pages.length > 0 && (
+                    <div className="space-y-2">
+                      {group.hasUmbrella && <p className="text-muted-foreground text-xs">Or only these pages:</p>}
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {group.pages.map((route) => (
+                          <label key={route} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={everything || selected.includes(route)}
+                              disabled={everything}
+                              onCheckedChange={(checked) =>
+                                setSelected((prev) =>
+                                  checked ? [...prev, route] : prev.filter((key) => key !== route)
+                                )
+                              }
+                            />
+                            {editRouteLabel(route)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </section>
+
+          <section className="space-y-2">
+            <Label htmlFor="edit-access-until">
+              {mode === "grant" ? "3. Until when? (optional)" : "3. Until when?"}
+            </Label>
+            <Input id="edit-access-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+            <p className="text-muted-foreground text-xs">
+              {mode === "grant"
+                ? "Leave empty for no end date."
+                : "It ends on its own on this day. You can withdraw it sooner."}
+            </p>
+          </section>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => save.mutate()} disabled={!canSubmit || save.isPending}>
+            {save.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  if (dialogOnly) return dialog
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -214,68 +355,7 @@ export function EditAccessManager({ mode, routes, emptyText }: EditAccessManager
         ]}
       />
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4" />
-              {mode === "grant" ? "Grant edit access" : "Delegate your access"}
-            </DialogTitle>
-            <DialogDescription>
-              {mode === "grant"
-                ? "Choose who may change things, and where. They must already have the admin role and view access."
-                : "Choose who acts for you, where, and until when. They must already have the admin role and view access."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Person</Label>
-              <SearchableSelect
-                value={userId}
-                onValueChange={setUserId}
-                placeholder="Choose a person"
-                searchPlaceholder="Search people..."
-                options={candidates.map((person) => ({
-                  value: person.id,
-                  label: `${person.name} (${person.role.replace("_", " ")})`,
-                }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Areas</Label>
-              <div className="space-y-2">
-                {routes.map((route) => (
-                  <label key={route} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={selected.includes(route)}
-                      onCheckedChange={(checked) =>
-                        setSelected((prev) => (checked ? [...prev, route] : prev.filter((key) => key !== route)))
-                      }
-                    />
-                    {editRouteLabel(route)}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-access-until">{mode === "grant" ? "Until (optional)" : "Until"}</Label>
-              <Input id="edit-access-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => save.mutate()} disabled={!canSubmit || save.isPending}>
-              {save.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialog}
     </div>
   )
 }

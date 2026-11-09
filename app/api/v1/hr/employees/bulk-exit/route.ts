@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-    if (!scopeCanEditRoute(scope, "hr.main")) {
+    if (!scopeCanEditRoute(scope, "hr.employees")) {
       return NextResponse.json({ error: "View only. Exiting staff needs HR edit access." }, { status: 403 })
     }
 

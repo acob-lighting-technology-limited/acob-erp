@@ -46,6 +46,10 @@ export type AdminRouteKeyV2 =
   | "finance.main"
   | "helpdesk.main"
   | "hr.main"
+  | "hr.employees"
+  | "hr.departments"
+  | "hr.lunch"
+  | "hr.offices"
   | "hr.fleet"
   | "hr.resources"
   | "hr.leave"
@@ -141,6 +145,10 @@ export interface AccessContextV2 {
  */
 export const HR_EDIT_ROUTES: AdminRouteKeyV2[] = [
   "hr.main",
+  "hr.employees",
+  "hr.departments",
+  "hr.lunch",
+  "hr.offices",
   "hr.fleet",
   "hr.resources",
   "hr.leave",
@@ -161,6 +169,10 @@ export const EDIT_OWNER_DEPARTMENTS = {
 /** Route keys an edit grant may be written for (mirrors admin_edit_grants_route_key_check). */
 export const GRANTABLE_EDIT_ROUTES: AdminRouteKeyV2[] = [
   "hr.main",
+  "hr.employees",
+  "hr.departments",
+  "hr.lunch",
+  "hr.offices",
   "hr.fleet",
   "hr.leave",
   "hr.attendance",
@@ -355,6 +367,10 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
     case "hr.pms":
     case "hr.leave":
     case "hr.attendance":
+    case "hr.employees":
+    case "hr.departments":
+    case "hr.lunch":
+    case "hr.offices":
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "hr" }
     case "reports.weekly":
       return { visibility: "global_view", mutations: "dept", adminOnly: false, domain: "reports" }
@@ -460,6 +476,10 @@ export function canAccessRouteV2(context: AccessContextV2, route: AdminRouteKeyV
     // Leave, Attendance, Resource Booking (Fleet/Resources) and PMS are grantable
     // on their own, but full "Employees & HR" (hr.main) also includes them — so
     // admins who already had HR keep access (no lockout). CBT folds into PMS.
+    // Edit-only areas of the HR pages: viewing them is part of hr.main.
+    if (route === "hr.employees" || route === "hr.departments" || route === "hr.lunch" || route === "hr.offices") {
+      return adminHasRoute(context, "hr.main")
+    }
     if (route === "hr.leave") {
       return adminHasRoute(context, "hr.leave") || adminHasRoute(context, "hr.main")
     }
@@ -557,6 +577,12 @@ export function resolveApiEditRouteKeyV2(pathname: string): AdminRouteKeyV2 | nu
   if (p.startsWith("/api/admin/settings/cbt")) return "hr.pms.cbt.manage"
   if (p.startsWith("/api/admin/hr/attendance")) return "hr.attendance"
   if (p.startsWith("/api/admin/hr/leave")) return "hr.leave"
+  if (p.startsWith("/api/admin/hr/lunch")) return "hr.lunch"
+  if (p.startsWith("/api/admin/hr/departments")) return "hr.departments"
+  if (p.startsWith("/api/admin/hr/office-locations")) return "hr.offices"
+  if (p.startsWith("/api/admin/hr/employees") || p.startsWith("/api/admin/hr/employment-categories"))
+    return "hr.employees"
+  if (p.startsWith("/api/admin/hr/birthdays")) return "hr.employees"
   if (p.startsWith("/api/admin/hr/performance/cbt")) return "hr.pms.cbt.manage"
   if (p.startsWith("/api/admin/hr/performance")) return "hr.pms"
   if (p.startsWith("/api/admin/hr/fleet")) return "hr.fleet"
