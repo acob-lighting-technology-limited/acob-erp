@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -355,6 +356,7 @@ const NO_DEPARTMENTS: string[] = []
 const NO_HOLIDAYS: Array<{ holiday_date: string; name?: string | null }> = []
 
 export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged }: EmployeeExpandProps) {
+  const canEditAttendance = useCanEdit("hr.attendance")
   const daysQuery = useQuery({
     queryKey: QUERY_KEYS.employeeAttendanceDays(report.user_id, yearMonth, Boolean(report.attendance_exempt)),
     queryFn: async () => {
@@ -647,7 +649,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
                   </TooltipTrigger>
                   <TooltipContent side="top">View edit history</TooltipContent>
                 </Tooltip>
-                {!day.isOnLeave && (
+                {!day.isOnLeave && canEditAttendance && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -727,7 +729,8 @@ export function AttendanceReportsPage({
   // Admin & HR only: department leads could grant leave from the manager with no
   // approval (see requireAttendanceAdmin). The server enforces it; this hides it.
   const adminScope = useAdminScopeOptional()
-  const canUseAttendanceManager = Boolean(adminScope?.isAdminLike) && !lockedDepartment
+  const canEditAttendance = useCanEdit("hr.attendance")
+  const canUseAttendanceManager = canEditAttendance && Boolean(adminScope?.isAdminLike) && !lockedDepartment
   // Export follows the open tab: on the Change log it exports the log, not attendance.
   const changeLogRef = useRef<ChangeLogViewHandle>(null)
   const [changeLogCount, setChangeLogCount] = useState(0)

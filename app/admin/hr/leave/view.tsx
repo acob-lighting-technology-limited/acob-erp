@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -350,7 +351,9 @@ export function LeaveApprovePage({
   const [addLeaveOpen, setAddLeaveOpen] = useState(false)
   // Adding leave here creates it already approved, skipping the workflow, so it is
   // Admin & HR only - the server refuses leads too (requireAttendanceAdmin).
-  const canAddLeave = Boolean(useAdminScopeOptional()?.isAdminLike)
+  const canEditLeave = useCanEdit("hr.leave")
+  const isAdminLike = Boolean(useAdminScopeOptional()?.isAdminLike)
+  const canAddLeave = canEditLeave && isAdminLike
   const [calendarStats, setCalendarStats] = useState<{
     total_days: number
     active_leaves: number

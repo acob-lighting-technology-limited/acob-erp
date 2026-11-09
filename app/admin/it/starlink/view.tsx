@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -87,6 +88,7 @@ export function StarlinkKitsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = searchParams.get("tab") === "new" ? "new" : "kits"
+  const canEditIt = useCanEdit("it.main")
   const [dialog, setDialog] = useState<KitDialogTarget | null>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
 
@@ -292,17 +294,19 @@ export function StarlinkKitsPage() {
       activeTab={tab}
       onTabChange={(next) => router.replace(next === "new" ? "?tab=new" : "?", { scroll: false })}
       actions={
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setAlertsOpen(true)}>
-            <Bell className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Alerts</span>
-          </Button>
-          <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Kit</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
-        </div>
+        canEditIt ? (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setAlertsOpen(true)}>
+              <Bell className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Alerts</span>
+            </Button>
+            <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Kit</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -354,7 +358,15 @@ export function StarlinkKitsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           rowActions={[
-            { label: "Edit kit", icon: Pencil, onClick: (k) => setDialog({ mode: "edit", kit: k }) },
+            ...(canEditIt
+              ? [
+                  {
+                    label: "Edit kit",
+                    icon: Pencil,
+                    onClick: (k: StarlinkKitListRow) => setDialog({ mode: "edit", kit: k }),
+                  },
+                ]
+              : []),
             {
               label: "Open payment",
               icon: CreditCard,
@@ -373,7 +385,7 @@ export function StarlinkKitsPage() {
             subtitle: (k) =>
               `${k.project?.project_name ?? "No project"} · next due ${formatDay(k.payment?.next_payment_due)}`,
             trailing: (k) => <MonthBadge kit={k} />,
-            onSelect: (k) => setDialog({ mode: "edit", kit: k }),
+            onSelect: canEditIt ? (k) => setDialog({ mode: "edit", kit: k }) : undefined,
           }}
           cardRenderer={(k) => (
             <div className="space-y-3 rounded-xl border p-4">
@@ -426,11 +438,15 @@ export function StarlinkKitsPage() {
           isLoading={isLoading}
           error={errorMessage}
           onRetry={() => void refetch()}
-          rowActions={[{ label: "Add as kit", icon: Plus, onClick: (a) => setDialog({ mode: "create", from: a }) }]}
+          rowActions={
+            canEditIt
+              ? [{ label: "Add as kit", icon: Plus, onClick: (a) => setDialog({ mode: "create", from: a }) }]
+              : []
+          }
           mobileRow={{
             title: (a) => a.account_number,
             subtitle: (a) => `${a.recipient_email ?? "Unknown login"} · ${a.emails} emails`,
-            onSelect: (a) => setDialog({ mode: "create", from: a }),
+            onSelect: canEditIt ? (a) => setDialog({ mode: "create", from: a }) : undefined,
           }}
           emptyTitle="No new Starlink accounts"
           emptyDescription="When a kit's Starlink email starts forwarding to ict and its account isn't a kit yet, it shows up here."

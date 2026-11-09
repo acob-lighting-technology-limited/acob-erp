@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
@@ -100,6 +101,7 @@ export function MailboxesPage() {
     const fromUrl = searchParams.get("tab") as TabKey | null
     return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "active"
   })
+  const canEditIt = useCanEdit("it.main")
   const [createOpen, setCreateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [linkTarget, setLinkTarget] = useState<MailboxReportRow | null>(null)
@@ -332,10 +334,12 @@ export function MailboxesPage() {
             <History className="h-4 w-4" />
             History
           </Button>
-          <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Create Mailbox
-          </Button>
+          {canEditIt && (
+            <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Create Mailbox
+            </Button>
+          )}
         </div>
       }
       tabs={tabs}
@@ -409,24 +413,28 @@ export function MailboxesPage() {
           isLoading={isLoading}
           error={errorMessage}
           onRetry={() => void refetch()}
-          rowActions={[
-            { label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) },
-            { label: "Reset password", icon: KeyRound, onClick: (m) => setPasswordTarget(m) },
-            { label: "Link mailbox", icon: Link2, onClick: (m) => setLinkTarget(m) },
-            {
-              label: "Suspend mailbox",
-              icon: Lock,
-              variant: "destructive",
-              hidden: (m) => m.suspendedLogin,
-              onClick: (m) => setSuspensionTarget({ mailbox: m, action: "suspend" }),
-            },
-            {
-              label: "Restore mailbox",
-              icon: LockOpen,
-              hidden: (m) => !m.suspendedLogin && !m.suspendedIncoming,
-              onClick: (m) => setSuspensionTarget({ mailbox: m, action: "restore" }),
-            },
-          ]}
+          rowActions={
+            canEditIt
+              ? [
+                  { label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) },
+                  { label: "Reset password", icon: KeyRound, onClick: (m) => setPasswordTarget(m) },
+                  { label: "Link mailbox", icon: Link2, onClick: (m) => setLinkTarget(m) },
+                  {
+                    label: "Suspend mailbox",
+                    icon: Lock,
+                    variant: "destructive",
+                    hidden: (m) => m.suspendedLogin,
+                    onClick: (m) => setSuspensionTarget({ mailbox: m, action: "suspend" }),
+                  },
+                  {
+                    label: "Restore mailbox",
+                    icon: LockOpen,
+                    hidden: (m) => !m.suspendedLogin && !m.suspendedIncoming,
+                    onClick: (m) => setSuspensionTarget({ mailbox: m, action: "restore" }),
+                  },
+                ]
+              : []
+          }
           mobileRow={{
             title: (m) => m.email,
             subtitle: (m) => m.owner?.name ?? (m.project ? `Project – ${m.project.name}` : "No staff record"),
@@ -438,7 +446,7 @@ export function MailboxesPage() {
                 className="w-28"
               />
             ),
-            onSelect: (m) => setQuotaTarget(m),
+            onSelect: canEditIt ? (m) => setQuotaTarget(m) : undefined,
           }}
           pagination={{ pageSize: 50 }}
           emptyTitle={

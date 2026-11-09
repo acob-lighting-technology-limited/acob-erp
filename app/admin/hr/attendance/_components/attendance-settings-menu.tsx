@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, Fingerprint, Mail, Settings2 } from "lucide-react"
@@ -17,6 +18,7 @@ export function AttendanceSettingsMenu({ canUseAttendanceManager, onOpenAttendan
   const router = useRouter()
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [deviceAlertOpen, setDeviceAlertOpen] = useState(false)
+  const canEditAttendance = useCanEdit("hr.attendance")
 
   return (
     <>
@@ -28,8 +30,18 @@ export function AttendanceSettingsMenu({ canUseAttendanceManager, onOpenAttendan
             onSelect: () => router.push("/admin/hr/attendance/settings"),
             hidden: !canUseAttendanceManager,
           },
-          { label: "Attendance reports", icon: Mail, onSelect: () => setReportDialogOpen(true) },
-          { label: "Device alerts", icon: Fingerprint, onSelect: () => setDeviceAlertOpen(true) },
+          {
+            label: "Attendance reports",
+            icon: Mail,
+            onSelect: () => setReportDialogOpen(true),
+            hidden: !canEditAttendance,
+          },
+          {
+            label: "Device alerts",
+            icon: Fingerprint,
+            onSelect: () => setDeviceAlertOpen(true),
+            hidden: !canEditAttendance,
+          },
           {
             label: "Attendance manager",
             icon: Settings2,

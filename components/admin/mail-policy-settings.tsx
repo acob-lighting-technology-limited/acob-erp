@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { QueryError, TableSkeleton } from "@/components/ui/query-states"
@@ -56,6 +57,7 @@ async function fetchMailPolicies(): Promise<PolicyRow[]> {
 
 export function MailPolicySettings() {
   const queryClient = useQueryClient()
+  const canEditIt = useCanEdit("it.main")
   const [policies, setPolicies] = useState<PolicyRow[]>([])
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -137,11 +139,13 @@ export function MailPolicySettings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button onClick={savePolicies} disabled={saving}>
-          {saving ? "Saving..." : "Save Mail Policies"}
-        </Button>
-      </div>
+      {canEditIt && (
+        <div className="flex items-center justify-end">
+          <Button onClick={savePolicies} disabled={saving}>
+            {saving ? "Saving..." : "Save Mail Policies"}
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -164,26 +168,28 @@ export function MailPolicySettings() {
               <div className="col-span-2 flex justify-center">
                 <Switch
                   checked={row.in_app_enabled}
+                  disabled={!canEditIt}
                   onCheckedChange={(checked) => updatePolicy(row.notification_key, "in_app_enabled", checked)}
                 />
               </div>
               <div className="col-span-3 flex justify-center">
                 <Switch
                   checked={row.in_app_mandatory}
-                  disabled={!row.in_app_enabled}
+                  disabled={!canEditIt || !row.in_app_enabled}
                   onCheckedChange={(checked) => updatePolicy(row.notification_key, "in_app_mandatory", checked)}
                 />
               </div>
               <div className="col-span-1 flex justify-center">
                 <Switch
                   checked={row.email_enabled}
+                  disabled={!canEditIt}
                   onCheckedChange={(checked) => updatePolicy(row.notification_key, "email_enabled", checked)}
                 />
               </div>
               <div className="col-span-2 flex justify-center">
                 <Switch
                   checked={row.email_mandatory}
-                  disabled={!row.email_enabled}
+                  disabled={!canEditIt || !row.email_enabled}
                   onCheckedChange={(checked) => updatePolicy(row.notification_key, "email_mandatory", checked)}
                 />
               </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
@@ -295,7 +296,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     nysc_cds_day: "",
   })
 
-  const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
+  const canEditHr = useCanEdit("hr.main")
+  const canManageUsers = canEditHr && ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
   const canReviewApplications = canManageUsers || Boolean(userProfile?.is_department_lead)
 
   const {
@@ -1354,11 +1356,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 icon: Eye,
                 onClick: () => handleViewEmployeeDetails(r),
               },
-              {
-                label: "Edit Staff",
-                icon: Pencil,
-                onClick: () => void handleEditEmployee(r),
-              },
+              ...(canManageUsers
+                ? [
+                    {
+                      label: "Edit Staff",
+                      icon: Pencil,
+                      onClick: () => void handleEditEmployee(r),
+                    },
+                  ]
+                : []),
             ],
           },
         }}

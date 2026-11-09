@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
@@ -180,7 +181,8 @@ export function DepartmentsPage({
 
   const departments = useMemo(() => data?.departments ?? [], [data?.departments])
   const departmentEmployees = useMemo(() => data?.departmentEmployees ?? {}, [data?.departmentEmployees])
-  const canManageDepartments = data?.canManageDepartments ?? false
+  const canEditHr = useCanEdit("hr.main")
+  const canManageDepartments = canEditHr && (data?.canManageDepartments ?? false)
 
   const filteredDepartments = useMemo(() => {
     if (activeTab === "active") return departments.filter((d) => d.is_active)
