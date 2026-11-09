@@ -45,6 +45,7 @@ import { logger } from "@/lib/logger"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { LinesSkeleton } from "@/components/skeletons"
 const log = logger("lunch-content")
 
 interface LunchDay {
@@ -505,6 +506,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
               icon={Check}
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
+              detail={myVote?.updated_at ? `At ${formatWATTime(myVote.updated_at)}` : undefined}
             />
             <StatCard
               variant="compact"
@@ -594,9 +596,8 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
           </div>
 
           {loadingDay ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-3 p-12">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">Loading menu…</span>
+            <div className="p-6">
+              <LinesSkeleton lines={4} />
             </div>
           ) : !menu ? (
             <EmptyState
@@ -1031,15 +1032,22 @@ function VoterRow({ voter, currentUserId }: { voter: LunchVoter; currentUserId: 
         onPointerEnter={prefetchCard}
         onFocus={prefetchCard}
         aria-label={`View ${label}'s contact card`}
-        className="group hover:bg-muted/40 focus-visible:ring-ring flex w-full items-center gap-2 rounded-md py-0.5 text-left transition-colors focus-visible:rounded-md focus-visible:ring-2 focus-visible:outline-none"
+        className="group hover:bg-muted/40 focus-visible:ring-ring flex w-full items-center justify-between gap-2 rounded-md py-0.5 text-left transition-colors focus-visible:rounded-md focus-visible:ring-2 focus-visible:outline-none"
       >
-        <StaffAvatar name={voter.full_name} src={voter.avatar_url} size="xs" />
-        <span className="text-muted-foreground group-hover:text-foreground truncate text-xs group-hover:underline">
-          {isYou ? "You" : voter.full_name}
-          {/* Only your own hidden vote reaches this list by name — colleagues
-              see it as a private vote — so say so. */}
-          {voter.hide_name && <span className="italic"> (private)</span>}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <StaffAvatar name={voter.full_name} src={voter.avatar_url} size="xs" />
+          <span className="text-muted-foreground group-hover:text-foreground truncate text-xs group-hover:underline">
+            {isYou ? "You" : voter.full_name}
+            {/* Only your own hidden vote reaches this list by name — colleagues
+                see it as a private vote — so say so. */}
+            {voter.hide_name && <span className="italic"> (private)</span>}
+          </span>
+        </div>
+        {voter.voted_at && (
+          <span className="text-muted-foreground/70 shrink-0 text-xs tabular-nums">
+            {formatWATTime(voter.voted_at)}
+          </span>
+        )}
       </button>
       {cardOpen && (
         <StaffCardDialog

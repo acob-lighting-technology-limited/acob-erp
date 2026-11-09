@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import {
-  appendAuditLog,
-  appendHelpDeskEvent,
-  getAuthContext,
-  HelpDeskProfile,
-  syncHelpDeskTicketTask,
-} from "@/lib/help-desk/server"
+import { appendAuditLog, appendHelpDeskEvent, getAuthContext } from "@/lib/help-desk/server"
+import { canReassignTicket } from "@/lib/help-desk/permissions"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -18,16 +15,6 @@ const AssignHelpDeskTicketSchema = z.object({
   assigned_to: z.string().optional().nullable(),
   action: z.string().optional(),
 })
-
-function managesDepartmentStrict(profile: HelpDeskProfile, department: string | null | undefined) {
-  if (!profile?.is_department_lead || !department) return false
-  const managedDepartments = Array.isArray(profile?.managed_departments)
-    ? profile.managed_departments
-    : Array.isArray(profile?.lead_departments)
-      ? profile.lead_departments
-      : []
-  return managedDepartments.includes(department) || profile?.department === department
-}
 
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -63,16 +50,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
     }
 
-    const canAssign = managesDepartmentStrict(profile, ticket.service_department)
-    if (!canAssign) {
-      return NextResponse.json({ error: "Only the service department lead can assign this ticket." }, { status: 403 })
-    }
-
-    if (ticket.status === "pending_approval") {
-      return NextResponse.json({ error: "Cannot assign while ticket is pending approval." }, { status: 400 })
-    }
-    if (!["new", "pending_lead_review", "department_queue", "department_assigned"].includes(ticket.status)) {
-      return NextResponse.json({ error: "Ticket is not assignable at its current stage." }, { status: 400 })
+    if (!canReassignTicket(profile, ticket)) {
+      return NextResponse.json(
+        { error: "Forbidden: Only receiving department leads or global admins can assign or reassign this ticket." },
+        { status: 403 }
+      )
     }
 
     const now = new Date().toISOString()
@@ -112,8 +94,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (!assigned_to) {
         return NextResponse.json({ error: "assigned_to is required" }, { status: 400 })
       }
-      const { data: assignee, error: assigneeError } = await supabase
-        .from("profiles")
+      const serviceClient = getServiceRoleClientOrFallback(supabase)
+      const { data: assignee, error: assigneeError } = await (serviceClient as any)
+        .from("staff_directory")
         .select("id, department, employment_status")
         .eq("id", assigned_to)
         .maybeSingle()
@@ -123,6 +106,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       const unassignableReason = getUnassignableReason(assignee, {
         allowLegacyNullStatus: false,
         requiredDepartment: ticket.service_department,
+        allowOnLeave: true,
       })
       if (unassignableReason) {
         return NextResponse.json({ error: unassignableReason }, { status: 400 })
@@ -148,12 +132,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (updateError) throw updateError
 
-    const syncResult = await syncHelpDeskTicketTask({
-      ticket: updated,
-      actorId: user.id,
-    })
-
-    const workItemNumber = syncResult?.workItemNumber || updated.ticket_number || ticket.ticket_number
+    const ticketNumber = updated.ticket_number || ticket.ticket_number
 
     await appendHelpDeskEvent({
       ticketId: ticket.id,
@@ -180,15 +159,46 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       },
     })
 
-    if (newAssignedTo) {
+    const oldAssigneeId = ticket.assigned_to
+
+    if (oldAssigneeId && oldAssigneeId !== newAssignedTo) {
+      await createNotification({
+        p_user_id: oldAssigneeId,
+        p_type: "help_desk",
+        p_category: "help_desk",
+        p_title: "Help desk ticket reassigned",
+        p_message: `${ticketNumber} - ${ticket.title} has been reassigned to another team member.`,
+        p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
+        p_link_url: `/help-desk/${ticket.id}`,
+        p_actor_id: user.id,
+        p_entity_type: "help_desk_ticket",
+        p_entity_id: ticket.id,
+        p_rich_content: { service_department: ticket.service_department, priority: ticket.priority },
+      })
+
+      try {
+        await sendHelpDeskMail({
+          userIds: [oldAssigneeId],
+          subject: `Help Desk Ticket Reassigned — ${ticketNumber}`,
+          title: "Ticket Reassigned",
+          message: `${ticket.title} has been reassigned to another team member.`,
+          ticketNumber: ticketNumber,
+          ctaPath: `/help-desk/${ticket.id}`,
+        })
+      } catch (err) {
+        log.error({ err: String(err) }, "Help desk mail error to old assignee")
+      }
+    }
+
+    if (newAssignedTo && newAssignedTo !== oldAssigneeId) {
       await createNotification({
         p_user_id: newAssignedTo,
-        p_type: "task_assigned",
-        p_category: "tasks",
-        p_title: "Help desk ticket assigned",
-        p_message: `${workItemNumber} - ${ticket.title}`,
+        p_type: "help_desk",
+        p_category: "help_desk",
+        p_title: "Help desk ticket assigned to you",
+        p_message: `${ticketNumber} - ${ticket.title} (${ticket.service_department})`,
         p_priority: ticket.priority === "urgent" ? "urgent" : ticket.priority === "high" ? "high" : "normal",
-        p_link_url: "/help-desk",
+        p_link_url: `/help-desk/${ticket.id}`,
         p_actor_id: user.id,
         p_entity_type: "help_desk_ticket",
         p_entity_id: ticket.id,
@@ -198,10 +208,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       try {
         await sendHelpDeskMail({
           userIds: [newAssignedTo],
-          subject: `Help Desk Ticket Assigned — ${workItemNumber}`,
+          subject: `Help Desk Ticket Assigned — ${ticketNumber}`,
           title: "Ticket Assigned To You",
           message: `${ticket.title} has been assigned to you for execution.`,
-          ticketNumber: workItemNumber,
+          ticketNumber: ticketNumber,
+          ctaPath: `/help-desk/${ticket.id}`,
         })
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error (assign):")

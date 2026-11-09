@@ -20,6 +20,7 @@ interface StatCardProps {
   trend?: Trend
   variant?: Variant
   description?: string
+  detail?: React.ReactNode
   tooltip?: string
   className?: string
 }
@@ -35,6 +36,7 @@ export function StatCard({
   // "large" are the older, taller cards — opt into them explicitly.
   variant = "compact",
   description,
+  detail,
   tooltip,
   className,
 }: StatCardProps) {
@@ -59,6 +61,7 @@ export function StatCard({
               </div>
             )}
           </div>
+          {detail && <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs">{detail}</div>}
           {trend && (
             <p className={cn("mt-1 text-xs sm:text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
               {trend.value >= 0 ? "+" : ""}

@@ -66,6 +66,10 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
 
   // Lead side: the employee's own Department Lead (or the Admin & HR Lead when the
   // department has no lead).
+  const isAppellantLead =
+    (a.user_name && a.department_lead_name && a.user_name === a.department_lead_name) ||
+    (a.initiated_by_role === "employee" && a.stage === "pending_admin" && !a.lead_reviewed_at)
+
   if (isLeadChange) {
     steps.push({ key: "lead", label: "Lead side", state: "done", text: "Made the change", by: maker })
   } else if (a.lead_reviewed_at) {
@@ -77,6 +81,15 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
       by: a.lead_reviewer_name,
       note: a.lead_resolution_note,
       at: a.lead_reviewed_at,
+    })
+  } else if (isAppellantLead) {
+    steps.push({
+      key: "lead",
+      label: "Lead side",
+      state: "done",
+      text: "Completed",
+      by: maker,
+      at: a.created_at,
     })
   } else if (overriddenStage === "pending_lead") {
     steps.push({ key: "lead", label: "Lead side", state: "skipped", text: "Skipped by override" })
@@ -95,7 +108,7 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
       text: overriddenStage ? "Skipped by override" : `Awaiting ${a.admin_hr_lead_name || "Admin & HR Lead"}`,
     })
   } else {
-    steps.push({ key: "lead", label: "Lead side", state: "none", text: "Not needed" })
+    steps.push({ key: "lead", label: "Lead side", state: "done", text: "Completed" })
   }
 
   // Second stage: the Admin & HR Lead, or whoever she has delegated to.

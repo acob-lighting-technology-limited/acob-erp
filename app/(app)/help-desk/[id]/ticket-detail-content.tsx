@@ -13,8 +13,8 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { apiFetch } from "@/lib/api-client"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { RatingInput } from "@/components/ui/rating-input"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
-import { TicketRequisitionsCard } from "@/components/requisitions/ticket-requisitions-card"
 
 type Ticket = {
   id: string
@@ -116,8 +116,9 @@ export function TicketDetailContent({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          csat_rating: Number(rating),
-          csat_feedback: feedback.trim() || null,
+          status: "closed",
+          rating: Number(rating),
+          rating_comment: feedback.trim() || null,
         }),
       })
       const payload = (await response.json().catch(() => null)) as { error?: string } | null
@@ -195,10 +196,6 @@ export function TicketDetailContent({
               ))}
             </CardContent>
           </Card>
-          <TicketRequisitionsCard
-            ticket={{ id: ticket.id, ticket_number: ticket.ticket_number, title: ticket.title }}
-            canRaise={!["resolved", "closed", "cancelled", "rejected"].includes(ticket.status)}
-          />
         </div>
         <div className="space-y-6">
           <Card>
@@ -230,36 +227,32 @@ export function TicketDetailContent({
                 <CardTitle>Service Rating</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <select
-                  value={rating}
-                  onChange={(event) => setRating(event.target.value)}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
-                >
-                  <option value="">Select a rating</option>
-                  <option value="1">1 - Poor</option>
-                  <option value="2">2 - Fair</option>
-                  <option value="3">3 - Good</option>
-                  <option value="4">4 - Very Good</option>
-                  <option value="5">5 - Excellent</option>
-                </select>
+                <RatingInput
+                  value={rating ? Number(rating) : null}
+                  onChange={(val) => setRating(String(val))}
+                  min={1}
+                  max={5}
+                />
                 <Textarea
                   value={feedback}
                   onChange={(event) => setFeedback(event.target.value)}
                   placeholder="Optional feedback about how the ticket was handled"
                 />
                 <Button onClick={submitRating} disabled={!rating || isSubmittingRating}>
-                  {isSubmittingRating ? "Submitting..." : "Submit Rating"}
+                  {isSubmittingRating ? "Closing..." : "Close Ticket with Rating"}
                 </Button>
               </CardContent>
             </Card>
-          ) : ticket.csat_rating ? (
+          ) : (ticket as any).rating || ticket.csat_rating ? (
             <Card>
               <CardHeader>
                 <CardTitle>Service Rating</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div>Rating: {ticket.csat_rating}/5</div>
-                {ticket.csat_feedback ? <div>{ticket.csat_feedback}</div> : null}
+                <div>Rating: {(ticket as any).rating || ticket.csat_rating}/5</div>
+                {(ticket as any).rating_comment || ticket.csat_feedback ? (
+                  <div>{(ticket as any).rating_comment || ticket.csat_feedback}</div>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

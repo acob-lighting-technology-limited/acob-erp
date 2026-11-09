@@ -213,7 +213,13 @@ A: Check [Tasks](/tasks) and use the search or filter for "All Statuses" to incl
 ## 7. Help Desk
 
 **Q: How do I raise a support ticket?**
-A: Go to [Help Desk](/help-desk) → click "Raise Ticket" → fill in the title, category, description, and priority → submit.
+A: Go to [Help Desk](/help-desk) → click "Raise Ticket" → fill in the title, department, description, and priority (you can also pick a specific team member directly) → submit.
+
+**Q: Does raising a Help Desk ticket create a Task on my board?**
+A: No. Help Desk tickets are standalone support requests tracked with an HD- number. They do not create mirror tasks or count toward task performance. If a ticket turns into a significant project, a lead or admin can convert it into a task.
+
+**Q: Who can close a ticket, and how does the service rating work?**
+A: The assigned agent marks a ticket as "Resolved" when work is complete. Only the requester (or a department lead/admin) can close the ticket. Closing requires giving a 1–5 service rating and optional feedback. Service ratings provide feedback on service delivery and never affect employee KPI or appraisal scoring.
 
 **Q: How do I track my ticket?**
 A: Go to [Help Desk](/help-desk) → find your ticket in the list. Click it to see the full details, comments, and current status.

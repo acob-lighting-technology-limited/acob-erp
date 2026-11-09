@@ -7,11 +7,13 @@
  *
  * Releases before 2026.10 were backfilled from git history on 2026-10-26.
  *
- * When a change ships, add a line to the current month's release (start a new
- * release at the TOP when the month turns). Write what staff or admins will
- * notice and can now do, not how it was built: no refactors, lint fixes or
- * migrations. A change big enough to announce also gets an entry in
- * lib/whats-new.ts, which drives the one-time staff popup.
+ * When a feature ships that staff or admins will notice, add one line to the
+ * current month's release under the right area (start a new release at the TOP
+ * when the month turns). One line per feature, not per tweak. Write what people
+ * can now see or do, not how it was built. Skip refactors, lint, tooling and
+ * small visual tweaks. A month that grows long is condensed: merge related lines
+ * and keep every real capability. A change big enough to announce also gets an
+ * entry in lib/whats-new.ts, which drives the one-time staff popup.
  */
 
 import { formatWATDate } from "@/lib/utils/date"
@@ -33,9 +35,17 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     version: "2026.11",
-    title: "UI refinement and workflow enhancements",
-    summary: "Visual contrast improvements across status banners and approval workflows.",
+    title: "Help Desk, signing and everyday lists",
+    summary:
+      "Help Desk runs on its own, requisitions and signing are easier to use, and lists and sheets behave consistently.",
     areas: [
+      {
+        area: "Help Desk",
+        items: [
+          "Tickets run on their own and no longer create task items. They can be assigned when created (with a warning if the assignee is on leave) and reassigned from any open status",
+          "Resolving is separate from closing: requesters or leads close a ticket with a 1–5 service rating, and tickets that grow into projects can be converted into formal tasks",
+        ],
+      },
       {
         area: "Attendance",
         items: [
@@ -85,13 +95,44 @@ export const RELEASES: Release[] = [
         area: "Tasks",
         items: [
           "New tasks default to 'Does not repeat' with start date and 5-working-day deadline displayed and automatically selected",
+          "Enforced a 3 to 200 character limit on task titles with live counter feedback, and capped task descriptions at 5,000 characters to keep lists and table views clean and scannable",
+          "Differentiated recurring cadence badges from linked project and portfolio metadata with neutral styling to keep action buttons distinct from structural context",
+          "The User Task Plan table now automatically seeds its time period filter to the current week on load, showing active weekly tasks immediately without manual filtering",
         ],
       },
       {
         area: "Leave Management",
         items: [
           "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
+          "Leave Without Pay (LWOP) is now automatically hidden from the admin leave calendar by default, with a dedicated toolbar toggle to show or hide it on demand",
         ],
+      },
+      {
+        area: "Attendance",
+        items: [
+          "Separated Attendance Appeals filtering into distinct Status and Stage controls, defaulting to open appeals in actionable stages ('Pending Admin' and 'Pending Lead & Admin') on load.",
+          "Admin attendance records group exceptions by what needs attention, approved exceptions and covered days",
+        ],
+      },
+      {
+        area: "Lunch",
+        items: ["Lunch voting shows when each vote was cast"],
+      },
+      {
+        area: "Reports & Meetings",
+        items: ["Minutes summaries open with a clearer header and cards for quick scanning"],
+      },
+      {
+        area: "Requisitions & Signing",
+        items: [
+          "Requisition amounts are larger and easier to read in the list",
+          "Beneficiary account name, account number, bank and amount can each be copied with one click",
+          "Settings → Signing offers Replace signature and Change PIN once you have them. A missing signature or PIN when you sign sends you to set it up, then back to the requisition",
+        ],
+      },
+      {
+        area: "Everywhere",
+        items: ["Side sheets and dialogs no longer leave the page behind them scrollable"],
       },
     ],
   },
@@ -104,133 +145,79 @@ export const RELEASES: Release[] = [
       {
         area: "Security",
         items: [
-          "Fixed the findings of the October security audit: closed privilege escalation paths, checked every form submission, and stopped raw database errors reaching the screen",
-          "Admins are alerted when someone changes the database outside Matrix",
-          "Built-in error monitor that groups errors across users so problems are spotted early",
+          "The October security audit is fixed: privilege escalation paths are closed, every form submission is checked, and raw database errors no longer reach the screen",
+          "Admins are alerted when someone changes the database outside Matrix, and the error monitor groups errors across users so problems are spotted early",
         ],
       },
       {
         area: "Requisitions & Payments",
         items: [
-          "Requisitions rebuilt with petty cash, approval routing and signing",
-          "Requisitions can be signed or rejected straight from the table, with a count on each tab",
-          "Any payment can be charged to a project; payment requests now need a cost category and site location",
-          "Payments split into All, Recurring and One-time tabs",
-          "Paid payments, paid requisitions, approved fleet documents and resolved help desk attachments are archived to SharePoint automatically",
+          "Requisitions rebuilt with petty cash, approval routing, signing, and signing or rejecting straight from the table",
+          "Payments can be charged to a project, need a cost category and site location, and are split into All, Recurring and One-time tabs",
+          "Paid payments and requisitions, approved fleet documents and resolved help desk attachments are archived to SharePoint automatically",
         ],
       },
       {
         area: "Mailboxes",
         items: [
-          "Activity history drawer on the Mailboxes page showing a full timeline of cPanel operations (creations, password resets, quota changes and suspensions)",
-          "New mailboxes default to 250 MB quota with preset buttons up to 5 GB and custom quota support",
-          "Create, suspend, restore and forward staff mailboxes from Matrix, and reset mailbox passwords",
-          "Admin Mailboxes page with storage usage and alerts when a mailbox is nearly full",
-          "Staff email updates automatically when a name is edited",
-          "Staff can set up their work email on their phone and copy their ACOB signature from the profile page",
+          "Staff mailboxes can be created, suspended, restored, forwarded and have their passwords reset from Matrix, with an activity history for every operation",
+          "New mailboxes default to 250 MB with presets up to 5 GB; admins see storage use and are alerted when a mailbox is nearly full",
+          "Staff can set up their work email on their phone and copy their ACOB signature from the profile page, and their email updates when their name is edited",
         ],
       },
       {
         area: "Starlink & Sites",
         items: [
-          "Starlink kits page, with billing emails filed against kit payments automatically",
-          "Chosen staff are alerted when a Starlink payment fails or falls due",
-          "Sites register under Portfolios; mini-grid projects link to their Starlink kits",
+          "Starlink kits page, with billing emails filed against kit payments automatically and chosen staff alerted when a payment fails or falls due",
+          "Sites register under Portfolios, and mini-grid projects link to their Starlink kits",
         ],
       },
       {
         area: "Attendance",
         items: [
-          "Weekend clock-ins and clock-outs are displayed as Present with their punch times instead of showing only a generic weekend status, and are kept out of workday attendance calculations",
-          "Attendance appeals display full audit history including initiator, lead endorsement, and admin approval with timestamps, with separation of duties enforcing department lead confirmation on manual alterations",
-          "Attendance change log showing every edit to a record",
-          "Staff are told when the clock-in device is offline",
-          "Attendance appeals now need both the lead and HR, with clear badges for who is pending",
-          "Time physically in the office is shown separately from official credited hours",
-          "Attendance is reconciled every hour, and the device retries punches that did not save",
-          "Remote check-in removed",
+          "Weekend clock-ins and clock-outs show as Present with their punch times, and are kept out of workday calculations",
+          "Attendance appeals need both the lead and HR, with full audit history, and the change log shows every edit to a record",
+          "Staff are told when the clock-in device is offline, punches that failed to save are retried, and attendance is reconciled every hour",
+          "Time physically in the office is shown separately from official credited hours. Remote check-in has been removed",
         ],
       },
       {
         area: "Leave",
         items: [
           "Leave waiting for the MD is no longer cancelled automatically",
-          "Multiple employees in the same department can now apply for overlapping leave without being blocked, with soft overlap notices shown to applicants and approvers",
-          "Leave details now open in a unified side sheet with complete approval timelines, prominent rejection reasons, and handover attachments",
-          "Admin leave queue shows staff avatars, resolves approver names by stage, and streamlines approval queues",
-          "Leave side sheet and expanded rows redesigned: tighter layout, no repeated dates, and the rejection reason shown once on the stage that rejected",
+          "Staff in the same department can apply for overlapping leave, with soft overlap notices for applicants and approvers",
+          "Leave details open in a side sheet with the full approval timeline and prominent rejection reasons",
         ],
       },
       {
-        area: "Notifications",
+        area: "Notifications & Meetings",
         items: [
-          "Notifications sorted into Needs you, Updates and Announcements",
-          "Phone push notifications are sent only for things that need action",
-          "What's New popup tells staff about changes the first time they log in after one ships",
-        ],
-      },
-      {
-        area: "Reports & Meetings",
-        items: [
-          "Email recipients for general meeting attendance and transcripts can be managed directly from a dedicated button on the Records page",
-          "Weekly PowerPoint export shows task and action point counts for every staff member",
+          "Notifications are sorted into Needs you, Updates and Announcements, and phone push is sent only for things that need action",
+          "Meeting recipients are managed from a button on the Records page, and the weekly PowerPoint shows task and action point counts for each staff member",
           "Weekly KSS and General Meeting appear on the calendar with the Teams link",
         ],
       },
       {
-        area: "Staff & Profile",
+        area: "Staff, Lunch, PMS & Tasks",
         items: [
-          "Tap any staff photo to open their contact card",
-          "Staff without a photo are prompted to upload one",
-          "In-app Matrix guide behind the ? icon in the top bar",
-          "Redesigned birthday poster",
+          "Tap a staff photo to open their contact card, and the in-app guide sits behind the ? icon in the top bar",
+          "Lunch menus can be shared to WhatsApp, and staff can hide their name on lunch votes",
+          "Corporate KPIs have a plan year picker, and CBT questions can be uploaded in bulk from Excel or CSV",
+          "Task sheets show assignment, status changes, notes and review decisions in one timeline, and closed or cancelled projects are excluded from new task assignments",
         ],
       },
       {
-        area: "Lunch",
-        items: ["Share the lunch menu to WhatsApp", "Staff can hide their name on lunch votes"],
-      },
-      {
-        area: "PMS & CBT",
-        items: ["Corporate KPIs have a plan year with a year picker", "Upload CBT questions in bulk from Excel or CSV"],
-      },
-      {
-        area: "Tasks",
+        area: "Tools & Operations",
         items: [
-          "Task tables give more space to task titles, with strategic goals and pillars moved into the expanded row view",
-          "Completed task sheets are quieter, with activity kept read-only after closure",
-          "Task sheets now show assignment, status changes, notes and review decisions in one timeline",
-          "Task creation excludes closed and cancelled projects from new task assignments",
-        ],
-      },
-      {
-        area: "Operations",
-        items: [
-          "Asset history now follows a clear event timeline",
-          "Fleet booking decisions are confirmed separately from the booking record",
-        ],
-      },
-      {
-        area: "Staff",
-        items: ["Employee profiles now open as a focused view, with editing and signature work in separate workspaces"],
-      },
-      {
-        area: "Tools",
-        items: [
-          "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",
-          "Media downloads stream straight to the download manager",
+          "All ten PDF tools, including compress, OCR and passwords, work on your device with no file size limit",
+          "Asset history follows a clear event timeline",
         ],
       },
       {
         area: "Everywhere",
         items: [
-          "Detail views open as a side panel instead of a pop-up",
-          "Every dialog becomes a bottom sheet on phones",
-          "Data tables can export what they show",
-          "Tapping a row on a phone opens its sheet with every column, the row's own panel and all of its actions (edit, approve, delete), not just a single Open button",
-          "The Cards view now appears only where a card shows more than the row does",
-          "Browser tabs now show the page name first, followed by Matrix, so several open tabs can be told apart",
-          "Department leads' consoles keep every link inside the console: the dashboard's View all links, activity feed, back links and shortcuts no longer send them to admin pages they cannot open",
+          "Detail views open as a side panel instead of a pop-up, and every dialog becomes a bottom sheet on phones",
+          "Tapping a row on a phone opens its sheet with every column and all its actions, and data tables can export what they show",
         ],
       },
     ],

@@ -17,6 +17,7 @@ export interface AssignableProfileLite {
 export interface AssignablePolicyOptions {
   allowLegacyNullStatus?: boolean
   requiredDepartment?: string | null
+  allowOnLeave?: boolean
 }
 
 export interface AssignableQueryOptions extends AssignablePolicyOptions {
@@ -44,7 +45,11 @@ export function isAssignableEmploymentStatus(
   status: EmploymentStatus | string | null | undefined,
   options: AssignablePolicyOptions = {}
 ): boolean {
-  if (typeof status === "string" && status.toLowerCase() === "active") return true
+  if (typeof status === "string") {
+    const s = status.toLowerCase()
+    if (s === "active") return true
+    if (options.allowOnLeave && s === "on_leave") return true
+  }
   if (options.allowLegacyNullStatus === false) return false
   return status == null
 }
@@ -75,6 +80,12 @@ export function applyAssignableStatusFilter<TQuery extends AssignableStatusQuery
   query: TQuery,
   options: AssignablePolicyOptions = {}
 ) {
+  if (options.allowOnLeave) {
+    if (options.allowLegacyNullStatus === false) {
+      return query.or("employment_status.eq.active,employment_status.eq.on_leave")
+    }
+    return query.or("employment_status.eq.active,employment_status.eq.on_leave,employment_status.is.null")
+  }
   if (options.allowLegacyNullStatus === false) {
     return query.eq("employment_status", "active")
   }

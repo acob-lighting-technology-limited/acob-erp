@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ export function PaymentDialog({
   onDone: () => void
 }) {
   const outstanding = Math.round((Number(requisition.amount) - Number(requisition.amount_paid)) * 100) / 100
+  const pathname = usePathname()
   const [amount, setAmount] = useState("")
   const [paidOn, setPaidOn] = useState(todayInLagos())
   const [method, setMethod] = useState<"transfer" | "cash">("transfer")
@@ -161,7 +163,10 @@ export function PaymentDialog({
             {viewer.signing_setup_missing.length ? (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                 Before you can record payments, set up your {viewer.signing_setup_missing.join(" and ")} in{" "}
-                <Link href="/settings/signing" className="font-medium underline">
+                <Link
+                  href={`/settings/signing?return=${encodeURIComponent(pathname)}`}
+                  className="font-medium underline"
+                >
                   Settings → Signing
                 </Link>
                 .

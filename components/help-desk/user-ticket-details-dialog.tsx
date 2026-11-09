@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
+import { CloseTicketDialog } from "./close-ticket-dialog"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,9 +36,6 @@ const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
   returned: ["in_progress"],
   closed: [],
   cancelled: [],
-  pending_approval: ["approved_for_procurement", "rejected"],
-  approved_for_procurement: ["assigned", "cancelled"],
-  rejected: ["new"],
   pending_lead_review: ["department_queue", "assigned", "cancelled"],
 }
 
@@ -99,6 +97,7 @@ export function UserHelpDeskTicketDetailsDialog({
   ratingSlot,
 }: UserHelpDeskTicketDetailsDialogProps) {
   const ticket = detail?.ticket || null
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const events = useMemo(() => detail?.events || [], [detail])
   const comments = useMemo(() => detail?.comments || [], [detail])
   const approvals = useMemo(() => detail?.approvals || [], [detail])
@@ -176,7 +175,13 @@ export function UserHelpDeskTicketDetailsDialog({
           >
             <Select
               value={selectedStatus}
-              onValueChange={(value) => void onStatusChange(value)}
+              onValueChange={(value) => {
+                if (value === "closed") {
+                  setCloseDialogOpen(true)
+                } else {
+                  void onStatusChange(value)
+                }
+              }}
               disabled={isSaving || !canChangeStatus}
             >
               <SelectTrigger className="h-9 text-sm">
@@ -254,10 +259,7 @@ export function UserHelpDeskTicketDetailsDialog({
               <DetailProperties>
                 <DetailProperty label="Service department">{ticket.service_department}</DetailProperty>
                 <DetailProperty label="Raised from">{ticket.requester_department}</DetailProperty>
-                <DetailProperty label="Request type">
-                  <span className="capitalize">{formatLabel(ticket.request_type)}</span>
-                  {ticket.category ? ` · ${ticket.category}` : ""}
-                </DetailProperty>
+                {ticket.category ? <DetailProperty label="Category">{ticket.category}</DetailProperty> : null}
                 <DetailProperty label="Logged">{formatDateTime(ticket.created_at)}</DetailProperty>
                 {/* Surfaced for the first time — the SLA target was on the record
                     all along and the sheet never showed it. */}
@@ -265,9 +267,36 @@ export function UserHelpDeskTicketDetailsDialog({
                   <DetailProperty label="SLA target">{formatDateTime(ticket.sla_target_at)}</DetailProperty>
                 )}
                 {ticket.resolved_at && (
-                  <DetailProperty label="Resolved">{formatDateTime(ticket.resolved_at)}</DetailProperty>
+                  <DetailProperty label="Resolved">
+                    {formatDateTime(ticket.resolved_at)}
+                    {(ticket as any).resolved_by_name || (ticket.metadata as any)?.resolved_by_name
+                      ? ` · by ${(ticket as any).resolved_by_name || (ticket.metadata as any)?.resolved_by_name}`
+                      : ""}
+                  </DetailProperty>
                 )}
-                {ticket.closed_at && <DetailProperty label="Closed">{formatDateTime(ticket.closed_at)}</DetailProperty>}
+                {ticket.closed_at && (
+                  <DetailProperty label="Closed">
+                    {formatDateTime(ticket.closed_at)}
+                    {(ticket as any).closed_by_name || (ticket.metadata as any)?.closed_by_name
+                      ? ` · by ${(ticket as any).closed_by_name || (ticket.metadata as any)?.closed_by_name}`
+                      : ""}
+                  </DetailProperty>
+                )}
+                {((ticket as any).rating || ticket.csat_rating) && (
+                  <DetailProperty label="Service rating">
+                    {(ticket as any).rating ?? ticket.csat_rating} / 5
+                    {(ticket as any).rating_comment || ticket.csat_feedback
+                      ? ` — "${(ticket as any).rating_comment || ticket.csat_feedback}"`
+                      : ""}
+                  </DetailProperty>
+                )}
+                {ticket.status === "converted" && (
+                  <DetailProperty label="Converted to task">
+                    {(ticket as any).converted_task_number ||
+                      (ticket.metadata as any)?.converted_task_number ||
+                      "Tracked as Task"}
+                  </DetailProperty>
+                )}
               </DetailProperties>
             </section>
 
@@ -305,6 +334,17 @@ export function UserHelpDeskTicketDetailsDialog({
           </>
         )}
       </DetailBody>
+      {ticket && (
+        <CloseTicketDialog
+          open={closeDialogOpen}
+          onOpenChange={setCloseDialogOpen}
+          ticket={ticket}
+          onSuccess={async () => {
+            setCloseDialogOpen(false)
+            await onRetry()
+          }}
+        />
+      )}
     </DetailSheet>
   )
 }

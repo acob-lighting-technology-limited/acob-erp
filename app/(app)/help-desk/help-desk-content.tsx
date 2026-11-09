@@ -12,6 +12,7 @@ import { Headset, Play, CheckCircle2, LifeBuoy, MessageSquare, Star, Building2 }
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
+import { RatingInput } from "@/components/ui/rating-input"
 import type { HelpDeskTicket, HelpDeskContentProps } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import { UserHelpDeskTicketDetailsDialog } from "@/components/help-desk/user-ticket-details-dialog"
@@ -97,7 +98,7 @@ export function HelpDeskContent({
     description: "",
     service_department: "IT and Communications",
     priority: "medium",
-    request_type: "support",
+    assigned_to: null,
   })
 
   useEffect(() => {
@@ -218,20 +219,8 @@ export function HelpDeskContent({
       render: (ticket) => <TicketStatusBadge status={ticket.status} />,
     },
     {
-      key: "goal",
-      label: "Goal",
-      sortable: true,
-      accessor: (ticket) => ticket.goal_title || "",
-      render: (ticket) =>
-        ticket.goal_title ? (
-          <span className="line-clamp-1 text-xs font-medium">{ticket.goal_title}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">Not linked</span>
-        ),
-      hideOnMobile: true,
-    },
-    {
       key: "comments",
+
       label: "Comments",
       sortable: true,
       accessor: (ticket) => ticket.comment_count || 0,
@@ -354,7 +343,7 @@ export function HelpDeskContent({
         description: "",
         service_department: "IT and Communications",
         priority: "medium",
-        request_type: "support",
+        assigned_to: null,
       })
       await refreshTickets()
     } catch (error: unknown) {
@@ -389,16 +378,17 @@ export function HelpDeskContent({
       const res = await apiFetch(`/api/help-desk/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csat_rating: rating }),
+        body: JSON.stringify({ status: "closed", rating }),
       })
 
       if (!res.ok) {
         const body = await res.json()
-        throw new Error(body.error || "Failed to rate")
+        throw new Error(body.error || "Failed to close ticket with rating")
       }
 
-      toast.success("Thanks for your feedback")
+      toast.success("Ticket closed and service rating recorded")
       await refreshTickets()
+      setDetailsOpen(false)
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to submit rating"))
     }
@@ -608,7 +598,6 @@ export function HelpDeskContent({
             fields: (ticket) => [
               { label: "Ticket Number", value: ticket.ticket_number, copyable: true },
               { label: "Service Dept", value: ticket.service_department },
-              { label: "Request Type", value: ticket.request_type || "-" },
               { label: "Priority", value: ticket.priority },
               { label: "Created", value: formatWATDate(ticket.created_at) },
               { label: "Description", value: ticket.description, fullWidth: true },
@@ -620,49 +609,6 @@ export function HelpDeskContent({
               },
             ],
           },
-        }}
-        expandable={{
-          render: (ticket) => (
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <span className="text-muted-foreground block text-xs font-semibold uppercase">Description</span>
-                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
-                  {ticket.description || "No description provided."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Service Dept</span>
-                  <span className="font-medium">{ticket.service_department}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Request Type</span>
-                  <span className="font-medium capitalize">{ticket.request_type || "—"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Created</span>
-                  <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Goal</span>
-                  <span className="font-medium">{ticket.goal_title || "—"}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 border-t pt-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-xs"
-                  onClick={() => void openTicketDetails(ticket.id)}
-                >
-                  <Headset className="h-3.5 w-3.5" />
-                  View Full Ticket & Comments {(ticket.comment_count || 0) > 0 ? `(${ticket.comment_count})` : ""}
-                </Button>
-              </div>
-            </div>
-          ),
         }}
         emptyTitle="No tickets"
         emptyDescription="Tickets you raise or are assigned appear here."
@@ -730,27 +676,24 @@ export function HelpDeskContent({
           selectedTicketDetail?.ticket &&
           selectedTicketDetail.ticket.requester_id === userId &&
           selectedTicketDetail.ticket.status === "resolved" ? (
-            <div className="flex items-center gap-2">
-              <Select
-                value={ratingDrafts[selectedTicketDetail.ticket.id] || ""}
-                onValueChange={(value) =>
-                  setRatingDrafts((previous) => ({ ...previous, [selectedTicketDetail.ticket.id]: value }))
-                }
-              >
-                <SelectTrigger className="h-9 w-32 text-sm">
-                  <SelectValue placeholder="Rate 1-5" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-semibold">Service Rating (1–5) *</span>
+                <RatingInput
+                  value={
+                    ratingDrafts[selectedTicketDetail.ticket.id]
+                      ? Number(ratingDrafts[selectedTicketDetail.ticket.id])
+                      : null
+                  }
+                  onChange={(val) =>
+                    setRatingDrafts((previous) => ({ ...previous, [selectedTicketDetail.ticket.id]: String(val) }))
+                  }
+                  min={1}
+                  max={5}
+                />
+              </div>
               <Button
                 size="sm"
-                variant="outline"
                 disabled={!ratingDrafts[selectedTicketDetail.ticket.id]}
                 onClick={async () => {
                   const ticketId = selectedTicketDetail.ticket.id
@@ -764,7 +707,7 @@ export function HelpDeskContent({
                   })
                 }}
               >
-                Submit
+                Close Ticket with Rating
               </Button>
             </div>
           ) : null

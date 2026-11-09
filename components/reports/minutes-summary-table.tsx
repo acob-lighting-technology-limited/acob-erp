@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertCircle, CalendarDays, Eye, FileText, Pencil, Plus, ScrollText, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -35,6 +37,7 @@ import { apiFetch } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cleanSlideTextHtml, sanitizeSlideTextHtml } from "@/lib/rich-text"
+import { SlideTextPreview } from "@/components/reports/slide-text-preview"
 import { createClient } from "@/lib/supabase/client"
 import { formatWATDate, formatWATTimeDate } from "@/lib/utils/date"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
@@ -54,9 +57,6 @@ interface Props {
   readOnly?: boolean
   pageTabs?: { tabs: DataTableTab[]; activeTab: string; onTabChange: (tab: string) => void }
 }
-
-const SUMMARY_PROSE =
-  "text-[15px] leading-7 break-words [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_h4]:font-bold [&_ol]:list-decimal [&_ol]:pl-6 [&_p+*]:mt-3 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-6"
 
 function formatMeetingMonday(week: number, year: number) {
   return formatWATDate(new Date(`${getDefaultMeetingDateIso(week, year)}T00:00:00`), {
@@ -404,13 +404,7 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
               {viewing ? formatMeetingMonday(viewing.meeting_week, viewing.meeting_year) : null}
             </DialogDescription>
           </DialogHeader>
-          {viewing ? (
-            <div
-              className={SUMMARY_PROSE}
-              // Sanitised to the slide-text tags; stored HTML is never trusted.
-              dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(viewing.content_html) }}
-            />
-          ) : null}
+          {viewing ? <SlideTextPreview html={viewing.content_html} /> : null}
         </DialogContent>
       </Dialog>
 
@@ -420,7 +414,7 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
             <AlertDialogTitle>Delete summary?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
-                ? `Delete the summary for Week ${pendingDelete.meeting_week}, ${pendingDelete.meeting_year}. The agenda deck will show the full minutes instead. This cannot be undone.`
+                ? `Delete the summary for Week ${pendingDelete.meeting_week}, ${pendingDelete.meeting_year}. The agenda deck will show only the Minutes of the Last Meeting title slide. This cannot be undone.`
                 : "This cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -455,13 +449,53 @@ export function MinutesSummaryTable({ backHref, backLabel, readOnly = false, pag
         error={error instanceof Error ? error.message : null}
         onRetry={() => void refetch()}
         rowActions={rowActions}
+        cards
+        cardRenderer={(row) => {
+          const editorName = row.updated_by ? nameMap.get(row.updated_by) || "Unknown" : "Not recorded"
+          return (
+            <Card className="border-border/80 bg-card hover:border-primary/40 h-full transition-colors">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-foreground text-sm font-semibold">
+                      {formatMeetingMonday(row.meeting_week, row.meeting_year)}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">Summary of minutes</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">{`Week ${row.meeting_week}`}</Badge>
+                </div>
+                <p className="text-muted-foreground line-clamp-3 text-sm leading-6">{summaryText(row.content_html)}</p>
+                <div className="border-border/60 flex items-center justify-between gap-3 border-t pt-3 text-xs">
+                  <span className="text-muted-foreground truncate">{editorName}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {formatWATDate(row.updated_at, { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }}
         expandable={{
-          render: (row) => (
-            <div
-              className={`${SUMMARY_PROSE} rounded-lg border p-4`}
-              dangerouslySetInnerHTML={{ __html: sanitizeSlideTextHtml(row.content_html) }}
-            />
-          ),
+          render: (row) => {
+            const editorName = row.updated_by ? nameMap.get(row.updated_by) || "Unknown" : "Not recorded"
+            return (
+              <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
+                <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-foreground text-sm font-semibold">
+                      {formatMeetingMonday(row.meeting_week, row.meeting_year)}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">Summary of minutes</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{`Week ${row.meeting_week}`}</Badge>
+                    <span className="text-muted-foreground text-xs">Updated by {editorName}</span>
+                  </div>
+                </div>
+                <SlideTextPreview html={row.content_html} className="px-4 py-5 sm:px-5" />
+              </div>
+            )
+          },
         }}
         mobileRow={{
           title: (row) => `Week ${row.meeting_week}, ${row.meeting_year}`,

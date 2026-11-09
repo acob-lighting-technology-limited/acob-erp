@@ -119,11 +119,11 @@ export async function loadStarlinkKits(supabase: SupabaseClient): Promise<Starli
       (eventsBySite.get(kit.id) ?? [])
         .filter((e) => BILLING_KINDS.has(e.kind))
         .map((e) => ({
-        kind: e.kind,
-        receivedAt: e.received_at,
-        periodStart: e.period_start,
-        waiting: e.outcome === "waiting",
-      })),
+          kind: e.kind,
+          receivedAt: e.received_at,
+          periodStart: e.period_start,
+          waiting: e.outcome === "waiting",
+        })),
       now
     )
     return {

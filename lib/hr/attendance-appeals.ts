@@ -432,6 +432,52 @@ export function leadFirstBlock(actor: { isAdminLike: boolean; scopeMode?: string
     : null
 }
 
+export function stagedLeaveEntryKey(userId: string, startDate: string) {
+  return `${userId}|${startDate}`
+}
+
+/**
+ * Who entered a manual leave and when. The admin's entry is recorded on the
+ * `admin_manual` appeal (admin_reviewed_by/at), not on the leave row, so Leave
+ * screens read it from here. Keyed by `stagedLeaveEntryKey(user_id, start_date)`.
+ */
+export async function findStagedLeaveAdminEntries(
+  client: SupabaseClient,
+  leaves: Array<{ user_id: string; start_date: string }>
+): Promise<Map<string, { reviewerId: string; reviewedAt: string | null }>> {
+  const entries = new Map<string, { reviewerId: string; reviewedAt: string | null }>()
+  if (leaves.length === 0) return entries
+  const userIds = Array.from(new Set(leaves.map((l) => l.user_id)))
+  const dates = Array.from(new Set(leaves.map((l) => l.start_date)))
+  const { data, error } = await client
+    .from("attendance_appeals")
+    .select("user_id, appeal_date, admin_reviewed_by, admin_reviewed_at")
+    .eq("initiated_by_role", "admin_manual")
+    .eq("requested_status", "on_leave")
+    .in("user_id", userIds)
+    .in("appeal_date", dates)
+    .returns<
+      Array<{
+        user_id: string
+        appeal_date: string
+        admin_reviewed_by: string | null
+        admin_reviewed_at: string | null
+      }>
+    >()
+  if (error) {
+    log.error({ err: String(error.message) }, "Failed to look up staged leave admin entries")
+    return entries
+  }
+  for (const row of data ?? []) {
+    if (!row.admin_reviewed_by) continue
+    entries.set(stagedLeaveEntryKey(row.user_id, row.appeal_date), {
+      reviewerId: row.admin_reviewed_by,
+      reviewedAt: row.admin_reviewed_at,
+    })
+  }
+  return entries
+}
+
 export type StagingActor = { userId: string; isAdminLike: boolean; scopeMode?: string | null }
 
 export type StagingTarget = {

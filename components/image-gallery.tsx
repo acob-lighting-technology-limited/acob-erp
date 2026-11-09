@@ -7,6 +7,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+import { Skeleton } from "@/components/ui/skeleton"
 interface ImageGalleryProps {
   images: File[]
   selectedIndex: number
@@ -79,9 +80,7 @@ export function ImageGallery({ images, selectedIndex, onSelect, onRemove, onClea
                   {thumbnailUrl ? (
                     <Image src={thumbnailUrl} alt={file.name} fill unoptimized className="object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <span className="text-muted-foreground text-xs">Loading...</span>
-                    </div>
+                    <Skeleton className="h-full w-full rounded-none" />
                   )}
                 </button>
 

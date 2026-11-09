@@ -83,6 +83,15 @@ export interface LeaveItem {
   created_at: string
   admin_manual?: boolean | null
   approved_at?: string | null
+  // Manual leaves: who entered it and when (from the linked admin_manual appeal).
+  admin_entry_by_profile?: {
+    id?: string
+    first_name?: string | null
+    last_name?: string | null
+    full_name?: string | null
+    company_email?: string | null
+  } | null
+  admin_entry_at?: string | null
   user?: {
     id?: string
     first_name?: string | null
@@ -112,7 +121,7 @@ export interface LeaveItem {
     full_name?: string | null
     company_email?: string | null
   } | null
-  leave_type?: { name: string }
+  leave_type?: { name: string; code?: string | null }
   current_approver?: { id: string; full_name: string; company_email: string; role?: string | null } | null
   approvals?: Array<{
     id: string

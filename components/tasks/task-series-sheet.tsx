@@ -22,6 +22,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { TASK_RATING_MAX, TASK_RATING_MIN } from "@/lib/tasks/scoring"
 import { fetchSeriesDetail, seriesDetailKey, seriesListKey } from "@/lib/tasks/series-client"
 
+import { LinesSkeleton } from "@/components/skeletons"
 const STATUS_LABELS = { active: "Active", paused: "Paused", ended: "Ended" } as const
 
 /**
@@ -172,9 +173,8 @@ export function TaskSeriesSheet({
         }
       >
         {isLoading || !detail || !series ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading recurring task...
+          <div className="py-2">
+            <LinesSkeleton lines={4} />
           </div>
         ) : (
           <>

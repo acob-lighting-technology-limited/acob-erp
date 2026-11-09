@@ -391,29 +391,6 @@ export function AdminAttendanceRecordsPage({
           searchPlaceholder="Search employee or department..."
           searchFn={(r, q) => [r.user_name, r.department].join(" ").toLowerCase().includes(q)}
           isLoading={loading}
-          expandable={{
-            render: (r) => (
-              <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-xs font-medium">Source</span>
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    {labelSource(r.source || "") || "Unknown"}
-                  </Badge>
-                </div>
-
-                <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-xs font-medium">Hours & Edits</span>
-                  <p className="text-foreground mt-1">
-                    Total: {r.total_hours != null ? `${r.total_hours.toFixed(1)}h` : "-"}
-                    {r.editor_first_name && ` · Edited by ${r.editor_first_name}`}
-                  </p>
-                  {r.manual_comment && (
-                    <p className="text-muted-foreground mt-1 italic">&ldquo;{r.manual_comment}&rdquo;</p>
-                  )}
-                </div>
-              </div>
-            ),
-          }}
           viewToggle
           contactsView
           stickyToolbar

@@ -141,15 +141,6 @@ export async function POST(request: NextRequest) {
       fundingCategoryName = category.name
     }
 
-    if (input.help_desk_ticket_id) {
-      const { data: ticket } = await admin
-        .from("help_desk_tickets")
-        .select("id")
-        .eq("id", input.help_desk_ticket_id)
-        .maybeSingle()
-      if (!ticket) return apiError("That help desk ticket was not found", ApiErrorCode.NOT_FOUND, 404)
-    }
-
     const amount = input.form_type === "petty_cash" ? lineItemsTotal(input.line_items) : input.amount
     const stages = resolveRequisitionStages(
       input.form_type,
@@ -172,7 +163,6 @@ export async function POST(request: NextRequest) {
         attachments: input.attachments || [],
         funding_category_id: input.funding_category_id || null,
         funding_category_name: fundingCategoryName,
-        help_desk_ticket_id: input.help_desk_ticket_id || null,
       },
       p_stages: stages,
     })
@@ -182,7 +172,6 @@ export async function POST(request: NextRequest) {
     const req = await loadRequisition(admin, id)
     if (req) {
       await notifyRequisitionEvent(admin, { kind: "submitted", req })
-      if (req.help_desk_ticket_id) await notifyRequisitionEvent(admin, { kind: "raised", req })
     }
 
     await writeAuditLog(

@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { monthBounds, toLocalYearMonth } from "@/lib/hr/attendance-utils"
+import { findStagedLeaveAdminEntries, stagedLeaveEntryKey } from "@/lib/hr/attendance-appeals"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
 const log = logger("admin-hr-leave-calendar")
@@ -122,6 +123,7 @@ export async function GET(request: NextRequest) {
     const filterUserId = searchParams.get("user_id") || null
     const filterLeaveTypeId = searchParams.get("leave_type_id") || null
     const filterStatus = searchParams.get("status") || null
+    const includeLwop = searchParams.get("include_lwop") === "true"
 
     if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
       return NextResponse.json({ error: "Invalid year_month format (expected YYYY-MM)" }, { status: 400 })
@@ -196,6 +198,17 @@ export async function GET(request: NextRequest) {
     }
     if (filterLeaveTypeId) {
       leaveQuery = leaveQuery.eq("leave_type_id", filterLeaveTypeId)
+    } else if (!includeLwop) {
+      const lwopTypeIds = leaveTypes
+        .filter((lt) => {
+          const norm = (lt.name || "").toLowerCase()
+          const code = (lt.code || "").toLowerCase()
+          return norm.includes("unpaid") || norm.includes("lwop") || code === "lwop"
+        })
+        .map((lt) => lt.id)
+      if (lwopTypeIds.length > 0) {
+        leaveQuery = leaveQuery.not("leave_type_id", "in", `(${lwopTypeIds.map((id) => `"${id}"`).join(",")})`)
+      }
     }
     if (filterStatus && filterStatus !== "all") {
       if (filterStatus === "approved") {
@@ -229,6 +242,14 @@ export async function GET(request: NextRequest) {
       evidenceData = (evData || []) as LeaveEvidenceRow[]
     }
 
+    // Manual leaves: the admin who entered it lives on the linked appeal, not the leave row.
+    const stagedAdminEntries = await findStagedLeaveAdminEntries(
+      dataClient,
+      leaveRows
+        .filter((r) => r.admin_manual && r.user_id)
+        .map((r) => ({ user_id: r.user_id, start_date: r.start_date ?? "" }))
+    )
+
     // Collect all profile IDs needing fallback resolution (reliever, supervisor, approved_by, approvers)
     const profileIds = new Set<string>()
     for (const r of leaveRows) {
@@ -238,6 +259,10 @@ export async function GET(request: NextRequest) {
       if (r.approved_by) profileIds.add(r.approved_by)
       for (const a of r.approvals || []) {
         if (a.approver_id) profileIds.add(a.approver_id)
+      }
+      if (r.admin_manual && r.user_id) {
+        const entry = stagedAdminEntries.get(stagedLeaveEntryKey(r.user_id, r.start_date ?? ""))
+        if (entry) profileIds.add(entry.reviewerId)
       }
     }
 
@@ -277,6 +302,11 @@ export async function GET(request: NextRequest) {
         const relieverProfile = r.reliever_id ? profilesMap.get(r.reliever_id) || null : null
         const supervisorProfile = r.supervisor_id ? profilesMap.get(r.supervisor_id) || null : null
         const approvedByProfile = r.approved_by ? profilesMap.get(r.approved_by) || null : null
+        const stagedEntry =
+          r.admin_manual && r.user_id
+            ? stagedAdminEntries.get(stagedLeaveEntryKey(r.user_id, r.start_date ?? "")) || null
+            : null
+        const adminEntryProfile = stagedEntry ? profilesMap.get(stagedEntry.reviewerId) || null : null
         const leaveType = r.leave_type || leaveTypesMap.get(r.leave_type_id) || null
 
         const empFullName = resolveName(userProfile) || "Employee"
@@ -339,6 +369,16 @@ export async function GET(request: NextRequest) {
                 company_email: approvedByProfile.company_email || null,
               }
             : null,
+          admin_entry_by_profile: adminEntryProfile
+            ? {
+                id: adminEntryProfile.id,
+                first_name: adminEntryProfile.first_name || null,
+                last_name: adminEntryProfile.last_name || null,
+                full_name: resolveName(adminEntryProfile) || null,
+                company_email: adminEntryProfile.company_email || null,
+              }
+            : null,
+          admin_entry_at: stagedEntry?.reviewedAt ?? null,
           leave_type: leaveType
             ? { id: leaveType.id, name: leaveType.name, code: leaveType.code || undefined }
             : { name: "Leave" },

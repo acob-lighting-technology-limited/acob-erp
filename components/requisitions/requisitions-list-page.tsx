@@ -35,6 +35,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { exportRequisitionsToExcel, exportRequisitionsToPDF } from "@/lib/requisitions/export"
 import { STATUS_LABELS, formatNaira, progressLabel, requisitionSummary } from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
+import { NairaAmount } from "@/components/requisitions/naira-amount"
 import type {
   Requisition,
   RequisitionFormType,
@@ -170,19 +171,19 @@ export function RequisitionsListPage({
               setPreviewId(r.id)
             }
           }}
-          className="text-primary font-mono text-xs font-semibold hover:underline"
+          className="text-primary font-mono text-xs font-semibold whitespace-nowrap hover:underline"
         >
           {r.requisition_number}
         </Link>
       ),
-      initialWidth: 140,
+      initialWidth: 130,
     },
     {
       key: "form_type",
       label: "Form",
       sortable: true,
       accessor: (r) => FORM_LABELS[r.form_type],
-      render: (r) => <span className="text-xs">{FORM_LABELS[r.form_type]}</span>,
+      render: (r) => <span className="text-xs whitespace-nowrap">{FORM_LABELS[r.form_type]}</span>,
       initialWidth: 130,
     },
     {
@@ -211,8 +212,9 @@ export function RequisitionsListPage({
       label: "Amount",
       sortable: true,
       accessor: (r) => Number(r.amount),
-      render: (r) => <span className="font-mono text-xs font-semibold">{formatNaira(r.amount)}</span>,
-      initialWidth: 140,
+      align: "right",
+      render: (r) => <NairaAmount value={r.amount} />,
+      initialWidth: 150,
     },
     {
       key: "status",
@@ -236,7 +238,9 @@ export function RequisitionsListPage({
       label: "Date",
       sortable: true,
       accessor: (r) => r.created_at,
-      render: (r) => <span className="text-muted-foreground text-xs">{formatWATDate(r.created_at)}</span>,
+      render: (r) => (
+        <span className="text-muted-foreground text-xs whitespace-nowrap">{formatWATDate(r.created_at)}</span>
+      ),
       initialWidth: 120,
       hideOnMobile: true,
     },
@@ -440,7 +444,7 @@ export function RequisitionsListPage({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground font-mono text-xs font-semibold">{r.requisition_number}</span>
-                <span className="font-mono text-xs font-semibold">{formatNaira(r.amount)}</span>
+                <NairaAmount value={r.amount} />
               </div>
               <p className="line-clamp-2 text-sm font-medium">{requisitionSummary(r)}</p>
               <p className="text-muted-foreground text-xs">

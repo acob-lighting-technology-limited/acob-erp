@@ -6,9 +6,11 @@
       "app/admin/corporate-scorecard/_components/kpi-dialogs.tsx": 5,
       "app/admin/hr/attendance/_components/calendar-view.tsx": 1,
       "app/admin/hr/leave/_components/leave-calendar-view.tsx": 3,
+      "app/admin/hr/lunch/view.tsx": 1,
       "app/admin/reports/general-meeting/attendance/_components/attendance-print-sheet.tsx": 2,
       "app/cbt/page-client.tsx": 1,
-      "components/approval-signing/signing-setup.tsx": 2
+      "components/approval-signing/signing-setup.tsx": 2,
+      "components/reports/slide-text-preview.tsx": 1
     },
     "locale-without-en-ng": {},
     "raw-img": {
@@ -31,9 +33,13 @@
       "lib/starlink/billing-alerts.ts": 1,
       "lib/tasks/mailer.ts": 1
     },
-    "key-index": {},
+    "key-index": {
+      "app/admin/hr/lunch/_components/lunch-feedback-panel.tsx": 1,
+      "components/reports/slide-text-preview.tsx": 2
+    },
     "dialog-in-page": {},
     "explicit-any": {
+      "app/(app)/help-desk/[id]/ticket-detail-content.tsx": 4,
       "app/(app)/hr/attendance/attendance-content.tsx": 2,
       "app/(app)/tools/media/_components/media-compressor.tsx": 2,
       "app/(app)/tools/media/_components/media-converter.tsx": 1,
@@ -46,6 +52,7 @@
       "app/admin/communications/meetings/mail/_components/WeeklySummaryForm.tsx": 1,
       "app/admin/corporate-scorecard/_components/kpi-dialogs.tsx": 7,
       "app/admin/dev/login-logs/dev-login-logs-content.tsx": 6,
+      "app/admin/help-desk/management/admin-help-desk-content.tsx": 1,
       "app/admin/hr/attendance/view.tsx": 2,
       "app/admin/hr/lunch/view.tsx": 1,
       "app/admin/it/bypass-override/_components/bypass-override-content.tsx": 15,
@@ -62,6 +69,10 @@
       "app/api/corporate-scorecard/kpis/route.ts": 1,
       "app/api/correspondence/records/route.ts": 2,
       "app/api/download/route.ts": 1,
+      "app/api/help-desk/assignees/route.ts": 1,
+      "app/api/help-desk/tickets/[id]/assign/route.ts": 1,
+      "app/api/help-desk/tickets/[id]/route.ts": 1,
+      "app/api/help-desk/tickets/route.ts": 1,
       "app/api/info/route.ts": 2,
       "app/api/projects/[id]/plans/route.ts": 9,
       "app/api/projects/[id]/route.ts": 1,
@@ -73,6 +84,7 @@
       "app/api/song/info/route.ts": 5,
       "app/employee/new/page-client.tsx": 1,
       "components/employees/employee-detail-types.ts": 2,
+      "components/help-desk/user-ticket-details-dialog.tsx": 14,
       "components/hr/manage-contract-categories-dialog.tsx": 2,
       "components/hr/manage-gross-salary-dialog.tsx": 1,
       "components/hr/manage-users-dialog.tsx": 2,
@@ -179,6 +191,7 @@
       "app/api/help-desk/dashboard/route.ts": 1,
       "app/api/help-desk/tickets/[id]/assign/route.ts": 2,
       "app/api/help-desk/tickets/[id]/comments/route.ts": 3,
+      "app/api/help-desk/tickets/[id]/convert-to-task/route.ts": 4,
       "app/api/help-desk/tickets/[id]/route.ts": 6,
       "app/api/help-desk/tickets/route.ts": 2,
       "app/api/hr/attendance/clock-in/route.ts": 1,
@@ -209,7 +222,6 @@
       "app/api/tasks/[id]/comments/route.ts": 1,
       "app/api/tasks/[id]/route.ts": 2,
       "app/api/tasks/[id]/status/route.ts": 1,
-      "app/api/tasks/route.ts": 2,
       "app/dept/[dept_id]/assets/page.tsx": 1,
       "app/dept/[dept_id]/correspondence/page.tsx": 1,
       "app/dept/[dept_id]/documentation/personal/page.tsx": 1,
@@ -222,7 +234,8 @@
       "lib/md-desk/server.ts": 1,
       "lib/performance/review-data.ts": 1,
       "lib/services/base.service.ts": 2,
-      "lib/services/tasks/task.service.ts": 3
+      "lib/services/tasks/task.service.ts": 3,
+      "lib/tasks/create-task.ts": 2
     },
     "inline-query-key": {},
     "dark-color-override": {
@@ -241,6 +254,7 @@
     "fixed-px-width": {
       "app/admin/dev/tests/_components/AssetMailRoutingPanel.tsx": 1,
       "app/admin/hr/departments/view.tsx": 1,
+      "app/admin/hr/lunch/view.tsx": 3,
       "app/admin/hr/offices-rooms/view.tsx": 1,
       "app/admin/hr/pms/_components/individual-attendance-expanded-row.tsx": 1,
       "app/admin/hr/pms/_components/pms-metric-tabs-page.tsx": 1,
@@ -286,26 +300,26 @@
       "app/lunch/_components/lunch-share-view.tsx": 1
     },
     "file-lines": {
-      "app/(app)/hr/attendance/attendance-content.tsx": 1133,
-      "app/(app)/hr/leave/leave-content.tsx": 1254,
-      "app/(app)/hr/lunch/lunch-content.tsx": 1112,
+      "app/(app)/hr/attendance/attendance-content.tsx": 1075,
+      "app/(app)/hr/leave/leave-content.tsx": 1190,
+      "app/(app)/hr/lunch/lunch-content.tsx": 1120,
       "app/(app)/reports/action-tracker/page-client.tsx": 1095,
       "app/(app)/tools/media/_components/pdf-tools.tsx": 1029,
       "app/admin/accounts/assets/admin-assets-content.tsx": 1736,
       "app/admin/accounts/payroll/calculator/view.tsx": 1364,
       "app/admin/communications/_components/communications-composer.tsx": 1033,
       "app/admin/dev/login-logs/dev-login-logs-content.tsx": 1263,
-      "app/admin/hr/attendance/_components/attendance-manager-dialog.tsx": 2590,
-      "app/admin/hr/attendance/view.tsx": 1159,
+      "app/admin/hr/attendance/_components/attendance-manager-dialog.tsx": 2591,
+      "app/admin/hr/attendance/view.tsx": 1181,
       "app/admin/hr/employees/admin-employee-content.tsx": 1470,
-      "app/admin/hr/lunch/view.tsx": 2651,
+      "app/admin/hr/lunch/view.tsx": 2693,
       "app/admin/hr/pms/reviews/view.tsx": 1087,
       "app/admin/reports/action-tracker/action-tracker-content.tsx": 1181,
-      "components/documentation/department-documents-browser.tsx": 1827,
+      "components/documentation/department-documents-browser.tsx": 1828,
       "components/hr/manage-users-dialog.tsx": 1388,
       "components/payments/payments-table.tsx": 1176,
       "components/reports/kss-roster-table.tsx": 1524,
-      "components/ui/data-table/data-table.tsx": 1876,
+      "components/ui/data-table/data-table.tsx": 1882,
       "lib/assets/handover-pdf-generator.ts": 1096,
       "lib/export/pptx.ts": 1876
     },
