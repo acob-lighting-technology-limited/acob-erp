@@ -830,7 +830,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                             value:
                               latestAppeal.status === "pending"
                                 ? latestAppeal.stage === "pending_admin"
-                                  ? `Awaiting Admin Review by ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
+                                  ? `Awaiting ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
                                   : latestAppeal.stage === "pending_hr_lead"
                                     ? "Pending HR Lead"
                                     : latestAppeal.initiated_by_role === "admin_manual"
@@ -840,7 +840,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                   ? "Approved"
                                   : latestAppeal.status === "resolved"
                                     ? "Resolved manually by Admin & HR"
-                                    : "Rejected",
+                                    : latestAppeal.status === "expired"
+                                      ? "Expired: not decided in time"
+                                      : "Rejected",
                             copyable: false,
                           },
                           {

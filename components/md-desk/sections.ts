@@ -16,6 +16,7 @@ export const MD_DESK_SECTIONS = [
   { slug: "workshops", name: "Workshops & Webinars" },
   { slug: "activities", name: "Activities" },
   { slug: "reports", name: "Reports" },
+  { slug: "self-approved", name: "Self-approved Appeals" },
   { slug: "delegates", name: "Delegates" },
 ] as const
 

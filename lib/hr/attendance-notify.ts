@@ -5,7 +5,8 @@ import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { ATTENDANCE_STATUS_LABELS, type UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { sendAttendanceMail, type AttendanceMailDetail } from "@/lib/hr/attendance-mailer"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
-import { loadDepartmentLeads } from "@/lib/hr/attendance-appeals"
+import { STUCK_AFTER_WORKING_DAYS, loadDepartmentLeads, workingDaysSince } from "@/lib/hr/attendance-appeals"
+import { appealExpiryDate } from "@/lib/hr/appeal-expiry"
 import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("attendance-notify")
@@ -113,7 +114,7 @@ type DecidedAppealRow = {
   current_status: string | null
   requested_status: string | null
   appeal_reason: string | null
-  status: "approved" | "rejected" | "resolved"
+  status: "approved" | "rejected" | "resolved" | "expired"
   resolution_note: string | null
   reviewed_by: string | null
   lead_reviewed_by: string | null
@@ -137,6 +138,7 @@ function appealVerb(appeal: DecidedAppealRow): string {
   if (appeal.overridden_by) return "Approved by override"
   if (appeal.status === "approved") return "Approved"
   if (appeal.status === "rejected") return "Rejected"
+  if (appeal.status === "expired") return "Expired"
   return "Resolved"
 }
 
@@ -147,6 +149,7 @@ function appealActorId(appeal: DecidedAppealRow): string | null {
 /** "Absent → Present", or the status the day kept when the appeal was turned down. */
 function appealTransition(appeal: DecidedAppealRow): string {
   if (appeal.status === "rejected") return `Stays ${statusLabel(appeal.current_status)}`
+  if (appeal.status === "expired") return `Stays ${statusLabel(appeal.current_status)} (not decided in time)`
   if (appeal.status === "resolved") return `Was ${statusLabel(appeal.current_status)}`
   return `${statusLabel(appeal.current_status)} → ${statusLabel(appeal.requested_status)}`
 }
@@ -180,7 +183,7 @@ export async function sendAppealDecisionDigest(client: NotifyClient): Promise<{ 
   const { data: claimed, error } = await client
     .from("attendance_appeals")
     .update({ decision_emailed_at: new Date().toISOString() })
-    .in("status", ["approved", "rejected", "resolved"])
+    .in("status", ["approved", "rejected", "resolved", "expired"])
     .is("decision_emailed_at", null)
     .lt("updated_at", quietBefore)
     .select(DECIDED_APPEAL_COLUMNS)
@@ -289,6 +292,7 @@ type SummaryAppealRow = Omit<DecidedAppealRow, "status"> & {
   status: string
   stage: string | null
   created_at: string
+  lead_reviewed_at: string | null
 }
 
 /** system_settings key holding { lastSentDate, lastSentAt } so the summary goes once a day. */
@@ -395,7 +399,7 @@ export async function sendAppealLeadDailySummary(
 
   const { data: rows, error } = await client
     .from("attendance_appeals")
-    .select(`${DECIDED_APPEAL_COLUMNS}, stage, created_at`)
+    .select(`${DECIDED_APPEAL_COLUMNS}, stage, created_at, lead_reviewed_at`)
     .or(`status.eq.pending,created_at.gte.${since},updated_at.gte.${since}`)
     .order("appeal_date", { ascending: true })
     .returns<SummaryAppealRow[]>()
@@ -443,7 +447,31 @@ export async function sendAppealLeadDailySummary(
     const decided = params.pool.filter(isDecided)
     if (params.waiting.length + raised.length + decided.length === 0 || params.to.length === 0) return 0
 
+    // Overdue: with the approver for STUCK_AFTER_WORKING_DAYS working days or more.
+    // Expiring: the deadline falls within a week; after it the appeal expires, the day stays
+    // as recorded and the employee is told.
+    const overdue = params.waiting.filter(
+      (row) =>
+        workingDaysSince(
+          row.stage === "pending_lead" ? row.created_at : (row.lead_reviewed_at ?? row.created_at),
+          now
+        ) >= STUCK_AFTER_WORKING_DAYS
+    )
+    const weekAhead = toLocalISODate(new Date(now.getTime() + 7 * DAY_MS))
+    const expiring = params.waiting.filter((row) => {
+      const deadline = appealExpiryDate(row.appeal_date, row.requested_status ?? "")
+      return deadline >= today && deadline <= weekAhead
+    })
+    const expiresOutcome = (row: SummaryAppealRow) =>
+      `Expires ${appealExpiryDate(row.appeal_date, row.requested_status ?? "")}`
+
     const sections = [
+      {
+        title: `Overdue, ${STUCK_AFTER_WORKING_DAYS}+ working days (${overdue.length})`,
+        rows: overdue,
+        outcome: undefined,
+      },
+      { title: `Expiring this week (${expiring.length})`, rows: expiring, outcome: expiresOutcome },
       { title: `Waiting for you (${params.waiting.length})`, rows: params.waiting, outcome: undefined },
       { title: `Raised since the last summary (${raised.length})`, rows: raised, outcome: undefined },
       { title: `Decided since the last summary (${decided.length})`, rows: decided, outcome: decidedOutcome },

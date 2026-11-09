@@ -160,6 +160,15 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
       note: a.resolution_note,
       at: a.reviewed_at,
     })
+  } else if (a.status === "expired") {
+    steps.push({
+      key: "outcome",
+      label: "Outcome",
+      state: "skipped",
+      text: "Expired: not decided in time. The day stays as recorded",
+      note: a.resolution_note,
+      at: a.reviewed_at,
+    })
   } else if (a.status === "resolved") {
     steps.push({
       key: "outcome",

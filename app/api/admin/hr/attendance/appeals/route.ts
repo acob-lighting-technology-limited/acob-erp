@@ -44,8 +44,8 @@ export type AppealWithProfile = {
   live_status: string
   requested_status: string
   appeal_reason: string
-  status: "pending" | "approved" | "rejected" | "resolved"
-  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
+  status: "pending" | "approved" | "rejected" | "resolved" | "expired"
+  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved" | "expired"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
   created_by?: string | null
   created_by_name?: string | null
@@ -89,8 +89,8 @@ type AppealRow = {
   current_status: string
   requested_status: string
   appeal_reason: string
-  status: "pending" | "approved" | "rejected" | "resolved"
-  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
+  status: "pending" | "approved" | "rejected" | "resolved" | "expired"
+  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved" | "expired"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
   created_by?: string | null
   lead_reviewed_by?: string | null
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
     const statusParam = request.nextUrl.searchParams.get("status") ?? "all"
-    const validStatuses = ["pending", "approved", "rejected", "resolved", "all"]
+    const validStatuses = ["pending", "approved", "rejected", "resolved", "expired", "all"]
     if (!validStatuses.includes(statusParam)) {
       return NextResponse.json({ error: "Invalid status filter" }, { status: 400 })
     }

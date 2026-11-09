@@ -26,8 +26,8 @@ export interface AppealRow {
   requested_status: string
   appeal_reason: string
   resolution_note: string | null
-  status: "pending" | "approved" | "rejected" | "resolved"
-  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
+  status: "pending" | "approved" | "rejected" | "resolved" | "expired"
+  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved" | "expired"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
   created_by?: string | null
   created_by_name?: string | null
