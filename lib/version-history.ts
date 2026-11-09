@@ -37,12 +37,32 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "Starlink & Payments",
+        items: [
+          "Populated missing states across Starlink accounts (Adewole, Bondu, Olooji, Sule) to match their community projects",
+          "Improved Starlink Kits table: added kit count to tab, displayed kit numbers alongside account IDs, and rearranged columns so status and schedule appear before monthly billing amounts",
+          "Converted payment details from an overlaid modal into a dedicated full page with return navigation to Starlink when opened via Open Payment",
+        ],
+      },
+      {
+        area: "Projects",
+        items: [
+          "Registered missing operational and under-construction mini-grid projects (Onipanu, Erinla, and Bondu) in the projects catalogue",
+        ],
+      },
+      {
         area: "UI & Badges",
         items: [
           "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
           "Enhanced list views and side sheets across Impersonation, Payroll, Attendance, Stock Movements, Challenges, and Tasks with one-click actions, expandable details, and full record properties",
           "Adopted standardized department short codes in list views and card subtitles across Impersonation, User Settings, Challenges, CBT logs, and Leave Management to eliminate text truncation on mobile while retaining full department names in side sheets and search filters",
           "Removed duplicate inline Action columns on desktop data tables where rowActions was active, keeping a single standardized trailing Action column",
+        ],
+      },
+      {
+        area: "Tasks",
+        items: [
+          "New tasks default to 'Does not repeat' with start date and 5-working-day deadline displayed and automatically selected",
         ],
       },
       {
