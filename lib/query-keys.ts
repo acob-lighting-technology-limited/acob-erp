@@ -184,6 +184,7 @@ export const QUERY_KEYS = {
   adminRolesSettings: () => ["admin-roles-settings"],
   adminAccessGrants: () => ["admin-access-grants"],
   adminAccessCandidates: () => ["admin-access-candidates"],
+  adminAccessPeople: () => ["admin-access-people"],
 
   // Inventory pages
   adminInventoryDashboard: () => ["admin-inventory-dashboard"],

@@ -1,4 +1,4 @@
-import { ViewOnlyNotice } from "@/components/admin/view-only-notice"
+import { EditAccessBoundary } from "@/components/admin/edit-access-boundary"
 
 /**
  * The IT console. Each page is gated by its own route key in middleware (it.main, or
@@ -6,10 +6,5 @@ import { ViewOnlyNotice } from "@/components/admin/view-only-notice"
  * view but not change IT's pages who can.
  */
 export default function AdminItLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <ViewOnlyNotice route="it.main" />
-      {children}
-    </>
-  )
+  return <EditAccessBoundary route="it.main">{children}</EditAccessBoundary>
 }

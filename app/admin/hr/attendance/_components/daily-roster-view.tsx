@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -204,6 +205,7 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
 
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
   const staffAvatars = useStaffAvatars()
+  const canEditAttendance = useCanEdit("hr.attendance")
   const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
@@ -706,13 +708,17 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        rowActions={[
-          {
-            label: "Edit Record",
-            icon: Pencil,
-            onClick: (r) => openEdit(r),
-          },
-        ]}
+        rowActions={
+          canEditAttendance
+            ? [
+                {
+                  label: "Edit Record",
+                  icon: Pencil,
+                  onClick: (r) => openEdit(r),
+                },
+              ]
+            : []
+        }
         mobileRow={{
           onSelect: (r) => openEdit(r),
           leading: (r) => (
@@ -781,13 +787,16 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
                 ...(r.manual_comment ? [{ icon: MessageSquare, label: "Note", value: r.manual_comment }] : []),
               ]
             },
-            actions: (r) => [
-              {
-                label: r.id.startsWith("missing-") ? "Add Record" : "Edit Record",
-                icon: Pencil,
-                onClick: () => openEdit(r),
-              },
-            ],
+            actions: (r) =>
+              canEditAttendance
+                ? [
+                    {
+                      label: r.id.startsWith("missing-") ? "Add Record" : "Edit Record",
+                      icon: Pencil,
+                      onClick: () => openEdit(r),
+                    },
+                  ]
+                : [],
           },
         }}
         cardRenderer={(r) => (

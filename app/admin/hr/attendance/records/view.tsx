@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useState } from "react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -57,6 +58,7 @@ export function AdminAttendanceRecordsPage({
   lockedDepartment,
 }: { backLinkHref?: string; lockedDepartment?: string } = {}) {
   const deptCode = useDepartmentCodes()
+  const canEditAttendance = useCanEdit("hr.attendance")
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRecords, setProcessedRecords] = useState<AttendanceRecord[]>([])
   const [filters, setFilters] = useState(() => ({
@@ -416,13 +418,17 @@ export function AdminAttendanceRecordsPage({
           contactsView
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-          rowActions={[
-            {
-              label: "Edit Record",
-              icon: Pencil,
-              onClick: (r) => openEdit(r),
-            },
-          ]}
+          rowActions={
+            canEditAttendance
+              ? [
+                  {
+                    label: "Edit Record",
+                    icon: Pencil,
+                    onClick: (r) => openEdit(r),
+                  },
+                ]
+              : []
+          }
           mobileRow={{
             onSelect: (r) => openEdit(r),
             title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
@@ -459,13 +465,16 @@ export function AdminAttendanceRecordsPage({
                   : []),
                 ...(r.source ? [{ icon: FileText, label: "Source", value: labelSource(r.source) }] : []),
               ],
-              actions: (r) => [
-                {
-                  label: "Edit Record",
-                  icon: Pencil,
-                  onClick: () => openEdit(r),
-                },
-              ],
+              actions: (r) =>
+                canEditAttendance
+                  ? [
+                      {
+                        label: "Edit Record",
+                        icon: Pencil,
+                        onClick: () => openEdit(r),
+                      },
+                    ]
+                  : [],
             },
           }}
           cardRenderer={(r) => (
