@@ -4,6 +4,7 @@ import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenanc
 import type { EmploymentStatus } from "@/types/database"
 import { resolveAdminScope, roleCanEnterAdmin, isAdminLikeRole } from "@/lib/admin/rbac"
 import { resolveDeptScope } from "@/lib/dept/scope"
+import { deptRelativePath, firstAllowedDeptPath, isDeptPathAllowed } from "@/lib/dept/delegated-pages"
 import {
   buildAccessContextV2,
   canAccessRouteV2,
@@ -257,6 +258,17 @@ export async function updateSession(request: NextRequest) {
       const deptId = pathname.startsWith("/api/dept/") ? segments[3] : segments[2]
       if (deptId) {
         const deptScope = await resolveDeptScope(supabase, user.id, deptId)
+        // A delegate reaches only the pages the lead gave them; everything else in the console is closed.
+        if (deptScope?.delegation && !isDeptPathAllowed(deptScope.delegation.pages, deptRelativePath(pathname))) {
+          if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ error: "That page was not delegated to you." }, { status: 403 })
+          }
+          const first = firstAllowedDeptPath(deptScope.delegation.pages)
+          const url = request.nextUrl.clone()
+          url.pathname = first ? `/dept/${deptId}${first}` : "/profile"
+          url.search = ""
+          return NextResponse.redirect(url)
+        }
         if (deptScope) {
           const encoded = Buffer.from(JSON.stringify(deptScope)).toString("base64")
           const forwardedHeaders = new Headers(request.headers)

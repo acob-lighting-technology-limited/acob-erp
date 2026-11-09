@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireApiAdminScope()
   if (!auth.ok) return auth.response
   const { scope, supabase } = auth
-  if (!scope.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!scope.isAdminLike || scope.delegated) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const parsed = CreateSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {

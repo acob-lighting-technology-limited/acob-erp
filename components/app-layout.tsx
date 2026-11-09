@@ -40,7 +40,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
   // Resolve every dept console for any user who is a dept lead — pure leads AND
   // admin+lead. Both surfaces are useful independently: admin = global ops,
   // dept = scoped view. A lead may hold several departments.
-  const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
+  const deptConsoles = await resolveDeptConsoles(typedSupabase, profile, data.user.id)
   const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
   const whatsNewSeen = await loadWhatsNewSeen(supabase, data.user.id)
 

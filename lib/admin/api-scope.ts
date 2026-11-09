@@ -5,6 +5,7 @@ import { resolveAdminScope, expandDepartmentScopeForQuery, type AdminScope } fro
 import { resolveDeptScope, type DeptScope } from "@/lib/dept/scope"
 import { logger } from "@/lib/logger"
 import { readDeptContextId } from "@/lib/admin/dept-context"
+import { isDeptApiAllowed } from "@/lib/dept/delegated-pages"
 
 const log = logger("admin-api-scope")
 
@@ -33,6 +34,7 @@ function adminScopeFromDeptScope(deptScope: DeptScope): AdminScope {
     isAdminLike: deptScope.isAdminLike,
     adminRoutes: [],
     editRoutes: [],
+    delegated: Boolean(deptScope.delegation),
     scopeMode: "lead",
   }
 }
@@ -69,7 +71,19 @@ export async function getRequestScope(): Promise<AdminScope | null> {
       const deptScope = await resolveDeptScope(supabase, user.id, deptContextId)
       // Not a lead of this department — deny rather than falling back to a
       // wider scope, which is what leaked data in the first place.
-      return deptScope ? adminScopeFromDeptScope(deptScope) : null
+      if (!deptScope) return null
+      // A delegate may only make the calls that belong to the pages they were given.
+      if (deptScope.delegation) {
+        const rawReferer = h.get("referer")
+        let refererPath: string | null = null
+        try {
+          refererPath = rawReferer ? new URL(rawReferer).pathname : null
+        } catch {
+          refererPath = null
+        }
+        if (!isDeptApiAllowed(deptScope.delegation.pages, h.get("x-pathname") ?? "", refererPath)) return null
+      }
+      return adminScopeFromDeptScope(deptScope)
     }
 
     const raw = h.get("x-admin-scope")

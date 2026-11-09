@@ -35,16 +35,27 @@ interface DeptLayoutProps {
   }
   /** The dept name — shown in the context ribbon. */
   deptName: string
+  /** Delegate only: the page keys they were given; the sidebar lists just these. */
+  delegatedPages?: string[]
+  /** Shown above the page: who a delegate is acting for, or the lead's "Delegate access" control. */
+  banner?: React.ReactNode
   children: React.ReactNode
 }
 
-export function DeptLayout({ scope, user, profile, deptName, children }: DeptLayoutProps) {
+export function DeptLayout({ scope, user, profile, deptName, delegatedPages, banner, children }: DeptLayoutProps) {
   return (
     <div className="admin-shell flex min-h-screen" data-scope="lead">
       <SkipToContent />
-      <AdminSidebar user={user} profile={profile} adminScopeMode="lead" deptId={scope.managedDepartmentIds[0]} />
+      <AdminSidebar
+        user={user}
+        profile={profile}
+        adminScopeMode="lead"
+        deptId={scope.managedDepartmentIds[0]}
+        delegatedPages={delegatedPages}
+      />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">
+          {banner}
           <AdminScopeProvider scope={scope}>{children}</AdminScopeProvider>
         </div>
       </SidebarContent>

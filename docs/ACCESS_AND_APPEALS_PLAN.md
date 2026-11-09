@@ -150,3 +150,22 @@ Differences from the plan above, so the next reader is not surprised:
 - **Expiry**: first run records the start and lists the backlog; nothing expires for a week after.
 - **Not in the migrations**: no data is changed. The 19 admin-started appeals in flight finish under the
   old rule.
+
+## Department delegation (10 Nov 2026)
+
+Delegation is wider than the HR and IT edit grants: any department lead can hand some of their own
+department's console pages to someone, until a date.
+
+- **Where**: a "Delegate access" button at the top of every `/dept/[id]` page, for the lead (not for delegates).
+  The lead picks a person, ticks pages from the list in `lib/dept/delegated-pages.ts`, sets an end date.
+- **What a delegate gets**: the department in their sidebar and account menu with only the ticked pages;
+  everything else under `/dept/[id]` redirects to their first page. A banner says who they act for and until when.
+  They keep their own role: the lead's admin role is never inherited, and a delegate cannot delegate or grant onward.
+- **Enforcement**: `resolveDeptScope` returns a scope with `delegation` set (table `dept_delegations`, migration
+  `20261110110000`). Middleware refuses pages and `/api/dept/*` calls outside the ticked pages; `getRequestScope`
+  refuses other API calls from the console unless the call belongs to a ticked page, or (for calls that belong to no
+  known page) the page it was made from is ticked. That last rule rests on the Referer header, so a delegate crafting
+  requests by hand could reach any API that honours the department context for this one department.
+- **Admin edit grants** (HR and IT pages under `/admin`) are separate and unchanged: Settings > Delegation.
+- **Not built**: "on behalf of" in the audit log for actions a delegate takes; delegations do not end on their own
+  when the lead changes (a new lead withdraws them from the same dialog).

@@ -32,7 +32,7 @@ export default async function GuidePage() {
 
   const [adminScope, deptConsoles, mdDesk] = await Promise.all([
     resolveAdminScope(typedSupabase, data.user.id),
-    resolveDeptConsoles(typedSupabase, profile),
+    resolveDeptConsoles(typedSupabase, profile, data.user.id),
     supabase.rpc("is_md_desk_member"),
   ])
 

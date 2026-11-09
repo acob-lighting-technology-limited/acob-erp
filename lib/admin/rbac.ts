@@ -61,6 +61,8 @@ export interface AdminScope {
    * expiry already applied. Separate from adminRoutes, which is VIEW.
    */
   editRoutes?: AdminRouteKeyV2[]
+  /** Acting through a department delegation. Such a scope can use delegated pages but never hands access on. */
+  delegated?: boolean
   scopeMode: AdminScopeMode
 }
 

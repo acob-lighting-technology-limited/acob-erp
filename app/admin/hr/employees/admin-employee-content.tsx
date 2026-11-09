@@ -1,6 +1,5 @@
 "use client"
 
-import { DelegateAccessButton } from "@/components/admin/delegate-access-button"
 import type { Employee, EmployeeGender, UserProfile } from "./_components/employee-types"
 import {
   deriveLeadDepartments,
@@ -1062,7 +1061,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}
       actions={
         <div className="flex items-center gap-2">
-          <DelegateAccessButton />
           {(canManageUsers || canReviewApplications) && (
             <Button onClick={() => setManageUsersOpen(true)} variant="default" size="sm" className="h-8 gap-2">
               <Settings2 className="h-4 w-4" />
