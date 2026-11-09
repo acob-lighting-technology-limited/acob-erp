@@ -4,6 +4,7 @@ import {
   canAccessRouteV2,
   canEditRouteV2,
   isEditOwnerV2,
+  editOwnerDepartmentsFor,
   type AccessContextV2,
   type AdminRouteKeyV2,
   EDIT_OWNER_DEPARTMENTS,
@@ -44,7 +45,7 @@ function umbrella(route: AdminRouteKeyV2): AdminRouteKeyV2 | null {
  *
  *  - Nobody grants or delegates to themselves.
  *  - Only a person with the admin role can hold an /admin grant.
- *  - "grant": developer or super admin only.
+ *  - "grant": the lead of the owning department only (see EDIT_OWNER_DEPARTMENTS).
  *  - "delegate": the actor must own the route (lead of the owning department) or hold
  *    an explicit grant on it — never a delegation, so access cannot be passed along
  *    a chain — and the delegation must end within MAX_DELEGATION_DAYS.
@@ -62,8 +63,11 @@ export function checkEditGrantRequest(request: EditGrantRequest): string | null 
   if (validUntil && validUntil.getTime() <= now.getTime()) return "The end date must be in the future."
 
   if (request.mode === "grant") {
-    if (request.actorRole !== "developer" && request.actorRole !== "super_admin") {
-      return "Only a developer or super admin can grant edit access."
+    // Standing edit is the area owner's call: HR's is the Admin and HR / Corporate Services lead's, IT's
+    // is the IT and Communications lead's. Being a super admin elsewhere gives no say over another area.
+    const notOwned = request.routes.find((route) => !isEditOwnerV2(request.actorContext, route))
+    if (notOwned) {
+      return `Only the lead of ${editOwnerDepartmentsFor(notOwned).join(" or ")} can give edit access to this area.`
     }
   } else {
     if (!validUntil) return "A delegation needs an end date."

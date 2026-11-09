@@ -49,14 +49,16 @@ async function readError(res: Response, fallback: string) {
 export function AccessRoster() {
   const queryClient = useQueryClient()
 
-  const { data: people = [], isLoading } = useQuery({
+  const { data: roster, isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminAccessPeople(),
-    queryFn: async (): Promise<AccessPerson[]> => {
+    queryFn: async (): Promise<{ data: AccessPerson[]; can_change: Record<Group, boolean> }> => {
       const res = await apiFetch("/api/admin/access/people", { cache: "no-store" })
       if (!res.ok) throw await readError(res, "Failed to load people")
-      return ((await res.json()) as { data: AccessPerson[] }).data
+      return (await res.json()) as { data: AccessPerson[]; can_change: Record<Group, boolean> }
     },
   })
+  const people = roster?.data ?? []
+  const canChange = roster?.can_change ?? { hr: false, it: false }
 
   const setLevel = useMutation({
     mutationFn: async ({ person, group, level }: { person: AccessPerson; group: Group; level: "view" | "edit" }) => {
@@ -88,7 +90,8 @@ export function AccessRoster() {
     const cell = person[group]
     if (cell.level === "none") return <span className="text-muted-foreground text-sm">No access</span>
 
-    const locked = person.is_self || cell.via === "lead" || cell.via === "delegation"
+    const notOwner = !canChange[group]
+    const locked = notOwner || person.is_self || cell.via === "lead" || cell.via === "delegation"
     const value = cell.level === "edit" && cell.via !== "some" ? "edit" : "view"
 
     return (
@@ -110,6 +113,8 @@ export function AccessRoster() {
           <span className="text-muted-foreground text-xs">You cannot change your own access</span>
         ) : cell.note ? (
           <span className="text-muted-foreground text-xs">{cell.note}</span>
+        ) : notOwner ? (
+          <span className="text-muted-foreground text-xs">Only the {GROUP_LABEL[group]} lead can change this</span>
         ) : null}
       </div>
     )

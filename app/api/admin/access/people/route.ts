@@ -69,7 +69,11 @@ export async function GET() {
   const auth = await requireApiAdminScope()
   if (!auth.ok) return auth.response
   const { scope, supabase } = auth
-  if (scope.role !== "developer" && scope.role !== "super_admin") {
+  const actorContext = buildAccessContextV2(scope)
+  // What this person may change: only the areas they own as lead. Others see the list, read only.
+  const canChange = { hr: isEditOwnerV2(actorContext, "hr.main"), it: isEditOwnerV2(actorContext, "it.main") }
+  const isDevOrSuper = scope.role === "developer" || scope.role === "super_admin"
+  if (!isDevOrSuper && !canChange.hr && !canChange.it) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -159,5 +163,5 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ data: rows })
+  return NextResponse.json({ data: rows, can_change: canChange })
 }
