@@ -1,9 +1,10 @@
 import { Eye, UserCheck } from "lucide-react"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { editRouteLabel } from "@/lib/admin/edit-route-labels"
-import { loadEditHolders, type EditHolder } from "@/lib/admin/edit-holders"
+import { loadEditHolders } from "@/lib/admin/edit-holders"
 import {
   EDIT_GUARDED_ROUTES,
+  EDIT_OWNER_DEPARTMENTS,
   HR_EDIT_ROUTES,
   IT_EDIT_ROUTES,
   canEditRouteV2,
@@ -25,11 +26,10 @@ function formatDate(value: string | null | undefined) {
   return formatWATDate(value)
 }
 
-function describeHolders(holders: EditHolder[]) {
-  const names = Array.from(new Set(holders.map((holder) => holder.name)))
-  if (names.length === 0) return "the lead of the owning department"
-  if (names.length <= 3) return names.join(", ")
-  return `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`
+/** Positions, not people: "Admin and HR Lead, Corporate Services Lead". */
+function describeOwners(route: "hr.main" | "it.main") {
+  const departments = route === "hr.main" ? EDIT_OWNER_DEPARTMENTS.hr : EDIT_OWNER_DEPARTMENTS.it
+  return departments.map((department) => `${department} Lead`).join(", ")
 }
 
 /**
@@ -76,8 +76,8 @@ export async function ViewOnlyNotice({ route }: ViewOnlyNoticeProps) {
     <div className="bg-muted/50 text-muted-foreground mx-4 mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm md:mx-6">
       <Eye className="mt-0.5 h-4 w-4 shrink-0" />
       <p>
-        <span className="text-foreground font-medium">View only.</span> Changes here are made by{" "}
-        {describeHolders(holders)}, or someone they have delegated to.
+        <span className="text-foreground font-medium">View only.</span> Changes here are made by {describeOwners(route)}
+        , or someone they have delegated to.
       </p>
     </div>
   )
