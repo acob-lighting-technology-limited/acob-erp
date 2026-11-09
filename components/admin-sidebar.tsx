@@ -481,6 +481,7 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Users", href: "/admin/settings/users" },
       { name: "Roles", href: "/admin/settings/roles" },
+      { name: "Access", href: "/admin/settings/access" },
       { name: "Company", href: "/admin/settings/company" },
       { name: "Attendance", href: "/admin/settings/attendance" },
       { name: "CBT", href: "/admin/settings/cbt" },
