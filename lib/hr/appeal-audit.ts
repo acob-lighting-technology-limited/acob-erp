@@ -11,6 +11,7 @@ export type AuditableAppeal = {
   status: string
   stage?: string | null
   initiated_by_role?: string | null
+  user_id?: string | null
   user_name?: string | null
   created_by_name?: string | null
   created_at: string
@@ -97,14 +98,14 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
     steps.push({ key: "lead", label: "Lead side", state: "none", text: "Not needed" })
   }
 
-  // Admin side: any admin.
+  // Second stage: the Admin & HR Lead, or whoever she has delegated to.
   if (isAdminChange) {
-    steps.push({ key: "admin", label: "Admin side", state: "done", text: "Made the change", by: maker })
+    steps.push({ key: "admin", label: "Admin & HR Lead", state: "done", text: "Made the change", by: maker })
   } else if (a.admin_reviewed_at) {
     const rejected = a.status === "rejected" && !rejectedByLead
     steps.push({
       key: "admin",
-      label: "Admin side",
+      label: "Admin & HR Lead",
       state: rejected ? "rejected" : "done",
       text: rejected ? "Rejected" : "Approved",
       by: a.admin_reviewer_name,
@@ -112,13 +113,18 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
       at: a.admin_reviewed_at,
     })
   } else if (overriddenStage === "pending_admin") {
-    steps.push({ key: "admin", label: "Admin side", state: "skipped", text: "Skipped by override" })
+    steps.push({ key: "admin", label: "Admin & HR Lead", state: "skipped", text: "Skipped by override" })
   } else if (a.status === "pending" && a.stage === "pending_admin") {
-    steps.push({ key: "admin", label: "Admin side", state: "waiting", text: "Awaiting an admin" })
+    steps.push({
+      key: "admin",
+      label: "Admin & HR Lead",
+      state: "waiting",
+      text: `Awaiting ${a.admin_hr_lead_name || "the Admin & HR Lead"}`,
+    })
   } else if (a.status === "pending" && a.stage === "pending_lead") {
-    steps.push({ key: "admin", label: "Admin side", state: "none", text: "Next, after the lead" })
+    steps.push({ key: "admin", label: "Admin & HR Lead", state: "none", text: "Next, after the lead" })
   } else {
-    steps.push({ key: "admin", label: "Admin side", state: "none", text: "Not needed" })
+    steps.push({ key: "admin", label: "Admin & HR Lead", state: "none", text: "Not needed" })
   }
 
   // Outcome
@@ -133,11 +139,14 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
       at: a.overridden_at,
     })
   } else if (a.status === "approved") {
+    // The person the appeal is about decided it: the Admin & HR Lead, or her delegate while she is on
+    // leave. Marked so the monthly self-approval list for the MD and the history agree.
+    const selfApproved = Boolean(a.user_id) && a.reviewed_by === a.user_id
     steps.push({
       key: "outcome",
       label: "Outcome",
       state: "done",
-      text: "Approved",
+      text: selfApproved ? "Self-approved" : "Approved",
       by: a.reviewer_name,
       at: a.reviewed_at,
     })

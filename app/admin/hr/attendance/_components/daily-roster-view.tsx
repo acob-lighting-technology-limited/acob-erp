@@ -181,7 +181,7 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
 
   if (appeal.stage === "pending_admin") {
     return {
-      label: "Pending Admin",
+      label: "Pending Admin & HR Lead",
       tooltip: "Awaiting Admin & HR final approval",
       className: "border-blue-300 bg-info/15 text-info",
     }
@@ -837,7 +837,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
                   : editRecord.pending_appeal.stage === "pending_lead"
                     ? "An appeal is currently awaiting Department Lead endorsement (Pending Lead), followed by Admin approval."
                     : editRecord.pending_appeal.stage === "pending_admin"
-                      ? "An appeal is awaiting Admin & HR final approval (Pending Admin)."
+                      ? "An appeal is awaiting Admin & HR final approval (Pending Admin & HR Lead)."
                       : "An alteration or appeal is already pending for this day."}{" "}
                 Please review or manage it in the Appeals tab.
               </div>

@@ -70,7 +70,7 @@ function renderStatusBadge(r: AppealRow) {
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
-        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
+        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
       </div>
     )
   }
@@ -78,7 +78,7 @@ function renderStatusBadge(r: AppealRow) {
   if (r.stage === "pending_admin") {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
+        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
         {r.lead_reviewer_name ? <span className="text-success pl-0.5 text-xs font-medium">Lead Endorsed ✓</span> : null}
       </div>
     )

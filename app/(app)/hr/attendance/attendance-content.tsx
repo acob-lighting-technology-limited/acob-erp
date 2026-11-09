@@ -117,7 +117,7 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
           Pending Lead
         </Badge>
         <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-          Pending Admin
+          Pending Admin & HR Lead
         </Badge>
       </div>
     )
@@ -125,7 +125,7 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   if (stage === "pending_admin") {
     return (
       <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-        Pending Admin
+        Pending Admin & HR Lead
       </Badge>
     )
   }

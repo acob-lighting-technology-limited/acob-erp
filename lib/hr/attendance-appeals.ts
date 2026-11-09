@@ -8,7 +8,8 @@ import {
 } from "@/lib/hr/attendance-status"
 import type { AttendancePolicy } from "@/lib/org-config"
 import { createNotification } from "@/lib/notifications/create"
-import { DEPT_ADMIN_HR } from "@/shared/departments"
+import { DEPT_ADMIN_HR, isSameDepartment } from "@/shared/departments"
+import { toLocalISODate } from "@/lib/utils/date"
 import { expandDepartmentScopeForQuery, type AdminScope } from "@/lib/admin/rbac"
 
 const log = logger("attendance-appeals")
@@ -334,15 +335,10 @@ export async function notifyAppealReviewers(
       if (params.department) {
         recipientIds = (await loadDepartmentLeads(client)).idsByDepartment.get(params.department) ?? []
       }
-    } else if (params.stage === "pending_hr_lead") {
-      recipientIds = (await loadDepartmentLeads(client)).adminHrLeadIds
     } else {
-      const { data: admins } = await client
-        .from("profiles")
-        .select("id")
-        .in("role", ["admin", "super_admin", "developer"])
-        .returns<Array<{ id: string }>>()
-      recipientIds = (admins ?? []).map((a) => a.id)
+      // Both second-stage values belong to the Admin & HR Lead and whoever they have
+      // delegated to, never to every holder of the admin role.
+      recipientIds = await loadAdminHrApproverIds(client)
     }
 
     const linkUrl =
@@ -423,6 +419,19 @@ export async function findStagedLeaveRequest(
   return data?.[0] ?? null
 }
 
+/**
+ * A day's status is never changed first from the admin side. Whoever holds the admin
+ * role (even with HR edit access) cannot start a single-day change: it starts with the
+ * employee's department lead, from their department console, and the Admin & HR Lead
+ * decides it. Returns the message to refuse an admin-scope caller with, or null.
+ */
+export function leadFirstBlock(actor: { isAdminLike: boolean; scopeMode?: string | null }): string | null {
+  const isAdminScope = actor.isAdminLike && actor.scopeMode !== "lead"
+  return isAdminScope
+    ? "Attendance changes start with the employee's department lead. Ask the lead to make this change from their department console."
+    : null
+}
+
 export type StagingActor = { userId: string; isAdminLike: boolean; scopeMode?: string | null }
 
 export type StagingTarget = {
@@ -465,10 +474,14 @@ export function stagingRoute(
 
 /** First stage of an employee's own appeal (made on /attendance). */
 export function employeeAppealStage(
-  appellant: { is_department_lead: boolean } | null,
+  appellant: { is_department_lead: boolean; department?: string | null } | null,
   departmentHasLead: boolean
 ): AppealReviewStage {
-  // A lead is their own lead side, so only the admin side is left.
+  // Admin & HR's own staff (and its lead) have one stage: the Admin & HR Lead or her
+  // delegate. Their department lead IS the Admin & HR Lead, so a lead step would be
+  // the same person twice.
+  if (appellant && isSameDepartment(appellant.department, DEPT_ADMIN_HR)) return "pending_hr_lead"
+  // A lead is their own lead side, so only the Admin & HR Lead stage is left.
   if (appellant?.is_department_lead) return "pending_admin"
   return departmentHasLead ? "pending_lead" : "pending_hr_lead"
 }
@@ -483,14 +496,46 @@ export async function departmentHasLead(client: SupabaseClient, department: stri
 export type AppealReviewer = Pick<
   AdminScope,
   "userId" | "department" | "isDepartmentLead" | "leadDepartments" | "isAdminLike" | "scopeMode"
->
+> & { role?: string }
 
 export type ReviewableAppeal = {
   stage?: string | null
   initiated_by_role?: string | null
   created_by?: string | null
   lead_reviewed_by?: string | null
+  /** The employee the appeal is about. */
+  user_id?: string | null
+  created_at?: string | null
+  lead_reviewed_at?: string | null
 }
+
+/**
+ * Who holds which approval position right now, loaded once per request
+ * (loadAppealRoutingContext) so the review rules below stay pure.
+ */
+export type AppealRoutingContext = {
+  /** The Admin & HR Lead(s): leads of the Admin and HR department. */
+  adminHrLeadIds: string[]
+  /** Department lead ids by department name. */
+  leadIdsByDepartment: Record<string, string[]>
+  /** Leads on approved leave today. */
+  onLeaveIds: string[]
+  /** Admin & HR Lead(s) that have at least one active delegate. */
+  leadsWithDelegate: string[]
+  /** The Admin & HR Lead(s) the reviewer is an active delegate of. */
+  actingForLeadIds: string[]
+}
+
+export const EMPTY_APPEAL_ROUTING: AppealRoutingContext = {
+  adminHrLeadIds: [],
+  leadIdsByDepartment: {},
+  onLeaveIds: [],
+  leadsWithDelegate: [],
+  actingForLeadIds: [],
+}
+
+/** An approval is stuck after this many working days with no decision. */
+export const STUCK_AFTER_WORKING_DAYS = 5
 
 function leadsDepartment(reviewer: AppealReviewer, department: string | null): boolean {
   if (!reviewer.isDepartmentLead || !department) return false
@@ -500,20 +545,55 @@ function leadsDepartment(reviewer: AppealReviewer, department: string | null): b
 }
 
 /**
+ * Why `reviewer` may not decide the Admin & HR Lead's stage of `appeal`, or null.
+ *
+ * The stage belongs to a person, the Admin & HR Lead, and to whoever she has
+ * delegated to — never to a role. Nobody decides their own appeal here, with two
+ * exceptions that carry an audit mark ("self-approved", listed monthly for the MD):
+ * the Admin & HR Lead (nobody sits above her in this chain), and her delegate while
+ * every lead they act for is on approved leave. A delegate can never decide the
+ * Admin & HR Lead's own appeal.
+ */
+function adminHrLeadStageBlock(
+  reviewer: AppealReviewer,
+  appeal: ReviewableAppeal,
+  routing: AppealRoutingContext
+): string | null {
+  const isLead = routing.adminHrLeadIds.includes(reviewer.userId)
+  const actingFor = routing.actingForLeadIds
+  if (!isLead && actingFor.length === 0) {
+    return "Only the Admin & HR Lead, or the person they have delegated to, can decide this."
+  }
+  if (appeal.lead_reviewed_by === reviewer.userId) {
+    return "You endorsed this as lead, so someone else must approve it."
+  }
+  if (appeal.user_id && routing.adminHrLeadIds.includes(appeal.user_id) && !isLead) {
+    return "Only the Admin & HR Lead can decide their own appeal."
+  }
+  if (appeal.user_id && appeal.user_id === reviewer.userId && !isLead) {
+    const away = actingFor.every((leadId) => routing.onLeaveIds.includes(leadId))
+    if (!away) return "You cannot decide your own appeal while the Admin & HR Lead is available."
+  }
+  return null
+}
+
+/**
  * Why `reviewer` may not approve or reject `appeal` at its current stage, or null
  * when they may. The PATCH route enforces it and the list sends it to the page.
  *
  * Each stage belongs to one side, taken from the employee's record, never from a
- * role: the lead stage only to the employee's real Department Lead, the admin stage
- * to any admin, the no-lead stage to the Admin & HR Lead. Whoever made a change
- * cannot also confirm it, and the lead who endorsed an appeal cannot also approve it
- * as admin. An admin may approve the admin side of their own appeal: their lead has
- * already confirmed it. Anything else goes through an override.
+ * role: the lead stage only to the employee's real Department Lead, the second stage
+ * (pending_admin, or pending_hr_lead for staff of a department with no lead and for
+ * Admin & HR's own staff) only to the Admin & HR Lead and their delegates. Whoever
+ * made a change cannot also confirm it, and the lead who endorsed an appeal cannot
+ * also approve it at the second stage. Anything else goes through an override, which
+ * is only open once an approval is stuck.
  */
 export function appealReviewBlock(
   reviewer: AppealReviewer,
   appeal: ReviewableAppeal,
-  appellantDepartment: string | null
+  appellantDepartment: string | null,
+  routing: AppealRoutingContext = EMPTY_APPEAL_ROUTING
 ): string | null {
   if (appeal.created_by === reviewer.userId && appeal.initiated_by_role !== "employee") {
     return "You made this change, so someone else must confirm it."
@@ -525,22 +605,158 @@ export function appealReviewBlock(
       ? null
       : `Only the Department Lead for ${appellantDepartment || "this department"} can confirm this.`
   }
-  if (stage === "pending_admin") {
-    if (!reviewer.isAdminLike || reviewer.scopeMode === "lead") return "Only an admin can approve this stage."
-    if (appeal.lead_reviewed_by === reviewer.userId) {
-      return "You endorsed this as lead, so another admin must approve it."
-    }
-    return null
-  }
-  if (stage === "pending_hr_lead") {
-    return leadsDepartment(reviewer, DEPT_ADMIN_HR) ? null : "Only the Admin & HR Lead can approve this."
+  if (stage === "pending_admin" || stage === "pending_hr_lead") {
+    return adminHrLeadStageBlock(reviewer, appeal, routing)
   }
   return "This appeal is no longer pending."
 }
 
-/** Admins (admin, super admin, developer) may override any pending stage, from the admin side. */
-export function canOverrideAppeal(reviewer: Pick<AdminScope, "isAdminLike" | "scopeMode">): boolean {
-  return reviewer.isAdminLike && reviewer.scopeMode !== "lead"
+/** Whole working days (Mon-Fri, West Africa Time) after `from` up to and including `now`. */
+export function workingDaysSince(from: string | Date, now: Date): number {
+  const WAT_OFFSET_MS = 60 * 60 * 1000
+  const dayStart = (value: Date) => {
+    const shifted = new Date(value.getTime() + WAT_OFFSET_MS)
+    return Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate())
+  }
+  const start = dayStart(typeof from === "string" ? new Date(from) : from)
+  const end = dayStart(now)
+  let count = 0
+  for (let day = start + 86_400_000; day <= end; day += 86_400_000) {
+    const weekday = new Date(day).getUTCDay()
+    if (weekday !== 0 && weekday !== 6) count += 1
+  }
+  return count
+}
+
+function stageOwnerIds(appeal: ReviewableAppeal, department: string | null, routing: AppealRoutingContext): string[] {
+  const stage = appeal.stage || "pending_lead"
+  if (stage === "pending_lead") return department ? (routing.leadIdsByDepartment[department] ?? []) : []
+  return routing.adminHrLeadIds
+}
+
+/**
+ * Why an approval is stuck, or null while it is not. Stuck means the owner of the
+ * current step has had it for STUCK_AFTER_WORKING_DAYS working days without deciding,
+ * or every owner of the step is on approved leave with no delegate. Only a stuck
+ * approval can be overridden.
+ */
+export function appealStuckReason(
+  appeal: ReviewableAppeal,
+  department: string | null,
+  routing: AppealRoutingContext,
+  now: Date
+): string | null {
+  const stage = appeal.stage || "pending_lead"
+  const owners = stageOwnerIds(appeal, department, routing)
+  if (
+    owners.length > 0 &&
+    owners.every((id) => routing.onLeaveIds.includes(id) && !routing.leadsWithDelegate.includes(id))
+  ) {
+    return "The approver is on leave and has no delegate."
+  }
+  const enteredAt = stage === "pending_lead" ? appeal.created_at : (appeal.lead_reviewed_at ?? appeal.created_at)
+  if (enteredAt && workingDaysSince(enteredAt, now) >= STUCK_AFTER_WORKING_DAYS) {
+    return `Waiting ${STUCK_AFTER_WORKING_DAYS}+ working days with no decision.`
+  }
+  return null
+}
+
+/**
+ * Why `reviewer` may not override `appeal`, or null when they may. Override is the
+ * way out of a stuck approval, not a second way to approve: super admins and
+ * developers only, and only once the approval is stuck. It needs a reason, is
+ * recorded as an override, and tells whoever was skipped.
+ */
+export function overrideBlock(
+  reviewer: Pick<AppealReviewer, "role" | "isAdminLike" | "scopeMode">,
+  appeal: ReviewableAppeal,
+  department: string | null,
+  routing: AppealRoutingContext,
+  now: Date
+): string | null {
+  const isSeniorAdmin = reviewer.role === "super_admin" || reviewer.role === "developer"
+  if (!isSeniorAdmin || reviewer.scopeMode === "lead") return "Only a super admin or developer can override."
+  const stuck = appealStuckReason(appeal, department, routing, now)
+  if (!stuck) {
+    return `Override opens once an approval is stuck: ${STUCK_AFTER_WORKING_DAYS} working days with no decision, or the approver on leave with no delegate.`
+  }
+  return null
+}
+
+/** The Admin & HR Lead(s) plus anyone they have an active delegation to. */
+export async function loadAdminHrApproverIds(client: SupabaseClient): Promise<string[]> {
+  const leads = await loadDepartmentLeads(client)
+  const ids = new Set(leads.adminHrLeadIds)
+  if (leads.adminHrLeadIds.length > 0) {
+    const { data } = await client
+      .from("admin_edit_grants")
+      .select("user_id, valid_until")
+      .in("delegated_from", leads.adminHrLeadIds)
+      .in("route_key", ["hr.attendance", "hr.main"])
+      .is("revoked_at", null)
+      .returns<Array<{ user_id: string; valid_until: string | null }>>()
+    const now = Date.now()
+    for (const row of data ?? []) {
+      if (!row.valid_until || new Date(row.valid_until).getTime() > now) ids.add(row.user_id)
+    }
+  }
+  return Array.from(ids)
+}
+
+/**
+ * Loads who holds each approval position today. `reviewerId` is the person looking at
+ * (or deciding) appeals; it fills `actingForLeadIds`. A failed read leaves a part empty,
+ * which blocks rather than permits.
+ */
+export async function loadAppealRoutingContext(
+  client: SupabaseClient,
+  reviewerId: string | null,
+  now: Date = new Date()
+): Promise<AppealRoutingContext> {
+  const leads = await loadDepartmentLeads(client)
+  const leadIdsByDepartment: Record<string, string[]> = {}
+  for (const [department, ids] of leads.idsByDepartment) leadIdsByDepartment[department] = ids
+  const allLeadIds = Array.from(new Set(Object.values(leadIdsByDepartment).flat()))
+  const today = toLocalISODate(now)
+
+  let onLeaveIds: string[] = []
+  if (allLeadIds.length > 0) {
+    const { data } = await client
+      .from("leave_requests")
+      .select("user_id")
+      .in("user_id", allLeadIds)
+      .eq("status", "approved")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .returns<Array<{ user_id: string }>>()
+    onLeaveIds = Array.from(new Set((data ?? []).map((row) => row.user_id)))
+  }
+
+  const leadsWithDelegate = new Set<string>()
+  const actingFor = new Set<string>()
+  if (leads.adminHrLeadIds.length > 0) {
+    const { data } = await client
+      .from("admin_edit_grants")
+      .select("user_id, delegated_from, valid_until")
+      .in("delegated_from", leads.adminHrLeadIds)
+      .in("route_key", ["hr.attendance", "hr.main"])
+      .is("revoked_at", null)
+      .returns<Array<{ user_id: string; delegated_from: string | null; valid_until: string | null }>>()
+    for (const row of data ?? []) {
+      if (row.valid_until && new Date(row.valid_until).getTime() <= now.getTime()) continue
+      if (!row.delegated_from) continue
+      leadsWithDelegate.add(row.delegated_from)
+      if (reviewerId && row.user_id === reviewerId) actingFor.add(row.delegated_from)
+    }
+  }
+
+  return {
+    adminHrLeadIds: leads.adminHrLeadIds,
+    leadIdsByDepartment,
+    onLeaveIds,
+    leadsWithDelegate: Array.from(leadsWithDelegate),
+    actingForLeadIds: Array.from(actingFor),
+  }
 }
 
 export type StageChangeResult =

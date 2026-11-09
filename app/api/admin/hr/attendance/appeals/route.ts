@@ -12,12 +12,15 @@ import { applyExemptionChange, type ExemptionChange } from "@/lib/hr/exemptions"
 import { openOosPeriod, type OosPeriodChange } from "@/lib/hr/oos-materialize"
 import {
   appealReviewBlock,
-  canOverrideAppeal,
+  appealStuckReason,
   findStagedLeaveRequest,
   isStagedLeaveAppeal,
   liveAppealDayStatus,
+  loadAppealRoutingContext,
   loadDepartmentLeads,
   notifyAppealReviewers,
+  overrideBlock,
+  type AppealRoutingContext,
   type StagedLeaveRequest,
 } from "@/lib/hr/attendance-appeals"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
@@ -68,8 +71,12 @@ export type AppealWithProfile = {
   overridden_stage?: string | null
   /** Why the caller may not approve or reject this pending appeal; null when they may. */
   review_block: string | null
-  /** Whether the caller may override this pending appeal. */
+  /** Whether the caller may override this pending appeal (only once it is stuck). */
   can_override: boolean
+  /** Why this pending appeal is stuck, or null while it is not. */
+  stuck_reason: string | null
+  /** Why the caller may not override it, or null when they may. */
+  override_block: string | null
   created_at: string
   updated_at: string
 }
@@ -161,15 +168,17 @@ export async function GET(request: NextRequest) {
 
     let rows = appeals ?? []
     if (scope.scopeMode === "lead") {
-      // A lead's console shows the lead side only: admin-side work stays on the admin page.
+      // A lead's console shows the lead side only. The second stage belongs to the
+      // Admin & HR Lead, so it appears only on her console (below), not on other leads'.
       rows = rows.filter((r) => !(r.status === "pending" && r.stage === "pending_admin"))
-      // The Admin & HR Lead also approves staff of departments with no lead.
+      // The Admin & HR Lead decides the second stage for every department, and alone for
+      // staff of departments with no lead and for Admin & HR's own staff.
       if (scope.leadDepartments.includes(DEPT_ADMIN_HR) && (statusParam === "all" || statusParam === "pending")) {
         const { data: noLead } = await dataClient
           .from("attendance_appeals")
           .select(APPEAL_COLUMNS)
           .eq("status", "pending")
-          .eq("stage", "pending_hr_lead")
+          .in("stage", ["pending_hr_lead", "pending_admin"])
           .returns<AppealRow[]>()
         const seen = new Set(rows.map((r) => r.id))
         rows = [...rows, ...(noLead ?? []).filter((r) => !seen.has(r.id))]
@@ -206,6 +215,8 @@ export async function GET(request: NextRequest) {
 
     const departmentLeads = await loadDepartmentLeads(dataClient)
     const admin_hr_lead_name = departmentLeads.adminHrLeadName
+    const routing = await loadAppealRoutingContext(dataClient, scope.userId)
+    const now = new Date()
 
     const policy = await loadAttendancePolicy(dataClient)
     const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
@@ -243,8 +254,10 @@ export async function GET(request: NextRequest) {
         admin_hr_lead_name,
         overridden_by_name: resolveProfileName(r.overridden_by),
         reviewer_name: r.status === "pending" ? null : resolveProfileName(r.reviewed_by),
-        review_block: r.status === "pending" ? appealReviewBlock(scope, r, department || null) : null,
-        can_override: r.status === "pending" && canOverrideAppeal(scope),
+        review_block: r.status === "pending" ? appealReviewBlock(scope, r, department || null, routing) : null,
+        can_override: r.status === "pending" && overrideBlock(scope, r, department || null, routing, now) === null,
+        stuck_reason: r.status === "pending" ? appealStuckReason(r, department || null, routing, now) : null,
+        override_block: r.status === "pending" ? overrideBlock(scope, r, department || null, routing, now) : null,
         live_status: liveAppealDayStatus(
           recordByDay.get(`${r.user_id}::${r.appeal_date}`) ?? null,
           r.appeal_date,
@@ -390,7 +403,8 @@ async function decideAppeal(
       date: appeal.appeal_date,
       isAdminLike: scope.isAdminLike,
       excludeRecordId: appeal.attendance_record_id,
-      isManualAlteration: appeal.initiated_by_role === "admin_manual",
+      // A lead filing for their staff is uncapped, like an admin's manual change.
+      isManualAlteration: appeal.initiated_by_role === "admin_manual" || appeal.initiated_by_role === "lead_on_behalf",
     })
     if (!quotaCheck.allowed) {
       return { ok: false, status: 403, error: quotaCheck.error ?? "Monthly permission limit reached" }
@@ -684,13 +698,8 @@ export async function PATCH(request: NextRequest) {
     if (action === "reject" && !resolutionNote) {
       return NextResponse.json({ error: "resolution_note is required when rejecting" }, { status: 400 })
     }
-    if (action === "override") {
-      if (!canOverrideAppeal(scope)) {
-        return NextResponse.json({ error: "Only admins can override an approval." }, { status: 403 })
-      }
-      if (!resolutionNote) {
-        return NextResponse.json({ error: "A reason is required to override." }, { status: 400 })
-      }
+    if (action === "override" && !resolutionNote) {
+      return NextResponse.json({ error: "A reason is required to override." }, { status: 400 })
     }
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
@@ -712,6 +721,7 @@ export async function PATCH(request: NextRequest) {
       .in("id", [...new Set(appeals.map((a) => a.user_id))])
       .returns<Appellant[]>()
     const appellants = new Map((appellantRows ?? []).map((p) => [p.id, p]))
+    const routing: AppealRoutingContext = await loadAppealRoutingContext(dataClient, scope.userId)
 
     // Check every day before writing any, so a range is decided whole or not at all.
     for (const appeal of appeals) {
@@ -721,10 +731,12 @@ export async function PATCH(request: NextRequest) {
           { status: 409 }
         )
       }
-      if (action !== "override") {
-        const blocked = appealReviewBlock(scope, appeal, appellants.get(appeal.user_id)?.department ?? null)
-        if (blocked) return NextResponse.json({ error: blocked }, { status: 403 })
-      }
+      const appellantDepartment = appellants.get(appeal.user_id)?.department ?? null
+      const blocked =
+        action === "override"
+          ? overrideBlock(scope, appeal, appellantDepartment, routing, new Date())
+          : appealReviewBlock(scope, appeal, appellantDepartment, routing)
+      if (blocked) return NextResponse.json({ error: blocked }, { status: 403 })
     }
 
     const decidedByUser = new Map<string, Decided[]>()

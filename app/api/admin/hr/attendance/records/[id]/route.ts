@@ -7,6 +7,7 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import {
   loadStagingTarget,
   resolvePendingAppealsOnManualStatus,
+  leadFirstBlock,
   stageAttendanceChange,
 } from "@/lib/hr/attendance-appeals"
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
@@ -129,7 +130,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       userId: record.user_id,
       targetStatus: nextStatus,
       date: record.date,
-      isAdminLike: auth.scope.isAdminLike,
+      // A lead changing a day for their staff is uncapped, like an admin.
+      isAdminLike: auth.scope.isAdminLike || auth.scope.scopeMode === "lead",
       excludeRecordId: record.id,
     })
     if (!quotaCheck.allowed) {
@@ -159,6 +161,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // stage 1 (an admin — including on their own day — or a Department Lead) and the
     // other side confirms; the final approval writes the day.
     if (isStatusOverride && overrideStatus) {
+      const leadFirst = leadFirstBlock(auth.scope)
+      if (leadFirst) return NextResponse.json({ error: leadFirst }, { status: 403 })
       const staged = await stageAttendanceChange(dataClient, {
         actor: auth.scope,
         userId: record.user_id,

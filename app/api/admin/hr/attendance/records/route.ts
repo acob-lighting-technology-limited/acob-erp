@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
-import { stageAttendanceChange } from "@/lib/hr/attendance-appeals"
+import { leadFirstBlock, stageAttendanceChange } from "@/lib/hr/attendance-appeals"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
 import { toLocalISODate, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
@@ -468,11 +468,15 @@ export async function POST(request: NextRequest) {
       userId: user_id,
       targetStatus: status,
       date,
-      isAdminLike: scope.isAdminLike,
+      // A lead changing a day for their staff is uncapped, like an admin.
+      isAdminLike: scope.isAdminLike || scope.scopeMode === "lead",
     })
     if (!quotaCheck.allowed) {
       return NextResponse.json({ error: quotaCheck.error }, { status: 403 })
     }
+
+    const leadFirst = leadFirstBlock(scope)
+    if (leadFirst) return NextResponse.json({ error: leadFirst }, { status: 403 })
 
     const currentStatus = deriveUnifiedAttendanceStatus({ record: null, recordDate: date }, policy)
     const staged = await stageAttendanceChange(dataClient, {
