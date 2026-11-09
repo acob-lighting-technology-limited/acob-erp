@@ -11,7 +11,7 @@ import { MAILBOX_ALERT_PERCENT, MAILBOX_ALERT_RESET_PERCENT, formatBytes, format
 
 const log = logger("mailbox-quota-alerts")
 
-const ADMIN_PATH = "/admin/settings/mailboxes?tab=attention"
+const ADMIN_PATH = "/admin/it/mailboxes?tab=attention"
 const FOOTER_LABEL = "Matrix · Mailboxes"
 
 interface OwnerRow {

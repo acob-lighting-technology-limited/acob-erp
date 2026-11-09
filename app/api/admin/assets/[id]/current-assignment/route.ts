@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { denyUnlessAssetInScope } from "@/lib/admin/target-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
@@ -20,6 +21,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { id: assetId } = await params
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessAssetInScope(db, scope, assetId)
+  if (denied) return denied
   const { data, error } = await db
     .from("asset_assignments")
     .select(

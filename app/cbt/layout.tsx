@@ -6,7 +6,7 @@ import { getCbtSettings, canAccessCbt, resolveCbtAccessScope } from "@/lib/cbt-c
 /**
  * Server-level guard for the standalone /cbt test-taking page.
  *
- * Access is driven entirely by CBT Settings (/admin/settings/cbt): super_admin
+ * Access is driven entirely by CBT Settings (/admin/hr/pms/cbt/settings): super_admin
  * and developer always pass, everyone else must be granted by role or by name.
  * The scope is resolved from the profile row rather than the admin scope so a
  * plain employee who has been granted access actually gets it.

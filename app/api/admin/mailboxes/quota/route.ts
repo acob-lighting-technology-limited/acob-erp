@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { CpanelError, getMailbox, isCpanelConfigured, setMailboxQuota } from "@/lib/cpanel/client"
 import { MAILBOX_QUOTA_STEPS_MB } from "@/lib/cpanel/quota"
@@ -26,7 +27,7 @@ export async function PATCH(request: NextRequest) {
 
   const auth = await requireApiAdminScope()
   if (!auth.ok) return auth.response
-  if (!auth.scope.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!scopeHoldsAdminRoute(auth.scope, "it.main")) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   if (!isCpanelConfigured()) {
     return NextResponse.json({ error: "cPanel is not configured on this server" }, { status: 503 })
   }

@@ -244,6 +244,8 @@ export function EmployeeEditForm({
               </Label>
               <Select
                 value={editForm.role}
+                // Only people who can assign roles may change this; the API enforces the same rule.
+                disabled={!canManageUsers || getAvailableRoles().length === 0}
                 onValueChange={(value: UserRole) => {
                   setEditForm((prev) => ({
                     ...prev,
@@ -326,7 +328,7 @@ export function EmployeeEditForm({
             </div>
           )}
 
-          {editForm.role === "admin" && (
+          {canManageUsers && editForm.role === "admin" && (
             <div className="bg-muted/20 mt-2 space-y-1.5 rounded-lg border p-3">
               <Label className="text-xs font-semibold">Admin Permitted Routes *</Label>
               <AdminRoutesPicker

@@ -2,7 +2,8 @@
 
 import type { Dispatch, SetStateAction } from "react"
 import type { AttendanceReport, TimelineContext, TimelineEvent } from "../view"
-import { formatDayShort, EVENT_LABELS, eventBadgeClass } from "../view"
+import { formatDayShort } from "../view"
+import { EVENT_LABELS, eventBadgeClass } from "./event-labels"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"

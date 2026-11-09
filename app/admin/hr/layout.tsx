@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditAccessBoundary } from "@/components/admin/edit-access-boundary"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
 export const metadata: Metadata = {
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   await requireAdminSectionAccess("hr")
-  return children
+  return <EditAccessBoundary route="hr.main">{children}</EditAccessBoundary>
 }

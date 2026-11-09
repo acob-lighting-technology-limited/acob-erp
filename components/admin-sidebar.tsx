@@ -60,6 +60,7 @@ import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import { usePendingRsvpCount } from "@/components/events/use-events"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
+import { buildDeptNavigation, filterDeptNavigationForDelegate, type NavItem } from "@/components/dept-navigation"
 import {
   canAccessRouteV2,
   resolveAdminRouteKeyV2,
@@ -96,6 +97,8 @@ interface AdminSidebarProps {
    *  2. Show a "Go to Admin" link in the account dropdown for admin-like users.
    */
   deptId?: string
+  /** Dept shell, delegate only: the page keys they were given. The nav shows just these. */
+  delegatedPages?: string[]
   /**
    * Admin shell only: the dept consoles this lead may open. Each is listed in
    * the account dropdown so an admin+lead can jump to any dept shell they hold.
@@ -103,129 +106,6 @@ interface AdminSidebarProps {
   deptConsoles?: DeptConsole[]
   /** Admin shell only: the viewer is the MD or an MD's Desk delegate. */
   showMdDesk?: boolean
-}
-
-/**
- * Builds dept-scoped navigation for the /dept/[deptId]/ shell.
- * Hrefs point to /dept/[id]/... so clicking a nav item stays in the dept shell.
- *
- * What belongs here: the admin nav, minus anything org-wide. A department lead
- * manages their own department, so a domain is included when it can be
- * meaningfully scoped to one department and left out when it cannot. That is
- * why HR is here but its Departments child is not, and why these are absent:
- *
- *  - Settings, System & Security, Developer — org-wide by definition.
- *  - Notifications, Events, Tools, Corporate Services — single org-wide
- *    consoles with nothing department-shaped to scope to.
- *  - Portfolios, Projects, Purchasing, Inventory — cross-department by nature;
- *    a portfolio or a purchase order does not belong to one department.
- *
- * Add a domain here only once its pages exist under /dept/[dept_id]/ and its
- * queries are scoped by requireDeptScope.
- */
-function buildDeptNavigation(deptId: string): NavItem[] {
-  const base = `/dept/${deptId}`
-  return [
-    {
-      section: "overview",
-      name: "Dashboard",
-      href: base,
-      icon: LayoutDashboard,
-    },
-    {
-      section: "management",
-      name: "HR",
-      description: "Human Resources",
-      href: `${base}/hr`,
-      icon: Users,
-      children: [
-        { name: "Employees", href: `${base}/hr/employees` },
-        // No "Departments" here — the dept shell is already scoped to one
-        // department, so the org-wide department list belongs to /admin only.
-        { name: "Attendance", href: `${base}/hr/attendance` },
-        { name: "Leave", href: `${base}/hr/leave` },
-        { name: "Offices & Rooms", href: `${base}/hr/offices-rooms` },
-      ],
-    },
-    {
-      section: "management",
-      name: "PMS",
-      description: "Performance Management System",
-      href: `${base}/pms`,
-      icon: TrendingUp,
-      children: pmsNavChildren(`${base}/pms`),
-    },
-    {
-      section: "management",
-      name: "Accounts",
-      href: `${base}/accounts`,
-      icon: Landmark,
-      children: [
-        { name: "Requisitions", href: `${base}/accounts/requisitions` },
-        { name: "Assets", href: `${base}/assets` },
-      ],
-    },
-    {
-      section: "management",
-      name: "Corporate Services",
-      href: `${base}/corporate-services`,
-      icon: Target,
-      children: [
-        { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
-        { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
-      ],
-    },
-    {
-      section: "operations",
-      name: "Tasks",
-      href: `${base}/tasks`,
-      icon: ClipboardList,
-    },
-    {
-      section: "operations",
-      name: "Help Desk",
-      href: `${base}/help-desk`,
-      icon: Ticket,
-    },
-    {
-      section: "operations",
-      name: "Reports",
-      href: `${base}/reports`,
-      icon: FileBarChart,
-      children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
-    },
-    {
-      section: "operations",
-      name: "Correspondence",
-      href: `${base}/correspondence`,
-      icon: Mail,
-    },
-    {
-      section: "operations",
-      name: "Communications",
-      href: `${base}/communications`,
-      icon: Megaphone,
-      children: [{ name: "Broadcast", href: `${base}/communications/broadcast` }],
-    },
-    {
-      section: "operations",
-      name: "Documentation",
-      href: `${base}/documentation`,
-      icon: FileText,
-      children: [
-        { name: "Policies", href: `${base}/documentation/policies` },
-        { name: "SOPs", href: `${base}/documentation/sops` },
-        { name: "Personal", href: `${base}/documentation/personal` },
-        { name: "Department", href: `${base}/documentation/department` },
-      ],
-    },
-    {
-      section: "operations",
-      name: "Feedback",
-      href: `${base}/feedback`,
-      icon: MessageSquare,
-    },
-  ]
 }
 
 function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKeyV2[] {
@@ -241,25 +121,6 @@ function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKe
         .filter(Boolean)
     )
   ).filter((value): value is AdminRouteKeyV2 => GRANTABLE_ADMIN_ROUTES.includes(value as AdminRouteKeyV2))
-}
-
-type NavItem = {
-  section: string
-  name: string
-  href: string
-  icon: React.ElementType
-  /** Expansion or gloss for an abbreviated name, shown on hover. */
-  description?: string
-  children?: NavChild[]
-  /**
-   * The viewer cannot open this branch's own page, so `href` was retargeted to
-   * the first descendant they can reach. The expanded row then toggles instead
-   * of navigating — following it would land on a page whose name does not match
-   * the label. The collapsed rail still uses `href`, since toggling is not
-   * available there.
-   */
-  retargeted?: boolean
-  badge?: number
 }
 
 /**
@@ -306,11 +167,11 @@ const adminNavigation: NavItem[] = [
     href: "/admin/it",
     icon: Server,
     children: [
-      { name: "Onboarding", href: "/admin/onboarding" },
-      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
-      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
-      { name: "Network Activity", href: "/admin/security/network-activity" },
-      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
+      { name: "Onboarding", href: "/admin/it/onboarding" },
+      { name: "Mailboxes", href: "/admin/it/mailboxes" },
+      { name: "Starlink Kits", href: "/admin/it/starlink" },
+      { name: "Network Activity", href: "/admin/it/network-activity" },
+      { name: "Bypass & Override", href: "/admin/it/bypass-override" },
     ],
   },
   {
@@ -323,14 +184,14 @@ const adminNavigation: NavItem[] = [
   },
   {
     // Split out of HR — it had grown to 11 sub-items nested three levels
-    // deep. Routes are unchanged (still /admin/pms/*), only the sidebar
+    // deep. Routes are unchanged (still /admin/hr/pms/*), only the sidebar
     // grouping moved.
     section: "management",
     name: "PMS",
     description: "Performance Management System",
-    href: "/admin/pms",
+    href: "/admin/hr/pms",
     icon: TrendingUp,
-    children: pmsNavChildren("/admin/pms"),
+    children: pmsNavChildren("/admin/hr/pms"),
   },
   {
     // Accounts also surfaces Purchasing, Inventory and Assets as nested groups
@@ -343,20 +204,20 @@ const adminNavigation: NavItem[] = [
     icon: Landmark,
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Payroll", href: "/admin/payroll" },
+      { name: "Payroll", href: "/admin/accounts/payroll" },
       {
         name: "Inventory",
-        href: "/admin/inventory",
+        href: "/admin/accounts/inventory",
         children: [
-          { name: "Products", href: "/admin/inventory/products" },
-          { name: "Categories", href: "/admin/inventory/categories" },
-          { name: "Warehouses", href: "/admin/inventory/warehouses" },
-          { name: "Movements", href: "/admin/inventory/movements" },
+          { name: "Products", href: "/admin/accounts/inventory/products" },
+          { name: "Categories", href: "/admin/accounts/inventory/categories" },
+          { name: "Warehouses", href: "/admin/accounts/inventory/warehouses" },
+          { name: "Movements", href: "/admin/accounts/inventory/movements" },
         ],
       },
       {
         name: "Assets",
-        href: "/admin/assets",
+        href: "/admin/accounts/assets",
       },
     ],
   },
@@ -481,10 +342,9 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Users", href: "/admin/settings/users" },
       { name: "Roles", href: "/admin/settings/roles" },
+      { name: "Access", href: "/admin/settings/access" },
       { name: "Company", href: "/admin/settings/company" },
-      { name: "Attendance", href: "/admin/settings/attendance" },
-      { name: "CBT", href: "/admin/settings/cbt" },
-      { name: "Mail", href: "/admin/settings/mail" },
+      { name: "Mail", href: "/admin/it/mail" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
   },
@@ -529,6 +389,7 @@ export function AdminSidebar({
   profile,
   adminScopeMode = "global",
   deptId,
+  delegatedPages,
   deptConsoles = [],
   showMdDesk = false,
 }: AdminSidebarProps) {
@@ -677,7 +538,9 @@ export function AdminSidebar({
   }
 
   const filteredNavigation = deptId
-    ? activeNavigation
+    ? delegatedPages
+      ? filterDeptNavigationForDelegate(activeNavigation, delegatedPages)
+      : activeNavigation
     : activeNavigation.reduce<NavItem[]>((acc, item) => {
         if (item.href === "/admin/md-desk" && !showMdDesk) return acc
         const children = filterNavChildren(item.children)

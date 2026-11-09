@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import Link from "next/link"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -157,7 +158,8 @@ export function OfficeLocationsPage({
 
   const locations = data?.locations ?? []
   const locationEmployees = data?.locationEmployees ?? {}
-  const canManageLocations = data?.canManageLocations ?? false
+  const canEditHr = useCanEdit("hr.offices")
+  const canManageLocations = canEditHr && (data?.canManageLocations ?? false)
   const departments = data?.departments ?? []
 
   // After renaming the canonical office, push the new name onto every profile that

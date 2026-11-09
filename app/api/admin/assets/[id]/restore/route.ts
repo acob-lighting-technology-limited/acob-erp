@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { denyUnlessAssetInScope } from "@/lib/admin/target-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
@@ -19,6 +20,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const { id: assetId } = await params
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessAssetInScope(db, scope, assetId)
+  if (denied) return denied
   const { error } = await db
     .from("assets")
     .update({ deleted_at: null, deleted_by: null, delete_reason: null, updated_at: new Date().toISOString() })

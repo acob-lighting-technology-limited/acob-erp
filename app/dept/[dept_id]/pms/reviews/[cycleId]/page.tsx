@@ -1,5 +1,5 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
-import { AdminPmsQuarterReviewsPage as AdminPmsReviewCyclePage } from "@/app/admin/pms/reviews/[cycleId]/view"
+import { AdminPmsQuarterReviewsPage as AdminPmsReviewCyclePage } from "@/app/admin/hr/pms/reviews/[cycleId]/view"
 
 export const metadata: Metadata = { title: "Dept Review details" }
 import type { Metadata } from "next"

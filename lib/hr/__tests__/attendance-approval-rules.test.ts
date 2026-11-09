@@ -2,10 +2,15 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {
   appealReviewBlock,
-  canOverrideAppeal,
+  EMPTY_APPEAL_ROUTING,
+  appealStuckReason,
   employeeAppealStage,
+  leadFirstBlock,
+  overrideBlock,
   stagingRoute,
+  workingDaysSince,
   type AppealReviewer,
+  type AppealRoutingContext,
 } from "@/lib/hr/attendance-appeals"
 import { appealAuditSteps } from "@/lib/hr/appeal-audit"
 
@@ -54,39 +59,95 @@ test("whoever made a change cannot confirm it", () => {
   assert.match(appealReviewBlock(hrLead, appeal, "Admin and HR") ?? "", /You made this change/)
 })
 
-test("the lead who endorsed an appeal cannot also approve it as admin", () => {
+// Onyeka-style Admin & HR Lead, her delegate, and an unrelated admin.
+const routing: AppealRoutingContext = {
+  adminHrLeadIds: ["hr-lead"],
+  leadIdsByDepartment: { "Admin and HR": ["hr-lead"], Project: ["lead-1"] },
+  onLeaveIds: [],
+  leadsWithDelegate: ["hr-lead"],
+  actingForLeadIds: [],
+}
+const asDelegate: AppealRoutingContext = { ...routing, actingForLeadIds: ["hr-lead"] }
+const delegate: AppealReviewer = { ...admin, userId: "rafiat" }
+const NOW = new Date("2026-11-09T09:00:00Z") // a Monday
+
+test("the lead who endorsed an appeal cannot also decide the second stage", () => {
   const appeal = { stage: "pending_admin", initiated_by_role: "employee", lead_reviewed_by: "hr-lead" }
-  assert.match(appealReviewBlock(hrLead, appeal, "Admin and HR") ?? "", /another admin/)
-  assert.equal(appealReviewBlock(admin, appeal, "Admin and HR"), null)
+  assert.match(appealReviewBlock(hrLead, appeal, "Admin and HR", routing) ?? "", /someone else must approve/)
 })
 
-test("any admin approves the admin side, a lead console cannot", () => {
-  const appeal = { stage: "pending_admin", initiated_by_role: "lead_on_behalf", created_by: "lead-2" }
-  assert.equal(appealReviewBlock(admin, appeal, "Project"), null)
-  assert.match(appealReviewBlock(projectLead, appeal, "Project") ?? "", /Only an admin/)
-  assert.match(appealReviewBlock({ ...hrLead, scopeMode: "lead" }, appeal, "Project") ?? "", /Only an admin/)
+test("the second stage is the Admin & HR Lead's and their delegate's, never any admin's", () => {
+  const appeal = { stage: "pending_admin", initiated_by_role: "lead_on_behalf", created_by: "lead-2", user_id: "staff" }
+  assert.equal(appealReviewBlock(hrLead, appeal, "Project", routing), null)
+  assert.equal(appealReviewBlock(delegate, appeal, "Project", asDelegate), null)
+  // An admin, a super admin, a developer and another lead are all refused.
+  assert.match(appealReviewBlock(admin, appeal, "Project", routing) ?? "", /Admin & HR Lead/)
+  assert.match(appealReviewBlock(developer, appeal, "Project", routing) ?? "", /Admin & HR Lead/)
+  assert.match(appealReviewBlock(projectLead, appeal, "Project", routing) ?? "", /Admin & HR Lead/)
 })
 
-test("an admin may approve the admin side of their own appeal", () => {
-  const appeal = { stage: "pending_admin", initiated_by_role: "employee", created_by: null, lead_reviewed_by: "x" }
-  assert.equal(appealReviewBlock(admin, appeal, "Admin and HR"), null)
+test("the no-lead stage and Admin & HR's own staff follow the same person rule", () => {
+  const appeal = { stage: "pending_hr_lead", initiated_by_role: "employee", created_by: null, user_id: "staff" }
+  assert.equal(appealReviewBlock(hrLead, appeal, "Logistics", routing), null)
+  assert.equal(appealReviewBlock(delegate, appeal, "Logistics", asDelegate), null)
+  assert.match(appealReviewBlock(admin, appeal, "Logistics", routing) ?? "", /Admin & HR Lead/)
 })
 
-test("the no-lead stage belongs to the Admin & HR Lead alone", () => {
-  const appeal = { stage: "pending_hr_lead", initiated_by_role: "employee", created_by: null }
-  assert.equal(appealReviewBlock(hrLead, appeal, "Logistics"), null)
-  assert.match(appealReviewBlock(admin, appeal, "Logistics") ?? "", /Admin & HR Lead/)
-  assert.match(appealReviewBlock(developer, appeal, "Logistics") ?? "", /Admin & HR Lead/)
+test("the Admin & HR Lead decides her own appeal; her delegate cannot", () => {
+  const own = { stage: "pending_hr_lead", initiated_by_role: "employee", created_by: null, user_id: "hr-lead" }
+  assert.equal(appealReviewBlock(hrLead, own, "Admin and HR", routing), null)
+  assert.match(appealReviewBlock(delegate, own, "Admin and HR", asDelegate) ?? "", /their own appeal/)
 })
 
-test("override is for admins on the admin side only", () => {
-  assert.equal(canOverrideAppeal(admin), true)
-  assert.equal(canOverrideAppeal(developer), true)
-  assert.equal(canOverrideAppeal(projectLead), false)
-  assert.equal(canOverrideAppeal({ ...hrLead, scopeMode: "lead" }), false)
+test("a delegate decides their own appeal only while the Admin & HR Lead is on leave", () => {
+  const own = { stage: "pending_hr_lead", initiated_by_role: "employee", created_by: null, user_id: "rafiat" }
+  assert.match(appealReviewBlock(delegate, own, "Admin and HR", asDelegate) ?? "", /available/)
+  assert.equal(appealReviewBlock(delegate, own, "Admin and HR", { ...asDelegate, onLeaveIds: ["hr-lead"] }), null)
+  // The Admin & HR Lead can still decide it.
+  assert.equal(appealReviewBlock(hrLead, own, "Admin and HR", routing), null)
 })
 
-test("staging: an admin's change goes to the lead side, a lead's change to an admin", () => {
+test("working days skip weekends and count up to today", () => {
+  assert.equal(workingDaysSince("2026-11-09T08:00:00Z", NOW), 0) // same day
+  assert.equal(workingDaysSince("2026-11-09T08:00:00Z", new Date("2026-11-13T09:00:00Z")), 4) // Mon -> Fri
+  assert.equal(workingDaysSince("2026-11-09T08:00:00Z", new Date("2026-11-16T09:00:00Z")), 5) // Mon -> next Mon
+})
+
+test("stuck: five working days with no decision, or the approver on leave with no delegate", () => {
+  const appeal = { stage: "pending_lead", created_at: "2026-11-02T08:00:00Z" }
+  assert.match(appealStuckReason(appeal, "Project", routing, NOW) ?? "", /5\+ working days/)
+  const fresh = { stage: "pending_lead", created_at: "2026-11-06T08:00:00Z" }
+  assert.equal(appealStuckReason(fresh, "Project", routing, NOW), null)
+  // A lead on leave holds it up straight away.
+  const away: AppealRoutingContext = { ...routing, onLeaveIds: ["lead-1"] }
+  assert.match(appealStuckReason(fresh, "Project", away, NOW) ?? "", /on leave/)
+  // The Admin & HR Lead on leave with a delegate is not stuck.
+  const second = {
+    stage: "pending_admin",
+    lead_reviewed_at: "2026-11-09T07:00:00Z",
+    created_at: "2026-11-02T08:00:00Z",
+  }
+  assert.equal(appealStuckReason(second, "Project", { ...routing, onLeaveIds: ["hr-lead"] }, NOW), null)
+  assert.match(
+    appealStuckReason(second, "Project", { ...routing, onLeaveIds: ["hr-lead"], leadsWithDelegate: [] }, NOW) ?? "",
+    /on leave/
+  )
+})
+
+test("override: super admin or developer only, and only once the approval is stuck", () => {
+  const stuck = { stage: "pending_lead", created_at: "2026-11-02T08:00:00Z" }
+  const fresh = { stage: "pending_lead", created_at: "2026-11-09T07:00:00Z" }
+  const superAdmin = { role: "super_admin", isAdminLike: true, scopeMode: "global" as const }
+  const dev = { role: "developer", isAdminLike: true, scopeMode: "global" as const }
+  const plainAdmin = { role: "admin", isAdminLike: true, scopeMode: "global" as const }
+  assert.equal(overrideBlock(superAdmin, stuck, "Project", routing, NOW), null)
+  assert.equal(overrideBlock(dev, stuck, "Project", routing, NOW), null)
+  assert.match(overrideBlock(plainAdmin, stuck, "Project", routing, NOW) ?? "", /super admin or developer/)
+  assert.match(overrideBlock(superAdmin, fresh, "Project", routing, NOW) ?? "", /stuck/)
+  assert.match(overrideBlock({ ...superAdmin, scopeMode: "lead" }, stuck, "Project", routing, NOW) ?? "", /super admin/)
+})
+
+test("staging: an admin's manual change goes to the lead side, a lead's change to the second stage", () => {
   const staff = { department: "Project", department_id: "d", is_department_lead: false, full_name: "Joseph" }
   const lead = { ...staff, is_department_lead: true }
   assert.equal(stagingRoute(admin, staff, true).stage, "pending_lead")
@@ -96,10 +157,27 @@ test("staging: an admin's change goes to the lead side, a lead's change to an ad
   assert.equal(stagingRoute(projectLead, staff, true).initiatedByRole, "lead_on_behalf")
 })
 
-test("an employee's own appeal: lead first; a lead goes to an admin; no lead goes to the HR Lead", () => {
-  assert.equal(employeeAppealStage({ is_department_lead: false }, true), "pending_lead")
-  assert.equal(employeeAppealStage({ is_department_lead: true }, true), "pending_admin")
-  assert.equal(employeeAppealStage({ is_department_lead: false }, false), "pending_hr_lead")
+test("a single-day change never starts from the admin side", () => {
+  assert.match(leadFirstBlock(admin) ?? "", /department lead/)
+  assert.match(leadFirstBlock(developer) ?? "", /department lead/)
+  assert.equal(leadFirstBlock(projectLead), null)
+  assert.equal(leadFirstBlock({ ...hrLead, scopeMode: "lead" }), null)
+})
+
+test("an employee's own appeal: lead first; a lead goes to the Admin & HR Lead; no lead goes to the HR Lead", () => {
+  assert.equal(employeeAppealStage({ is_department_lead: false, department: "Project" }, true), "pending_lead")
+  assert.equal(employeeAppealStage({ is_department_lead: true, department: "Project" }, true), "pending_admin")
+  assert.equal(employeeAppealStage({ is_department_lead: false, department: "Logistics" }, false), "pending_hr_lead")
+})
+
+test("Admin & HR's own staff, and the Admin & HR Lead, have one stage", () => {
+  assert.equal(employeeAppealStage({ is_department_lead: false, department: "Admin and HR" }, true), "pending_hr_lead")
+  assert.equal(employeeAppealStage({ is_department_lead: true, department: "Admin and HR" }, true), "pending_hr_lead")
+})
+
+test("with no routing context loaded nobody passes the second stage", () => {
+  const appeal = { stage: "pending_admin", initiated_by_role: "employee", user_id: "staff" }
+  assert.match(appealReviewBlock(hrLead, appeal, "Project", EMPTY_APPEAL_ROUTING) ?? "", /Admin & HR Lead/)
 })
 
 test("audit: an admin's change shows as made, not approved, and the lead confirmation is the outcome", () => {

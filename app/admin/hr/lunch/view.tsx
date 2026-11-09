@@ -1,5 +1,7 @@
 "use client"
 
+import { FeedbackExpandPanel, type LunchReviewSummary } from "./_components/lunch-feedback-panel"
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DataTablePage, DataTable } from "@/components/ui/data-table"
@@ -197,15 +199,6 @@ const LUNCH_TABS: DataTableTab[] = [
   { key: "reviews", label: "Feedback" },
 ]
 
-/** One day's anonymous feedback. No author is returned by the API, by design. */
-type LunchReviewSummary = {
-  menu_id: string
-  date: string
-  review_count: number
-  average_rating: number | null
-  comments: { id: string; rating: number; comment: string | null; created_at: string }[]
-}
-
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -247,6 +240,7 @@ export function LunchRegisterPage({
   todayDate,
 }: LunchRegisterPageProps) {
   const router = useRouter()
+  const canEditHr = useCanEdit("hr.lunch")
   const [activeTab, setActiveTab] = useState<LunchTab>("menus")
   const [reviews, setReviews] = useState<LunchReviewSummary[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
@@ -703,6 +697,7 @@ export function LunchRegisterPage({
       return (
         <Checkbox
           checked={ateUserIds.includes(userId)}
+          disabled={!canEditHr}
           onCheckedChange={(checked) => {
             void toggleEmployeeLunch(userId, !!checked)
           }}
@@ -711,6 +706,7 @@ export function LunchRegisterPage({
         />
       )
     }
+    if (!canEditHr) return null
     return (
       <Button size="sm" variant="outline" className="h-7 text-xs font-medium" onClick={() => openDailyOverride(userId)}>
         Change Choice
@@ -1292,7 +1288,7 @@ export function LunchRegisterPage({
       }
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          {activeTab === "menus" && (
+          {activeTab === "menus" && canEditHr && (
             <Button
               size="sm"
               onClick={() => {
@@ -1306,15 +1302,17 @@ export function LunchRegisterPage({
           )}
 
           {/* Settings Dialog */}
-          <LunchPriceScheduleSettingsDialog
-            openSettings={openSettings}
-            setOpenSettings={setOpenSettings}
-            handleSaveSettings={handleSaveSettings}
-            settingsForm={settingsForm}
-            setSettingsForm={setSettingsForm}
-            toggleFormWeekday={toggleFormWeekday}
-            loading={loading}
-          />
+          {canEditHr && (
+            <LunchPriceScheduleSettingsDialog
+              openSettings={openSettings}
+              setOpenSettings={setOpenSettings}
+              handleSaveSettings={handleSaveSettings}
+              settingsForm={settingsForm}
+              setSettingsForm={setSettingsForm}
+              toggleFormWeekday={toggleFormWeekday}
+              loading={loading}
+            />
+          )}
 
           {/* Export Report */}
           <Button variant="outline" onClick={handleExportClick} size="sm">
@@ -1422,16 +1420,19 @@ export function LunchRegisterPage({
                     fullWidth: true,
                   },
                 ],
-                actions: (row) => [
-                  {
-                    label: "Edit Menu",
-                    icon: Pencil,
-                    onClick: () => {
-                      setEditingMenu(row)
-                      setOpenMenuBuilder(true)
-                    },
-                  },
-                ],
+                actions: (row) =>
+                  canEditHr
+                    ? [
+                        {
+                          label: "Edit Menu",
+                          icon: Pencil,
+                          onClick: () => {
+                            setEditingMenu(row)
+                            setOpenMenuBuilder(true)
+                          },
+                        },
+                      ]
+                    : [],
               },
             }}
             cardRenderer={(row) => {
@@ -1463,73 +1464,79 @@ export function LunchRegisterPage({
                           Share
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingMenu(row)}>
-                        Edit
-                      </Button>
+                      {canEditHr && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingMenu(row)}>
+                          Edit
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
               )
             }}
             expandable={{ render: (row) => <MenuVotesPanel menu={row} totalStaff={employees.length} /> }}
-            rowActions={[
-              {
-                // Always offered. When votes exist the builder warns that
-                // changing the dishes clears them, rather than the action
-                // silently disappearing.
-                label: "Edit menu",
-                onClick: (row) => {
-                  setEditingMenu(row)
-                  setOpenMenuBuilder(true)
-                },
-              },
-              {
-                // The clock stays editable after votes exist — only rebuilding
-                // the dishes is destructive. Past days are left alone.
-                label: "Change deadline",
-                hidden: (row) => row.date < todayDate,
-                onClick: (row) => setDeadlineMenu(row),
-              },
-              {
-                label: "Change someone's answer",
-                onClick: (row) => setOverrideMenu(row),
-              },
-              {
-                label: "Publish for voting",
-                hidden: (row) => row.status === "published",
-                onClick: (row) => void updateMenuStatus(row, "published"),
-              },
-              {
-                // Only worth offering while voting is genuinely still open —
-                // it closes itself at the deadline, so after that this would
-                // just be a button that changes nothing anyone can see.
-                label: "Close voting early",
-                hidden: (row) => !row.votingOpen,
-                onClick: (row) => void updateMenuStatus(row, "closed"),
-              },
-              {
-                label: "Reopen voting",
-                hidden: (row) => row.status !== "closed" || row.date < todayDate,
-                onClick: (row) => void updateMenuStatus(row, "published"),
-              },
-              {
-                // The everyday "this day is off" action: keeps the record,
-                // drops the charges.
-                label: "Cancel this day",
-                hidden: (row) => Boolean(row.archived_at),
-                onClick: (row) => setArchivingMenu(row),
-              },
-              {
-                label: "Restore this day",
-                hidden: (row) => !row.archived_at,
-                onClick: (row) => void setArchived(row, false),
-              },
-              {
-                label: "Delete permanently",
-                variant: "destructive",
-                onClick: (row) => setDeletingMenu(row),
-              },
-            ]}
+            rowActions={
+              canEditHr
+                ? [
+                    {
+                      // Always offered. When votes exist the builder warns that
+                      // changing the dishes clears them, rather than the action
+                      // silently disappearing.
+                      label: "Edit menu",
+                      onClick: (row) => {
+                        setEditingMenu(row)
+                        setOpenMenuBuilder(true)
+                      },
+                    },
+                    {
+                      // The clock stays editable after votes exist — only rebuilding
+                      // the dishes is destructive. Past days are left alone.
+                      label: "Change deadline",
+                      hidden: (row) => row.date < todayDate,
+                      onClick: (row) => setDeadlineMenu(row),
+                    },
+                    {
+                      label: "Change someone's answer",
+                      onClick: (row) => setOverrideMenu(row),
+                    },
+                    {
+                      label: "Publish for voting",
+                      hidden: (row) => row.status === "published",
+                      onClick: (row) => void updateMenuStatus(row, "published"),
+                    },
+                    {
+                      // Only worth offering while voting is genuinely still open —
+                      // it closes itself at the deadline, so after that this would
+                      // just be a button that changes nothing anyone can see.
+                      label: "Close voting early",
+                      hidden: (row) => !row.votingOpen,
+                      onClick: (row) => void updateMenuStatus(row, "closed"),
+                    },
+                    {
+                      label: "Reopen voting",
+                      hidden: (row) => row.status !== "closed" || row.date < todayDate,
+                      onClick: (row) => void updateMenuStatus(row, "published"),
+                    },
+                    {
+                      // The everyday "this day is off" action: keeps the record,
+                      // drops the charges.
+                      label: "Cancel this day",
+                      hidden: (row) => Boolean(row.archived_at),
+                      onClick: (row) => setArchivingMenu(row),
+                    },
+                    {
+                      label: "Restore this day",
+                      hidden: (row) => !row.archived_at,
+                      onClick: (row) => void setArchived(row, false),
+                    },
+                    {
+                      label: "Delete permanently",
+                      variant: "destructive",
+                      onClick: (row) => setDeletingMenu(row),
+                    },
+                  ]
+                : []
+            }
           />
         </div>
       )}
@@ -1666,6 +1673,7 @@ export function LunchRegisterPage({
                     },
                   ],
                   actions: (row) => {
+                    if (!canEditHr) return []
                     if (dailyMenu) {
                       return [{ label: "Change Choice", onClick: () => openDailyOverride(row.employee.id) }]
                     }
@@ -2272,68 +2280,6 @@ export function LunchRegisterPage({
         </div>
       )}
     </DataTablePage>
-  )
-}
-
-function FeedbackExpandPanel({ entry }: { entry: LunchReviewSummary }) {
-  return (
-    <div className="border-border/80 bg-card overflow-hidden rounded-xl border">
-      <div className="border-border bg-muted/40 flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-foreground text-sm font-semibold">
-            Feedback for{" "}
-            {formatWATDate(entry.date, { weekday: "long", day: "numeric", month: "short", year: "numeric" })}
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Submitted anonymously — no comment is linked to a staff member.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-warning/15 text-warning gap-1">
-            <Star className="h-3 w-3 fill-current" />
-            {entry.average_rating ? `${entry.average_rating.toFixed(1)} / 5` : "No rating"}
-          </Badge>
-          <Badge variant="outline" className="font-normal">
-            {entry.review_count} review{entry.review_count === 1 ? "" : "s"}
-          </Badge>
-          <Badge variant="outline" className="font-normal">
-            {entry.comments.length} comment{entry.comments.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
-      </div>
-
-      {entry.comments.length === 0 ? (
-        <p className="text-muted-foreground p-4 text-sm italic">
-          Ratings were submitted without written comments for this day.
-        </p>
-      ) : (
-        <div className="grid gap-3 p-4 sm:grid-cols-2 lg:p-5">
-          {entry.comments.map((comment) => (
-            <section key={comment.id} className="bg-muted/35 rounded-lg p-4" aria-label="Staff comment">
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className="text-warning flex items-center gap-0.5"
-                  aria-label={`${comment.rating} out of 5 stars`}
-                >
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <Star key={i} className={cn("h-3.5 w-3.5", i < comment.rating ? "fill-current" : "opacity-30")} />
-                  ))}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {formatWATDate(comment.created_at, {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-              <p className="text-foreground mt-2 text-sm leading-6 whitespace-pre-wrap">{comment.comment}</p>
-            </section>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 

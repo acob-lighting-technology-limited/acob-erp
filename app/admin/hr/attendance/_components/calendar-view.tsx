@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -99,6 +100,7 @@ export const CELL_BG: Record<string, string> = {
 }
 
 export function CalendarView({ employees }: CalendarViewProps) {
+  const canEditAttendance = useCanEdit("hr.attendance")
   const [selectedUserId, setSelectedUserId] = useState<string>(employees[0]?.user_id ?? "")
   const [calendarMonth, setCalendarMonth] = useState(toLocalYearMonth())
 
@@ -304,7 +306,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
               const isFuture = date > today
               const isWeekendDay = isWeekend(date)
               const bg = !isFuture && status && CELL_BG[status] ? CELL_BG[status] : ""
-              const isClickable = !isFuture && !isWeekendDay && day
+              const isClickable = canEditAttendance && !isFuture && !isWeekendDay && day
 
               return (
                 <div

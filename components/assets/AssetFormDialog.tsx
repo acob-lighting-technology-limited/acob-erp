@@ -22,7 +22,7 @@ import { formatName } from "@/lib/utils"
 import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { generateUniqueCodePreview } from "@/lib/asset-types"
 import { Plus, User, Building2, Building } from "lucide-react"
-import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
+import type { Asset, Employee } from "@/app/admin/accounts/assets/admin-assets-content"
 
 const currentYear = new Date().getFullYear()
 

@@ -40,7 +40,7 @@ async function requirePrivilegedActor(supabase: MailSettingsClient) {
   if (!user) return { user: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
+  if (!scope || !scopeHoldsAdminRoute(scope, "it.main")) {
     return { user: null, error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
 

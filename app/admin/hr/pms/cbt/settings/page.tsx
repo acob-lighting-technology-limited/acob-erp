@@ -1,0 +1,48 @@
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Brain } from "lucide-react"
+import { getCbtSettings } from "@/lib/cbt-config"
+import { CbtSettingsForm } from "./_components/cbt-settings-form"
+
+export const metadata: Metadata = { title: "Admin CBT settings" }
+import type { Metadata } from "next"
+
+export default async function CbtSettingsPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/auth/login")
+  }
+
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope || !scopeHoldsAdminRoute(scope, "hr.pms.cbt.manage")) {
+    redirect("/admin")
+  }
+
+  const db = getServiceRoleClientOrFallback(supabase)
+  const [initialSettings, { data: profiles }] = await Promise.all([
+    getCbtSettings(db),
+    db
+      .from("profiles")
+      .select("id, full_name, company_email, department, role")
+      .order("full_name", { ascending: true }),
+  ])
+
+  return (
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="CBT Assessment Settings"
+        description="Manage default CBT session question counts, duration per question, response visibility, and access permissioning."
+        icon={Brain}
+        backLink={{ href: "/admin/hr/pms/cbt", label: "Back to CBT" }}
+      />
+      <CbtSettingsForm initialSettings={initialSettings} profiles={profiles || []} />
+    </PageWrapper>
+  )
+}

@@ -26,8 +26,8 @@ export interface AppealRow {
   requested_status: string
   appeal_reason: string
   resolution_note: string | null
-  status: "pending" | "approved" | "rejected" | "resolved"
-  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
+  status: "pending" | "approved" | "rejected" | "resolved" | "expired"
+  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved" | "expired"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
   created_by?: string | null
   created_by_name?: string | null
@@ -53,6 +53,10 @@ export interface AppealRow {
   review_block?: string | null
   /** Whether the viewer may override this pending appeal. */
   can_override?: boolean
+  /** Why this appeal is stuck, or null while it is not. */
+  stuck_reason?: string | null
+  /** Why the viewer may not override it, or null when they may. */
+  override_block?: string | null
   /** Every day of a range staged as one batch, oldest first. Absent for a single day. */
   days?: AppealRow[]
   /** Last day of a batched range. */
@@ -134,7 +138,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const approveButtonText = () => {
     if (loadingAction === "approve") return "Processing…"
     if (appeal?.stage === "pending_lead") {
-      return appeal.initiated_by_role === "admin_manual" ? "Confirm Change" : "Endorse (Send to Admin)"
+      return appeal.initiated_by_role === "admin_manual" ? "Confirm Change" : "Endorse (Send to Admin & HR Lead)"
     }
     return "Approve"
   }
@@ -294,7 +298,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
         open={overrideOpen}
         onOpenChange={setOverrideOpen}
         title="Override this approval?"
-        description={`Only override if the person who should approve this (usually the Department Lead) is not available. This approves ${dayCount > 1 ? `all ${dayCount} days` : "it"} now, skips the remaining steps, and is recorded against your name. The employee, the skipped approver and the Admin & HR Lead are told.`}
+        description={`Override is only for an approval that is stuck. This approves ${dayCount > 1 ? `all ${dayCount} days` : "it"} now, skips the remaining steps, and is recorded against your name. The employee, the skipped approver and the Admin & HR Lead are told.`}
         label="Reason for overriding"
         placeholder="e.g. Department Lead on leave, payroll closes today"
         inputType="textarea"

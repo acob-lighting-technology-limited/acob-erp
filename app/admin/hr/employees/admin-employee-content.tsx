@@ -1,5 +1,16 @@
 "use client"
 
+import type { Employee, EmployeeGender, UserProfile } from "./_components/employee-types"
+import { DeptDelegationAction } from "@/components/dept/dept-delegation-dialog"
+import {
+  deriveLeadDepartments,
+  getRoleBadgeLabel,
+  isContractStaff,
+  roleList,
+  genderFilterOptions,
+  ELEVATED_ROLES,
+} from "./_components/employee-helpers"
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
@@ -74,16 +85,9 @@ import { describeExitBlockers, type ExitBlockers } from "@/lib/hr/exit-blockers"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 import { EmployeeAvatar } from "./_components/employee-avatar"
+export type { Employee, UserProfile } from "./_components/employee-types"
+
 const log = logger("hr-employees-admin-employee-content")
-
-type EmployeeGender = "male" | "female" | "prefer_not_to_say" | "unspecified"
-
-const genderFilterOptions: { value: EmployeeGender; label: string }[] = [
-  { value: "male", label: "Male" },
-  { value: "female", label: "Female" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-  { value: "unspecified", label: "Unspecified" },
-]
 
 async function fetchAllEmployees(): Promise<Employee[]> {
   const response = await apiFetch("/api/admin/employees", { cache: "no-store" })
@@ -93,53 +97,6 @@ async function fetchAllEmployees(): Promise<Employee[]> {
   }
   const payload = (await response.json()) as { data: Employee[] }
   return payload.data || []
-}
-
-export interface Employee {
-  id: string
-  employee_number: string | null
-  first_name: string
-  last_name: string
-  other_names: string | null
-  company_email: string
-  additional_email: string | null
-  personal_email: string | null
-  department: string
-  designation: string | null
-  role: UserRole
-  admin_routes?: string[] | null
-  phone_number: string | null
-  additional_phone: string | null
-  gender?: EmployeeGender | null
-  residential_address: string | null
-  office_location: string | null
-  device_key?: string | null
-  date_of_birth: string | null
-  birthday: string | null
-  employment_date: string | null
-  confirmation_date?: string | null
-  separation_date?: string | null
-  is_admin: boolean
-  is_department_lead: boolean
-  lead_departments: string[]
-  employment_status: EmploymentStatus
-  employment_type?: "full_time" | "part_time" | "contract"
-  contract_category_id?: string | null
-  contract_categories?: { id: string; name: string; code: string } | null
-  avatar_path?: string | null
-  avatar_url?: string | null
-  created_at: string
-  mailbox_credentials_sent_at?: string | null
-  /** cPanel mailbox provisioning outcome: "created" | "failed" | null (not attempted by Matrix) */
-  mailbox_status?: string | null
-  mailbox_error?: string | null
-  nysc_cds_day?: string | null
-}
-
-export interface UserProfile {
-  role: UserRole
-  is_department_lead?: boolean
-  managed_departments?: string[]
 }
 
 interface AdminEmployeeContentProps {
@@ -152,31 +109,6 @@ interface AdminEmployeeContentProps {
  * selection is preserved; the home department is only used as a fallback when
  * nothing has been chosen yet.
  */
-function deriveLeadDepartments(department: string, isDepartmentLead: boolean, selected?: string[] | null): string[] {
-  if (!isDepartmentLead) return []
-  const source = selected?.length ? selected : [department]
-  return Array.from(new Set(source.map((name) => normalizeDepartmentName(name)).filter(Boolean)))
-}
-
-const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
-const ELEVATED_ROLES: UserRole[] = ["super_admin", "admin", "developer"]
-
-function getRoleBadgeLabel(role: UserRole): string {
-  if (role === "super_admin") return "S. Admin"
-  return getRoleDisplayName(role)
-}
-
-/**
- * Field contractors on payroll (CTR group without company email). Contract personnel
- * with company email addresses are active platform employees and appear under Employees.
- */
-function isContractStaff(employee: Employee): boolean {
-  return (
-    ((employee.employment_status || "").toLowerCase() === "contract" || employee.employment_type === "contract") &&
-    !employee.company_email
-  )
-}
-
 type EmployeeProfileRecord = EmployeeProfile & {
   contract_categories?: { code?: string } | null
   separation_reason?: string | null
@@ -295,8 +227,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     nysc_cds_day: "",
   })
 
-  const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
-  const canReviewApplications = canManageUsers || Boolean(userProfile?.is_department_lead)
+  const canEditHr = useCanEdit("hr.employees")
+  const canManageUsers = canEditHr && ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
+  const canReviewApplications = canEditHr && (canManageUsers || Boolean(userProfile?.is_department_lead))
 
   const {
     data: employees = [],
@@ -1123,6 +1056,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}
       actions={
         <div className="flex items-center gap-2">
+          <DeptDelegationAction />
           {(canManageUsers || canReviewApplications) && (
             <Button onClick={() => setManageUsersOpen(true)} variant="default" size="sm" className="h-8 gap-2">
               <Settings2 className="h-4 w-4" />
@@ -1136,10 +1070,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setBirthdayManagerOpen(true)}>
-                <Cake className="mr-2 h-4 w-4" />
-                Birthday Manager
-              </DropdownMenuItem>
+              {canEditHr && (
+                <DropdownMenuItem onClick={() => setBirthdayManagerOpen(true)}>
+                  <Cake className="mr-2 h-4 w-4" />
+                  Birthday Manager
+                </DropdownMenuItem>
+              )}
               {(canManageUsers || canReviewApplications) && (
                 <DropdownMenuItem onClick={() => setCategoriesDialogOpen(true)}>
                   <Tags className="mr-2 h-4 w-4" />
@@ -1354,11 +1290,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 icon: Eye,
                 onClick: () => handleViewEmployeeDetails(r),
               },
-              {
-                label: "Edit Staff",
-                icon: Pencil,
-                onClick: () => void handleEditEmployee(r),
-              },
+              ...(canManageUsers
+                ? [
+                    {
+                      label: "Edit Staff",
+                      icon: Pencil,
+                      onClick: () => void handleEditEmployee(r),
+                    },
+                  ]
+                : []),
             ],
           },
         }}

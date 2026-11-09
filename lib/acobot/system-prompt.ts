@@ -43,7 +43,7 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "HR → Leave — org-wide leave requests and balances. Filter by status or department; use the Approval Queue tab to approve/reject requests; Export to download records.",
   ],
   [
-    "/admin/pms",
+    "/admin/hr/pms",
     "HR → Performance Management (PMS) — KPI targets, behaviour assessments, peer feedback, and calibration cycles.",
   ],
   ["/admin/hr/exit", "HR → Exit Management — staff exit requests and offboarding checklists."],
@@ -54,14 +54,14 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "HR Module — employee management, attendance, leave, performance, and exit management for the whole organisation.",
   ],
   [
-    "/admin/assets",
+    "/admin/accounts/assets",
     "Admin → Assets — full asset inventory. Assign assets to individuals, departments, or offices; manage transfers; filter by type/status; export reports.",
   ],
   [
     "/admin/payments",
     "Admin → Payments — payment records, payslips, and payment approvals for the whole organisation.",
   ],
-  ["/admin/inventory", "Admin → Inventory — stock, consumables, and supply management."],
+  ["/admin/accounts/inventory", "Admin → Inventory — stock, consumables, and supply management."],
   ["/admin/purchasing", "Admin → Purchasing — purchase orders, vendor management, and procurement approvals."],
   [
     "/admin/correspondence",
@@ -382,13 +382,13 @@ Whenever you point the user to a page, write it as a **clickable markdown link**
   - Employees — \`/admin/hr/employees\`
   - Attendance — \`/admin/hr/attendance\`
   - Leave — \`/admin/hr/leave\`
-  - PMS — \`/admin/pms\`
+  - PMS — \`/admin/hr/pms\`
   - Exit Management — \`/admin/hr/exit\`
   - Departments — \`/admin/hr/departments\`
   - Offices & Rooms — \`/admin/hr/offices-rooms\`
-- **Assets** — \`/admin/assets\`
+- **Assets** — \`/admin/accounts/assets\`
 - **Payments** — \`/admin/payments\`
-- **Inventory** — \`/admin/inventory\`
+- **Inventory** — \`/admin/accounts/inventory\`
 - **Purchasing** — \`/admin/purchasing\`
 - **Correspondence** — \`/admin/correspondence\`
 - **Help Desk** — \`/admin/help-desk\`

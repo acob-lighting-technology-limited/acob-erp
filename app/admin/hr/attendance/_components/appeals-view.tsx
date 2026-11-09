@@ -63,6 +63,11 @@ function renderStatusBadge(r: AppealRow) {
     return <Badge className="bg-info/15 text-info">Resolved</Badge>
   }
 
+  // Nobody decided it by its deadline. Not a rejection: the day stays as recorded.
+  if (r.status === "expired") {
+    return <Badge className="bg-muted text-muted-foreground">Expired</Badge>
+  }
+
   if (r.stage === "pending_lead") {
     if (r.initiated_by_role === "admin_manual") {
       return <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
@@ -70,7 +75,7 @@ function renderStatusBadge(r: AppealRow) {
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
-        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
+        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
       </div>
     )
   }
@@ -78,7 +83,7 @@ function renderStatusBadge(r: AppealRow) {
   if (r.stage === "pending_admin") {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-info/15 text-info">Pending Admin</Badge>
+        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
         {r.lead_reviewer_name ? <span className="text-success pl-0.5 text-xs font-medium">Lead Endorsed ✓</span> : null}
       </div>
     )
@@ -223,6 +228,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           { value: "approved", label: "Approved" },
           { value: "rejected", label: "Rejected" },
           { value: "resolved", label: "Resolved manually" },
+          { value: "expired", label: "Expired" },
         ],
         defaultValues: ["pending"],
         mode: "custom",

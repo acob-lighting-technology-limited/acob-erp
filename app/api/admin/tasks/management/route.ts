@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { Task } from "@/types/task"
 import { serverError } from "@/lib/api/errors"
@@ -24,11 +24,12 @@ export async function GET() {
   }
 
   const db = getServiceRoleClientOrFallback(supabase)
-  const { data: tasksData, error: tasksError } = await db
-    .from("tasks")
-    .select("*")
-    .neq("category", "weekly_action")
-    .order("created_at", { ascending: false })
+  // Service-role reads skip RLS, so a lead's list is limited to their departments here.
+  const scopedDepartments = getScopedDepartments(scope)
+  if (scopedDepartments !== null && scopedDepartments.length === 0) return NextResponse.json({ data: [] })
+  let tasksQuery = db.from("tasks").select("*").neq("category", "weekly_action")
+  if (scopedDepartments !== null) tasksQuery = tasksQuery.in("department", scopedDepartments)
+  const { data: tasksData, error: tasksError } = await tasksQuery.order("created_at", { ascending: false })
   if (tasksError) return serverError(log, tasksError)
 
   const tasks = (tasksData ?? []).filter((task) => String(task.source_type || "") !== "action_item") as Task[]

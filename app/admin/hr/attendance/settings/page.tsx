@@ -1,0 +1,51 @@
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Clock } from "lucide-react"
+import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
+import type { Metadata } from "next"
+import { AttendanceForm } from "./_components/attendance-form"
+
+export const metadata: Metadata = { title: "Admin Attendance settings" }
+
+export default async function AttendanceSettingsPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/auth/login")
+  }
+
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope || !scopeHoldsAdminRoute(scope, "hr.attendance")) {
+    redirect("/admin")
+  }
+
+  const { data: settingRow } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "attendance_policy")
+    .maybeSingle()
+
+  const initialPolicy: AttendancePolicy = {
+    ...DEFAULT_ATTENDANCE_POLICY,
+    ...((settingRow?.value as Partial<AttendancePolicy>) ?? {}),
+  }
+
+  return (
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Attendance Policy Settings"
+        description="Configure workday start/end times, late grace period, and incomplete punch credit penalties."
+        icon={Clock}
+        backLink={{ href: "/admin/hr/attendance", label: "Back to Attendance" }}
+      />
+      <div className="mx-auto max-w-2xl py-8">
+        <AttendanceForm initialPolicy={initialPolicy} />
+      </div>
+    </PageWrapper>
+  )
+}

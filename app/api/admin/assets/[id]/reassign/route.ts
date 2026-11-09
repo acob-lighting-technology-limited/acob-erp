@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { denyUnlessAssetInScope } from "@/lib/admin/target-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { assignment_type, assigned_to, department, office_location, assigned_by, assigned_at, assignment_notes } =
     parsed.data
   const db = getServiceRoleClientOrFallback(supabase)
+  const denied = await denyUnlessAssetInScope(db, scope, assetId)
+  if (denied) return denied
 
   const { error } = await db.rpc("reassign_asset", {
     p_asset_id: assetId,

@@ -3,7 +3,7 @@ import { parseJsonBody } from "@/lib/api/parse-body"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
-import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { canAccessAdminSection, resolveAdminScope, scopeCanEditRoute } from "@/lib/admin/rbac"
 import { getExitBlockers } from "@/lib/hr/exit-blockers"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -16,7 +16,11 @@ const log = logger("api-employee-status")
 
 type RouteContext = { params: Promise<{ employeeId: string }> }
 
-async function getAdminContext(employeeId: string) {
+/**
+ * `mutating` calls (PATCH) need HR edit, not just HR view: an exit changes the
+ * record. The mailbox steps inside an exit are allowed for whoever performs it.
+ */
+async function getAdminContext(employeeId: string, mutating = false) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -27,6 +31,9 @@ async function getAdminContext(employeeId: string) {
   const scope = await resolveAdminScope(supabase, user.id)
   if (!scope || !canAccessAdminSection(scope, "hr")) {
     return { error: "Forbidden", status: 403 } as const
+  }
+  if (mutating && !scopeCanEditRoute(scope, "hr.employees")) {
+    return { error: "View only. Changing an employee's status needs HR edit access.", status: 403 } as const
   }
 
   const id = String(employeeId || "").trim()
@@ -68,7 +75,7 @@ const ChangeStatusSchema = z.object({
 export async function PATCH(request: Request, { params }: RouteContext) {
   const { employeeId } = await params
   try {
-    const ctx = await getAdminContext(employeeId)
+    const ctx = await getAdminContext(employeeId, true)
     if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
     const parsed = await parseJsonBody(request, ChangeStatusSchema)

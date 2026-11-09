@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { consolePageKeys } from "@/lib/dept/delegated-pages"
 import { normalizeDepartmentName } from "@/shared/departments"
 import type { Database } from "@/types/database"
 
-/** A department console a lead is entitled to open. */
+/** A department console a lead is entitled to open, or a delegate has been given pages of. */
 export interface DeptConsole {
   id: string
   name: string
   href: string
+  /** Opened through a delegation: only some pages are available. */
+  delegated?: boolean
 }
 
 interface LeadProfileLike {
@@ -23,6 +26,43 @@ interface LeadProfileLike {
  * profile's home department for a lead whose array has not been populated yet.
  */
 export async function resolveDeptConsoles(
+  supabase: SupabaseClient<Database>,
+  profile: LeadProfileLike | null | undefined,
+  userId?: string
+): Promise<DeptConsole[]> {
+  const led = await resolveLedConsoles(supabase, profile)
+  if (!userId) return led
+  const delegated = await resolveDelegatedConsoles(supabase, userId)
+  const ledIds = new Set(led.map((console) => console.id))
+  return [...led, ...delegated.filter((console) => !ledIds.has(console.id))].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
+}
+
+/** Departments the person has been given pages of and that have not ended or been withdrawn. */
+async function resolveDelegatedConsoles(supabase: SupabaseClient<Database>, userId: string): Promise<DeptConsole[]> {
+  const { data } = await supabase
+    .from("dept_delegations" as never)
+    .select("department_id, pages")
+    .eq("delegate_id", userId)
+    .is("revoked_at", null)
+    .gt("valid_until", new Date().toISOString())
+  const live = ((data ?? []) as unknown as Array<{ department_id: string; pages: string[] | null }>).filter(
+    (row) => consolePageKeys(row.pages ?? []).length > 0
+  )
+  const ids = Array.from(new Set(live.map((row) => row.department_id)))
+  if (ids.length === 0) return []
+  const { data: depts } = await supabase.from("departments").select("id, name").in("id", ids)
+  type DeptRow = Pick<Database["public"]["Tables"]["departments"]["Row"], "id" | "name">
+  return ((depts ?? []) as unknown as DeptRow[]).map((row) => ({
+    id: row.id,
+    name: row.name,
+    href: `/dept/${row.id}`,
+    delegated: true,
+  }))
+}
+
+async function resolveLedConsoles(
   supabase: SupabaseClient<Database>,
   profile: LeadProfileLike | null | undefined
 ): Promise<DeptConsole[]> {

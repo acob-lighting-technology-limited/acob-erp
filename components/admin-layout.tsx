@@ -57,7 +57,7 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   // Resolve dept consoles for admin+lead users so "Go to Dept" appears in the
   // admin sidebar dropdown — mirrors the same logic in app-layout.tsx. A lead
   // may hold several departments, so every one of them is listed.
-  const deptConsoles = await resolveDeptConsoles(supabase as SupabaseClient<Database>, profile)
+  const deptConsoles = await resolveDeptConsoles(supabase as SupabaseClient<Database>, profile, data.user.id)
   const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
 
   // "lead" scope visuals apply when the user's view is dept-restricted:

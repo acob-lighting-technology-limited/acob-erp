@@ -27,7 +27,7 @@ export interface AccessScopeShape {
  *
  * Deliberately NOT built on resolveAdminScope(): that returns null for plain
  * employees, visitors, and route-less admins, which would make every grant
- * configured in /admin/settings/cbt (allowed_roles / allowed_user_ids) a no-op
+ * configured in /admin/hr/pms/cbt/settings (allowed_roles / allowed_user_ids) a no-op
  * for exactly the users it exists to grant. This reads the profile row
  * directly so any authenticated user can be evaluated on their own merits.
  */

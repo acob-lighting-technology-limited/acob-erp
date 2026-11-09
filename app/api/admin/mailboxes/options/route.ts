@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { logger } from "@/lib/logger"
@@ -31,7 +32,7 @@ function formatName(p: ProfileDbRow): string {
 export async function GET() {
   const auth = await requireApiAdminScope()
   if (!auth.ok) return auth.response
-  if (!auth.scope.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!scopeHoldsAdminRoute(auth.scope, "it.main")) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const serviceClient = getServiceRoleClientOrFallback(auth.supabase)
 

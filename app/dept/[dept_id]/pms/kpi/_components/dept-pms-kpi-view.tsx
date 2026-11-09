@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { BarChart2, Flag, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
-import { PmsMetricTabsPage } from "@/app/admin/pms/_components/pms-metric-tabs-page"
+import { PmsMetricTabsPage } from "@/app/admin/hr/pms/_components/pms-metric-tabs-page"
 import { StrategicGoalsView } from "@/app/admin/corporate-scorecard/_components/strategic-goals-view"
 
 interface DeptPmsKpiViewProps {

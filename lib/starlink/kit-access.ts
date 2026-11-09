@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 type KitAccess =
@@ -8,8 +8,9 @@ type KitAccess =
   | { ok: false; status: number; error: string }
 
 /**
- * Starlink kits are company-wide finance records (account numbers, logins,
- * billing), so only users with org-wide finance access may see or change them.
+ * Starlink kits are company-wide records (account numbers, logins, billing) owned by
+ * IT, so only admins holding the IT console route (it.main) may see them. Changing
+ * them is further limited to IT edit access by the central check in middleware.
  */
 export async function requireStarlinkKitAccess(): Promise<KitAccess> {
   const supabase = (await createClient()) as unknown as SupabaseClient
@@ -19,8 +20,8 @@ export async function requireStarlinkKitAccess(): Promise<KitAccess> {
   if (!user) return { ok: false, status: 401, error: "Unauthorized" }
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || getDepartmentScope(scope, "finance") !== null) {
-    return { ok: false, status: 403, error: "Org-wide finance access is required for Starlink kits" }
+  if (!scope || !scopeHoldsAdminRoute(scope, "it.main")) {
+    return { ok: false, status: 403, error: "IT access is required for Starlink kits" }
   }
   return { ok: true, userId: user.id, supabase, dataClient: getServiceRoleClientOrFallback(supabase) }
 }

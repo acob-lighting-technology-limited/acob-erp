@@ -4,7 +4,15 @@ import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenanc
 import type { EmploymentStatus } from "@/types/database"
 import { resolveAdminScope, roleCanEnterAdmin, isAdminLikeRole } from "@/lib/admin/rbac"
 import { resolveDeptScope } from "@/lib/dept/scope"
-import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
+import { deptRelativePath, firstAllowedDeptPath, isDeptPathAllowed } from "@/lib/dept/delegated-pages"
+import {
+  buildAccessContextV2,
+  canAccessRouteV2,
+  canEditRouteV2,
+  resolveAdminRouteKeyV2,
+  resolveApiEditRouteKeyV2,
+} from "@/lib/admin/policy-v2"
+import { readDeptContextId } from "@/lib/admin/dept-context"
 import { resolveCookieMaxAge } from "@/lib/supabase/cookie-policy"
 import { getCbtSettings, canAccessCbt, resolveCbtAccessScope } from "@/lib/cbt-config"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -147,6 +155,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/reports") ||
     pathname.startsWith("/api/documentation") ||
     pathname.startsWith("/api/assets") ||
+    pathname.startsWith("/api/starlink") ||
     pathname.startsWith("/admin")
 
   if (isAdminOrApiPath && user) {
@@ -162,7 +171,11 @@ export async function updateSession(request: NextRequest) {
       // Metadata can also be stale, so it must never be the basis for a *denial*.
       const metaRole = user.user_metadata?.role as string | undefined
       const isAdminPage = pathname.startsWith("/admin")
-      const needsScope = isAdminPage || !metaRole || isAdminLikeRole(metaRole)
+      // A mutating call on an edit-guarded section always resolves scope: stale
+      // metadata must never let it skip the edit check below.
+      const isMutation = request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS"
+      const guardedEditRoute = !isAdminPage && isMutation ? resolveApiEditRouteKeyV2(pathname) : null
+      const needsScope = isAdminPage || guardedEditRoute !== null || !metaRole || isAdminLikeRole(metaRole)
       if (needsScope) {
         const scope = await resolveAdminScope(supabase, user.id)
         if (!scope && isAdminPage) {
@@ -182,6 +195,25 @@ export async function updateSession(request: NextRequest) {
               blockedTarget.pathname = "/admin"
               return NextResponse.redirect(blockedTarget)
             }
+          }
+
+          // VIEW is not EDIT on the HR and IT routes: a mutating API call there needs
+          // department-lead ownership or an edit grant / delegation. Calls made from a
+          // department console are governed by the lead scope instead, so skipped here.
+          if (
+            guardedEditRoute &&
+            scope.isAdminLike &&
+            !readDeptContextId(request.headers) &&
+            !canEditRouteV2(buildAccessContextV2(scope), guardedEditRoute)
+          ) {
+            return NextResponse.json(
+              {
+                error:
+                  "View only. Changes here are made by the department lead who owns this area, or someone they have delegated to.",
+                code: "VIEW_ONLY",
+              },
+              { status: 403 }
+            )
           }
 
           const encoded = Buffer.from(JSON.stringify(scope)).toString("base64")
@@ -226,6 +258,17 @@ export async function updateSession(request: NextRequest) {
       const deptId = pathname.startsWith("/api/dept/") ? segments[3] : segments[2]
       if (deptId) {
         const deptScope = await resolveDeptScope(supabase, user.id, deptId)
+        // A delegate reaches only the pages the lead gave them; everything else in the console is closed.
+        if (deptScope?.delegation && !isDeptPathAllowed(deptScope.delegation.pages, deptRelativePath(pathname))) {
+          if (pathname.startsWith("/api/")) {
+            return NextResponse.json({ error: "That page was not delegated to you." }, { status: 403 })
+          }
+          const first = firstAllowedDeptPath(deptScope.delegation.pages)
+          const url = request.nextUrl.clone()
+          url.pathname = first ? `/dept/${deptId}${first}` : "/profile"
+          url.search = ""
+          return NextResponse.redirect(url)
+        }
         if (deptScope) {
           const encoded = Buffer.from(JSON.stringify(deptScope)).toString("base64")
           const forwardedHeaders = new Headers(request.headers)
@@ -402,7 +445,7 @@ export async function updateSession(request: NextRequest) {
   if (isCbtPageOrSessionApi && user) {
     // Scope comes from the profile row, not resolveAdminScope(): that returns
     // null for employees, visitors and route-less admins, which would silently
-    // void every grant configured in /admin/settings/cbt.
+    // void every grant configured in /admin/hr/pms/cbt/settings.
     const dataClient = getServiceRoleClientOrFallback(supabase)
     const [scope, cbtSettings] = await Promise.all([
       resolveCbtAccessScope(dataClient, user.id),

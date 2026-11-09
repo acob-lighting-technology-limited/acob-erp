@@ -31,12 +31,13 @@ const SETTINGS_TABS = [
 
 export function SettingsNav() {
   const pathname = usePathname()
+  const tabs = SETTINGS_TABS
 
   return (
     <div className="bg-muted text-muted-foreground inline-flex h-11 max-w-full items-center justify-start overflow-x-auto rounded-lg p-1">
-      {SETTINGS_TABS.map((tab) => {
+      {tabs.map((tab) => {
         const Icon = tab.icon
-        const isActive = pathname === tab.href || (tab.exactHref && pathname === tab.exactHref)
+        const isActive = pathname === tab.href || ("exactHref" in tab && tab.exactHref && pathname === tab.exactHref)
 
         return (
           <Link

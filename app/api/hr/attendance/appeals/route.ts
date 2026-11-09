@@ -405,7 +405,9 @@ export async function POST(request: NextRequest) {
       date: appealDate,
       isAdminLike: false,
       excludeRecordId: attendanceRecord?.id ?? null,
-      isManualAlteration: false,
+      // A lead filing for their staff is not capped at 3 a month; the staff member's own
+      // appeals still are.
+      isManualAlteration: initiatedByRole === "lead_on_behalf",
     })
     if (!quotaCheck.allowed) {
       return NextResponse.json(

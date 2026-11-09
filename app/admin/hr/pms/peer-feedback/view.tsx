@@ -1,0 +1,421 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { Download, MessageSquare, UserRoundSearch, Users } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import { useCycleFilters } from "@/components/pms/use-cycle-filters"
+import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { Button } from "@/components/ui/button"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
+import { DetailSheet } from "@/components/ui/detail-sheet"
+import { DetailList } from "@/components/ui/detail-list"
+import { exportPmsRowsToExcel } from "@/lib/pms/export"
+import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
+
+type Profile = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+}
+
+type PeerFeedbackRow = {
+  id: string
+  subject_user_id: string
+  reviewer_user_id: string
+  review_cycle_id: string
+  score: number
+  collaboration: number | null
+  communication: number | null
+  teamwork: number | null
+  professionalism: number | null
+  comments: string | null
+  status: string
+  created_at: string
+  subject?: Profile | null
+  reviewer?: Profile | null
+}
+
+type Cycle = {
+  id: string
+  name: string
+  review_type?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
+function formatMetric(value: number | null | undefined) {
+  return typeof value === "number" ? `${value}%` : "-"
+}
+
+function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: PeerFeedbackRow) => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{personName(row.subject)}</p>
+          <p className="text-muted-foreground text-xs">{row.subject?.department || "No department"}</p>
+        </div>
+        <Badge className={row.score >= 70 ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}>
+          {row.score}%
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Reviewer</p>
+          <p>{personName(row.reviewer)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Status</p>
+          <p className="capitalize">{row.status}</p>
+        </div>
+      </div>
+      <p className="text-muted-foreground line-clamp-2 text-sm">{row.comments || "No comments provided."}</p>
+      <Button size="sm" variant="outline" onClick={() => onView(row)}>
+        View Details
+      </Button>
+    </div>
+  )
+}
+
+export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const {
+    data: feedback = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminPeerFeedback(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: PeerFeedbackRow[] }>(
+        "/api/hr/performance/peer-feedback?subject_user_id=all_admin",
+        { cache: "no-store" }
+      )
+      return payload.data ?? []
+    },
+  })
+  const error = queryError?.message ?? null
+  const { cycles } = usePerformanceCycles<Cycle>()
+  // Rows currently visible in the table (after search + filters + sort).
+  const [processedFeedback, setProcessedFeedback] = useState<PeerFeedbackRow[]>([])
+
+  const [selectedRow, setSelectedRow] = useState<PeerFeedbackRow | null>(null)
+
+  const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
+
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(new Set(feedback.map((row) => row.subject?.department).filter(Boolean) as string[]))
+        .sort()
+        .map((department) => ({ value: department, label: department })),
+    [feedback]
+  )
+
+  const { filters: cycleFilters } = useCycleFilters<PeerFeedbackRow>({
+    cycles,
+    getRowCycleId: (row) => row.review_cycle_id,
+    cycleLabel: "Quarter",
+  })
+
+  const reviewerOptions = useMemo(() => {
+    const reviewers = new Map<string, string>()
+    for (const row of feedback) {
+      const name = personName(row.reviewer)
+      if (row.reviewer_user_id && name !== "Unknown") {
+        reviewers.set(row.reviewer_user_id, name)
+      }
+    }
+    return Array.from(reviewers.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [feedback])
+
+  const submittedCount = feedback.filter((row) => row.status === "submitted").length
+  const avgScore =
+    feedback.length > 0
+      ? Math.round((feedback.reduce((sum, row) => sum + row.score, 0) / feedback.length) * 100) / 100
+      : null
+
+  // Export the rows currently visible in the table (respects search + filters + sort).
+  const exportSource = processedFeedback.length ? processedFeedback : feedback
+  const exportRows = exportSource.map((row, index) => ({
+    "S/N": index + 1,
+    Subject: personName(row.subject),
+    Reviewer: personName(row.reviewer),
+    Department: row.subject?.department || "-",
+    Cycle: cycleNameMap.get(row.review_cycle_id) || "-",
+    Score: row.score,
+    Collaboration: row.collaboration ?? "-",
+    Communication: row.communication ?? "-",
+    Teamwork: row.teamwork ?? "-",
+    Professionalism: row.professionalism ?? "-",
+    Comments: row.comments || "",
+    Status: row.status,
+    Date: formatWATDate(row.created_at),
+  }))
+
+  const columns: DataTableColumn<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        key: "subject",
+        label: "Subject",
+        sortable: true,
+        accessor: (row) => personName(row.subject),
+        render: (row) => <span className="font-medium">{personName(row.subject)}</span>,
+        resizable: true,
+        initialWidth: 190,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.subject?.department || "-",
+        hideOnMobile: true,
+      },
+      {
+        key: "reviewer",
+        label: "Reviewer",
+        sortable: true,
+        accessor: (row) => personName(row.reviewer),
+        resizable: true,
+        initialWidth: 190,
+        hideOnMobile: true,
+      },
+      {
+        key: "cycle",
+        label: "Quarter",
+        sortable: true,
+        accessor: (row) => cycleNameMap.get(row.review_cycle_id) || "-",
+        hideOnMobile: true,
+      },
+      {
+        key: "score",
+        label: "Score",
+        sortable: true,
+        accessor: (row) => row.score,
+        render: (row) => (
+          <Badge className={row.score >= 70 ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}>
+            {row.score}%
+          </Badge>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => <StatusBadge status={row.status} className="text-xs capitalize" />,
+      },
+      {
+        key: "created_at",
+        label: "Date",
+        sortable: true,
+        accessor: (row) => row.created_at,
+        render: (row) => <span className="text-muted-foreground text-sm">{formatWATDate(row.created_at)}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    [cycleNameMap]
+  )
+
+  const filters: DataTableFilter<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+        placeholder: "All Departments",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.subject?.department || ""),
+      },
+      ...cycleFilters,
+      {
+        key: "reviewer",
+        label: "Reviewer",
+        options: reviewerOptions,
+        placeholder: "All Reviewers",
+        mode: "custom",
+        filterFn: (row, values) => values.length === 0 || values.includes(row.reviewer_user_id),
+      },
+    ],
+    [cycleFilters, departmentOptions, reviewerOptions]
+  )
+
+  const rowActions: RowAction<PeerFeedbackRow>[] = useMemo(
+    () => [
+      {
+        label: "View",
+        icon: UserRoundSearch,
+        onClick: (row) => setSelectedRow(row),
+      },
+    ],
+    []
+  )
+
+  return (
+    <DataTablePage
+      title="Peer Feedback"
+      description="Review peer feedback submissions across employees, quarters, and reviewers."
+      icon={MessageSquare}
+      backLink={{ href: backLinkHref ?? "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={exportRows.length === 0}
+          onClick={() => void exportPmsRowsToExcel(exportRows, `peer-feedback-${toLocalISODate()}`)}
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+      }
+      stats={
+        <StatGrid>
+          <StatCard
+            variant="compact"
+            title="Total"
+            value={feedback.length}
+            icon={MessageSquare}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Subjects"
+            value={new Set(feedback.map((row) => row.subject_user_id)).size}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+            className="hidden sm:block"
+          />
+          <StatCard
+            variant="compact"
+            title="Avg Score"
+            value={avgScore !== null ? `${avgScore}%` : "-"}
+            icon={UserRoundSearch}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Submitted"
+            value={submittedCount}
+            icon={MessageSquare}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </StatGrid>
+      }
+    >
+      <DataTable<PeerFeedbackRow>
+        data={feedback}
+        columns={columns}
+        onProcessedDataChange={setProcessedFeedback}
+        filters={filters}
+        getRowId={(row) => row.id}
+        pagination={{ pageSize: 50 }}
+        searchPlaceholder="Search subject, reviewer, department, or comments…"
+        searchFn={(row, query) => {
+          return [
+            personName(row.subject),
+            personName(row.reviewer),
+            row.subject?.department || "",
+            row.comments || "",
+            cycleNameMap.get(row.review_cycle_id) || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }}
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void refetch()}
+        rowActions={rowActions}
+        expandable={{
+          render: (row) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Collaboration</p>
+                <p className="mt-1">{formatMetric(row.collaboration)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Communication</p>
+                <p className="mt-1">{formatMetric(row.communication)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Teamwork</p>
+                <p className="mt-1">{formatMetric(row.teamwork)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Professionalism</p>
+                <p className="mt-1">{formatMetric(row.professionalism)}</p>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-4">
+                <p className="text-muted-foreground text-xs">Comments</p>
+                <p className="mt-1">{row.comments || "No comments provided."}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (row) => `${personName(row.subject)} (by ${personName(row.reviewer)})`,
+          subtitle: (row) =>
+            `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,
+          trailing: (row) => (
+            <Badge
+              className={row.score >= 70 ? "bg-success/15 text-success text-xs" : "bg-warning/15 text-warning text-xs"}
+            >
+              {row.score}%
+            </Badge>
+          ),
+          onSelect: (row) => setSelectedRow(row),
+        }}
+        cardRenderer={(row) => <FeedbackCard row={row} onView={setSelectedRow} />}
+        emptyTitle="No peer feedback found"
+        emptyDescription="Peer feedback submissions will appear here once employees start reviewing colleagues."
+        emptyIcon={MessageSquare}
+        skeletonRows={6}
+      />
+
+      <DetailSheet
+        open={Boolean(selectedRow)}
+        onOpenChange={() => setSelectedRow(null)}
+        title="Peer feedback"
+        description={
+          selectedRow ? `${personName(selectedRow.subject)} reviewed by ${personName(selectedRow.reviewer)}` : ""
+        }
+      >
+        {selectedRow ? (
+          <>
+            <DetailList
+              items={[
+                { label: "Department", value: selectedRow.subject?.department },
+                { label: "Quarter", value: cycleNameMap.get(selectedRow.review_cycle_id) },
+                { label: "Collaboration", value: formatMetric(selectedRow.collaboration) },
+                { label: "Communication", value: formatMetric(selectedRow.communication) },
+                { label: "Teamwork", value: formatMetric(selectedRow.teamwork) },
+                { label: "Professionalism", value: formatMetric(selectedRow.professionalism) },
+              ]}
+            />
+            <DetailList
+              items={[{ label: "Comments", value: selectedRow.comments || "No comments provided.", wide: true }]}
+            />
+          </>
+        ) : null}
+      </DetailSheet>
+    </DataTablePage>
+  )
+}

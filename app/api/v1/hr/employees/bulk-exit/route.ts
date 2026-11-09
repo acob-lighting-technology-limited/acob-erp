@@ -3,7 +3,7 @@ import { parseJsonBody } from "@/lib/api/parse-body"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
-import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { canAccessAdminSection, resolveAdminScope, scopeCanEditRoute } from "@/lib/admin/rbac"
 import { sendExitNotificationEmail } from "@/lib/hr/exit-mailer"
 import type { ExitedEmployee } from "@/lib/hr/exit-mailer"
 import { ORG_EMAIL_SENDERS } from "@/lib/org-config"
@@ -38,6 +38,9 @@ export async function POST(request: Request) {
     const scope = await resolveAdminScope(supabase, user.id)
     if (!scope || !canAccessAdminSection(scope, "hr")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (!scopeCanEditRoute(scope, "hr.employees")) {
+      return NextResponse.json({ error: "View only. Exiting staff needs HR edit access." }, { status: 403 })
     }
 
     const parsed = await parseJsonBody(request, BulkExitSchema)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { ownerLeadChangeBlock } from "@/lib/admin/edit-grants"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { formValidation } from "@/lib/validation"
@@ -108,9 +109,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { data: currentProfile, error: fetchErr } = await db
     .from("profiles")
-    .select("role")
+    .select("role, is_department_lead, lead_departments")
     .eq("id", userId)
-    .single<{ role: string | null }>()
+    .single<{ role: string | null; is_department_lead: boolean | null; lead_departments: string[] | null }>()
 
   if (fetchErr || !currentProfile) {
     return NextResponse.json(
@@ -144,6 +145,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (body.is_department_lead && leadDepartments.length === 0) {
     return NextResponse.json({ error: "A department lead must lead at least one department" }, { status: 400 })
   }
+
+  // Who leads an owning department decides who edits HR and IT: developer / super admin only.
+  const leadBlock = ownerLeadChangeBlock({
+    actorRole: String(scope.role),
+    before: currentProfile.is_department_lead ? (currentProfile.lead_departments ?? []) : [],
+    after: leadDepartments,
+  })
+  if (leadBlock) return NextResponse.json({ error: leadBlock }, { status: 403 })
 
   let departmentId: string | null = null
   if (canonicalDepartment) {

@@ -87,7 +87,7 @@ export async function AdminAccountsPage({ basePath, lockedDepartmentId }: AdminA
           {
             title: "Payroll",
             description: "Manage employee salaries, allowances, statutory deductions, and pay slips.",
-            href: "/admin/payroll",
+            href: "/admin/accounts/payroll",
             icon: Wallet,
             badge: "Salaries",
             subLabel: "Payroll Management",
@@ -143,7 +143,7 @@ export async function AdminAccountsPage({ basePath, lockedDepartmentId }: AdminA
           {
             title: "Inventory",
             description: "Manage product catalogs, warehouse stock levels, and item distributions.",
-            href: "/admin/inventory",
+            href: "/admin/accounts/inventory",
             icon: Package,
             badge: "Stock Manager",
             subLabel: "Stock & Warehouses",

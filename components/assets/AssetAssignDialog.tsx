@@ -21,7 +21,7 @@ import { formatName } from "@/lib/utils"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { useOfficeLocations } from "@/hooks/use-office-locations"
 import { User, Building2, Building } from "lucide-react"
-import type { Asset, Employee } from "@/app/admin/assets/admin-assets-content"
+import type { Asset, Employee } from "@/app/admin/accounts/assets/admin-assets-content"
 
 interface AssetAssignment {
   id: string

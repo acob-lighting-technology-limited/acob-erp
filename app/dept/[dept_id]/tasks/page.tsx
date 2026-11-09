@@ -44,12 +44,26 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     is_md: isMd === true,
   }
 
+  // Everyone who has ever been in this department, former staff included, so their tasks stay visible.
+  const { data: deptProfileRows } = await dataClient.from("profiles").select("id").in("department", expandedDepts)
+  const deptProfileIds = ((deptProfileRows || []) as Array<{ id: string }>).map((row) => row.id)
+
+  // Narrow in the database to what the filter below keeps, so the page no longer reads every task in the
+  // company. `ilike` without wildcards is a case-insensitive match, as normalizeDepartmentName is.
+  const quote = (value: string) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`
+  const taskScopeFilter = [
+    ...expandedDepts.map((name) => `department.ilike.${quote(name)}`),
+    ...(deptProfileIds.length > 0 ? [`assigned_to.in.(${deptProfileIds.join(",")})`] : []),
+    `assigned_to.eq.${userId}`,
+  ].join(",")
+
   const [tasksResult, employeeResult] = await Promise.all([
     dataClient
       .from("tasks")
       .select("*")
       .eq("is_archived", false)
       .neq("category", "weekly_action")
+      .or(taskScopeFilter)
       .order("created_at", { ascending: false }),
     listAssignableProfiles(dataClient, {
       select:
@@ -129,7 +143,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     return copy
   })
 
-  // Filter to this dept
+  // The query above already narrows to this dept; this keeps the exact rules (aliases, individual tasks).
   const scopedTokens = new Set(expandedDepts.map((d) => normalizeDepartmentName(d)))
   const filteredTasks = tasksWithUsers
     .filter((t) => String(t.source_type || "") !== "action_item")

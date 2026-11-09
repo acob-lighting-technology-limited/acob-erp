@@ -1,5 +1,6 @@
 "use client"
 
+import { countPermissionDaysInMonth } from "@/lib/hr/permission-days"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
@@ -116,7 +117,7 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
           Pending Lead
         </Badge>
         <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-          Pending Admin
+          Pending Admin & HR Lead
         </Badge>
       </div>
     )
@@ -124,7 +125,7 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   if (stage === "pending_admin") {
     return (
       <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-        Pending Admin
+        Pending Admin & HR Lead
       </Badge>
     )
   }
@@ -283,22 +284,10 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   const [editAppeal, setEditAppeal] = useState<AppealRecord | null>(null)
   const [cancelAppealId, setCancelAppealId] = useState<string | null>(null)
   const [isCancellingAppeal, setIsCancellingAppeal] = useState(false)
-  const currentMonthLwpAwpCount = useMemo(() => {
-    const currentYM = toLocalYearMonth()
-    let count = 0
-    for (const day of unifiedDays ?? []) {
-      if (day.date.startsWith(currentYM)) {
-        if (
-          day.status === "lateness_with_permission" ||
-          day.status === "incomplete_with_permission" ||
-          day.status === "absent_with_permission"
-        ) {
-          count++
-        }
-      }
-    }
-    return count
-  }, [unifiedDays])
+  const currentMonthLwpAwpCount = useMemo(
+    () => countPermissionDaysInMonth(unifiedDays ?? [], appeals, toLocalYearMonth()),
+    [unifiedDays, appeals]
+  )
 
   const fetchAttendanceData = useCallback(() => void daysQuery.refetch(), [daysQuery])
   const fetchAppeals = useCallback(() => void appealsQuery.refetch(), [appealsQuery])
@@ -827,7 +816,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                             value:
                               latestAppeal.status === "pending"
                                 ? latestAppeal.stage === "pending_admin"
-                                  ? `Awaiting Admin Review by ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
+                                  ? `Awaiting ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
                                   : latestAppeal.stage === "pending_hr_lead"
                                     ? "Pending HR Lead"
                                     : latestAppeal.initiated_by_role === "admin_manual"
@@ -837,7 +826,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                   ? "Approved"
                                   : latestAppeal.status === "resolved"
                                     ? "Resolved manually by Admin & HR"
-                                    : "Rejected",
+                                    : latestAppeal.status === "expired"
+                                      ? "Expired: not decided in time"
+                                      : "Rejected",
                             copyable: false,
                           },
                           {

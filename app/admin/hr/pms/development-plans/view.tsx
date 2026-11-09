@@ -1,0 +1,689 @@
+"use client"
+
+import { useCanEdit } from "@/components/admin/edit-access-context"
+import { useMemo, useState } from "react"
+import { BookOpen, Eye, Pencil, Plus, Target, TrendingUp, Users } from "lucide-react"
+import { formatWATDate } from "@/lib/utils/date"
+import { toast } from "sonner"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import { useCycleFilters } from "@/components/pms/use-cycle-filters"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { Dialog } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
+import { NewDevelopmentPlanDialog } from "./_components/new-development-plan-dialog"
+import { EditDevelopmentPlanDialog } from "./_components/edit-development-plan-dialog"
+
+export type Profile = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+}
+
+type PlanAction = {
+  id?: string
+  title: string
+  description?: string | null
+  due_date?: string | null
+  status?: string | null
+  completed_at?: string | null
+}
+
+type DevelopmentPlan = {
+  id: string
+  user_id: string
+  review_cycle_id?: string | null
+  title: string
+  description: string | null
+  focus_area: string
+  priority: "low" | "medium" | "high"
+  status: "active" | "completed" | "cancelled" | "on_hold"
+  target_date: string | null
+  progress_pct: number | null
+  created_at: string
+  user?: Profile | null
+  actions?: PlanAction[] | null
+  review?: { id: string } | null
+}
+
+export type Cycle = {
+  id: string
+  name: string
+  review_type?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
+export const FOCUS_LABELS: Record<string, string> = {
+  general: "General",
+  communication: "Communication",
+  leadership: "Leadership",
+  technical: "Technical Skills",
+  collaboration: "Collaboration",
+  time_management: "Time Management",
+  problem_solving: "Problem Solving",
+}
+
+const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  active: "default",
+  completed: "secondary",
+  cancelled: "destructive",
+  on_hold: "outline",
+}
+
+const PRIORITY_VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  high: "destructive",
+  medium: "default",
+  low: "secondary",
+}
+
+function formatDate(date: string | null | undefined) {
+  if (!date) return "-"
+  return formatWATDate(date, { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function normalizeCycleValue(value: string) {
+  return value === "none" ? "" : value
+}
+
+function PlanCard({
+  plan,
+  canEdit,
+  cycleName,
+  onView,
+  onEdit,
+}: {
+  plan: DevelopmentPlan
+  canEdit: boolean
+  cycleName: string
+  onView: (plan: DevelopmentPlan) => void
+  onEdit: (plan: DevelopmentPlan) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{plan.title}</p>
+          <p className="text-muted-foreground text-xs">{personName(plan.user)}</p>
+        </div>
+        <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
+          {plan.status.replace("_", " ")}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Department</p>
+          <p>{plan.user?.department || "-"}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Quarter</p>
+          <p>{cycleName}</p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Progress</span>
+          <span>{plan.progress_pct || 0}%</span>
+        </div>
+        <Progress value={plan.progress_pct || 0} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => onView(plan)}>
+          View
+        </Button>
+        {canEdit && (
+          <Button size="sm" variant="outline" onClick={() => onEdit(plan)}>
+            Edit
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const canEditPms = useCanEdit("hr.pms")
+  const { profiles: employees } = useHrProfiles<Profile>()
+  const { cycles } = usePerformanceCycles<Cycle>()
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [viewingPlan, setViewingPlan] = useState<DevelopmentPlan | null>(null)
+  const [editingPlan, setEditingPlan] = useState<DevelopmentPlan | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [selectedEmployee, setSelectedEmployee] = useState("")
+  const [selectedCycle, setSelectedCycle] = useState("none")
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [focusArea, setFocusArea] = useState("general")
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
+  const [status, setStatus] = useState<"active" | "completed" | "cancelled" | "on_hold">("active")
+  const [targetDate, setTargetDate] = useState("")
+  const [progressPct, setProgressPct] = useState("0")
+  const [actionLines, setActionLines] = useState("")
+
+  const {
+    data: plans = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminDevelopmentPlans(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: DevelopmentPlan[] }>(
+        "/api/hr/performance/development-plans?user_id=all_admin",
+        { cache: "no-store" }
+      )
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load development plans" },
+  })
+  const error = queryError?.message ?? null
+  const loadData = async (..._args: unknown[]) => {
+    await refetch()
+  }
+
+  const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
+
+  const departmentOptions = useMemo(
+    () =>
+      Array.from(new Set(plans.map((plan) => plan.user?.department).filter(Boolean) as string[]))
+        .sort()
+        .map((department) => ({ value: department, label: department })),
+    [plans]
+  )
+
+  const { filters: cycleFilters } = useCycleFilters<DevelopmentPlan>({
+    cycles,
+    getRowCycleId: (plan) => plan.review_cycle_id,
+    cycleKey: "review_cycle",
+    cycleLabel: "Quarter",
+  })
+
+  function resetForm() {
+    setSelectedEmployee("")
+    setSelectedCycle("none")
+    setTitle("")
+    setDescription("")
+    setFocusArea("general")
+    setPriority("medium")
+    setStatus("active")
+    setTargetDate("")
+    setProgressPct("0")
+    setActionLines("")
+    setEditingPlan(null)
+  }
+
+  function openCreate() {
+    resetForm()
+    setIsCreateOpen(true)
+  }
+
+  function openEdit(plan: DevelopmentPlan) {
+    setEditingPlan(plan)
+    setSelectedEmployee(plan.user_id)
+    setSelectedCycle(plan.review_cycle_id || "none")
+    setTitle(plan.title)
+    setDescription(plan.description || "")
+    setFocusArea(plan.focus_area)
+    setPriority(plan.priority)
+    setStatus(plan.status)
+    setTargetDate(plan.target_date || "")
+    setProgressPct(String(plan.progress_pct || 0))
+    setActionLines((plan.actions || []).map((action) => action.title).join("\n"))
+    setIsEditOpen(true)
+  }
+
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault()
+    if (!selectedEmployee || !title) {
+      toast.error("Employee and title are required")
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      const actions = actionLines
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => ({ title: line }))
+
+      const res = await apiFetch("/api/hr/performance/development-plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: selectedEmployee,
+          review_cycle_id: normalizeCycleValue(selectedCycle) || null,
+          title,
+          description: description || null,
+          focus_area: focusArea,
+          priority,
+          target_date: targetDate || null,
+          status,
+          actions: actions.length > 0 ? actions : undefined,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create plan")
+      }
+      toast.success(data.message || "Development plan created")
+      setIsCreateOpen(false)
+      resetForm()
+      void loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create plan")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleEdit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!editingPlan) return
+    setIsSubmitting(true)
+    try {
+      const res = await apiFetch("/api/hr/performance/development-plans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingPlan.id,
+          title,
+          description: description || null,
+          focus_area: focusArea,
+          priority,
+          status,
+          target_date: targetDate || null,
+          progress_pct: Number(progressPct) || 0,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update plan")
+      }
+      toast.success(data.message || "Development plan updated")
+      setIsEditOpen(false)
+      resetForm()
+      void loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update plan")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const totalPlans = plans.length
+  const activePlans = plans.filter((plan) => plan.status === "active").length
+  const completedPlans = plans.filter((plan) => plan.status === "completed").length
+  const avgProgress =
+    plans.length > 0
+      ? `${Math.round(plans.reduce((sum, plan) => sum + (plan.progress_pct || 0), 0) / plans.length)}%`
+      : "-"
+
+  const columns: DataTableColumn<DevelopmentPlan>[] = useMemo(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        accessor: (plan) => personName(plan.user),
+        render: (plan) => <span className="font-medium">{personName(plan.user)}</span>,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (plan) => plan.user?.department || "-",
+        hideOnMobile: true,
+      },
+      {
+        key: "title",
+        label: "Plan",
+        sortable: true,
+        accessor: (plan) => plan.title,
+        render: (plan) => <span className="block max-w-[220px] truncate">{plan.title}</span>,
+        resizable: true,
+        initialWidth: 220,
+      },
+      {
+        key: "review_cycle",
+        label: "Quarter",
+        sortable: true,
+        accessor: (plan) => cycleNameMap.get(plan.review_cycle_id || "") || "-",
+        hideOnMobile: true,
+      },
+      {
+        key: "focus_area",
+        label: "Focus",
+        sortable: true,
+        accessor: (plan) => FOCUS_LABELS[plan.focus_area] || plan.focus_area,
+        hideOnMobile: true,
+      },
+      {
+        key: "priority",
+        label: "Priority",
+        sortable: true,
+        accessor: (plan) => plan.priority,
+        render: (plan) => (
+          <Badge variant={PRIORITY_VARIANTS[plan.priority] || "secondary"} className="capitalize">
+            {plan.priority}
+          </Badge>
+        ),
+        hideOnMobile: true,
+      },
+      {
+        key: "progress_pct",
+        label: "Progress",
+        sortable: true,
+        accessor: (plan) => plan.progress_pct || 0,
+        render: (plan) => (
+          <div className="flex items-center gap-2">
+            <Progress value={plan.progress_pct || 0} className="w-20" />
+            <span className="text-muted-foreground text-xs">{plan.progress_pct || 0}%</span>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (plan) => plan.status,
+        render: (plan) => (
+          <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
+            {plan.status.replace("_", " ")}
+          </Badge>
+        ),
+      },
+      {
+        key: "target_date",
+        label: "Due",
+        sortable: true,
+        accessor: (plan) => plan.target_date || "",
+        render: (plan) => <span className="text-muted-foreground text-sm">{formatDate(plan.target_date)}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    [cycleNameMap]
+  )
+
+  // Four filters max (AGENTS.md): Department, Status, Review Type, Quarter.
+  const filters: DataTableFilter<DevelopmentPlan>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departmentOptions,
+        placeholder: "All Departments",
+        mode: "custom",
+        filterFn: (plan, values) => values.length === 0 || values.includes(plan.user?.department || ""),
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "on_hold", label: "On Hold" },
+          { value: "completed", label: "Completed" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+        placeholder: "All Statuses",
+      },
+      ...cycleFilters,
+    ],
+    [cycleFilters, departmentOptions]
+  )
+
+  const rowActions: RowAction<DevelopmentPlan>[] = [
+    {
+      label: "View",
+      icon: Eye,
+      onClick: (plan) => setViewingPlan(plan),
+    },
+    ...(canEditPms
+      ? [
+          {
+            label: "Edit",
+            icon: Pencil,
+            onClick: (plan: DevelopmentPlan) => openEdit(plan),
+          },
+        ]
+      : []),
+  ]
+
+  return (
+    <DataTablePage
+      title="Development Plans"
+      description="Create and track employee development plans linked to performance reviews."
+      icon={BookOpen}
+      backLink={{ href: backLinkHref ?? "/admin/hr/pms", label: "Back to PMS" }}
+      actions={
+        canEditPms ? (
+          <Button onClick={openCreate} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Plan</span>
+          </Button>
+        ) : undefined
+      }
+      stats={
+        <StatGrid>
+          <StatCard
+            variant="compact"
+            title="Total Plans"
+            value={totalPlans}
+            icon={BookOpen}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Active"
+            value={activePlans}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Completed"
+            value={completedPlans}
+            icon={Target}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Avg Progress"
+            value={avgProgress}
+            icon={TrendingUp}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </StatGrid>
+      }
+    >
+      <DataTable<DevelopmentPlan>
+        data={plans}
+        columns={columns}
+        filters={filters}
+        getRowId={(plan) => plan.id}
+        pagination={{ pageSize: 50 }}
+        searchPlaceholder="Search employee, department, plan title, or focus area…"
+        searchFn={(plan, query) =>
+          [
+            personName(plan.user),
+            plan.user?.department || "",
+            plan.title,
+            plan.description || "",
+            FOCUS_LABELS[plan.focus_area] || plan.focus_area,
+            cycleNameMap.get(plan.review_cycle_id || "") || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => void loadData()}
+        rowActions={rowActions}
+        expandable={{
+          render: (plan) => (
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground text-xs">Employee</p>
+                <p className="mt-1 font-medium">{personName(plan.user)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Quarter</p>
+                <p className="mt-1">{cycleNameMap.get(plan.review_cycle_id || "") || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Target Date</p>
+                <p className="mt-1">{formatDate(plan.target_date)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Action Items</p>
+                <p className="mt-1">{plan.actions?.length || 0}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (plan) => `${personName(plan.user)} · ${plan.title}`,
+          subtitle: (plan) =>
+            `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,
+          trailing: (plan) => (
+            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-xs capitalize">
+              {plan.status.replace("_", " ")}
+            </Badge>
+          ),
+          onSelect: (plan) => setViewingPlan(plan),
+        }}
+        cardRenderer={(plan) => (
+          <PlanCard
+            plan={plan}
+            canEdit={canEditPms}
+            cycleName={cycleNameMap.get(plan.review_cycle_id || "") || "-"}
+            onView={setViewingPlan}
+            onEdit={openEdit}
+          />
+        )}
+        emptyTitle="No development plans yet"
+        emptyDescription="Create a plan to start tracking employee growth and follow-up actions."
+        emptyIcon={BookOpen}
+        skeletonRows={6}
+      />
+
+      <NewDevelopmentPlanDialog
+        isCreateOpen={isCreateOpen}
+        setIsCreateOpen={setIsCreateOpen}
+        handleCreate={handleCreate}
+        selectedEmployee={selectedEmployee}
+        setSelectedEmployee={setSelectedEmployee}
+        employees={employees}
+        title={title}
+        setTitle={setTitle}
+        focusArea={focusArea}
+        setFocusArea={setFocusArea}
+        priority={priority}
+        setPriority={setPriority}
+        selectedCycle={selectedCycle}
+        setSelectedCycle={setSelectedCycle}
+        cycles={cycles}
+        targetDate={targetDate}
+        setTargetDate={setTargetDate}
+        description={description}
+        setDescription={setDescription}
+        actionLines={actionLines}
+        setActionLines={setActionLines}
+        isSubmitting={isSubmitting}
+      />
+
+      <EditDevelopmentPlanDialog
+        isEditOpen={isEditOpen}
+        setIsEditOpen={setIsEditOpen}
+        handleEdit={handleEdit}
+        title={title}
+        setTitle={setTitle}
+        focusArea={focusArea}
+        setFocusArea={setFocusArea}
+        priority={priority}
+        setPriority={setPriority}
+        status={status}
+        setStatus={setStatus}
+        progressPct={progressPct}
+        setProgressPct={setProgressPct}
+        targetDate={targetDate}
+        setTargetDate={setTargetDate}
+        description={description}
+        setDescription={setDescription}
+        isSubmitting={isSubmitting}
+      />
+
+      <DetailSheet
+        open={Boolean(viewingPlan)}
+        onOpenChange={() => setViewingPlan(null)}
+        title={viewingPlan?.title || "Plan Details"}
+        description={viewingPlan ? `${personName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
+      >
+        {viewingPlan ? (
+          <div className="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <p className="text-muted-foreground text-xs">Quarter</p>
+              <p className="mt-1">{cycleNameMap.get(viewingPlan.review_cycle_id || "") || "-"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Due Date</p>
+              <p className="mt-1">{formatDate(viewingPlan.target_date)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Priority</p>
+              <p className="mt-1 capitalize">{viewingPlan.priority}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Progress</p>
+              <p className="mt-1">{viewingPlan.progress_pct || 0}%</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground text-xs">Description</p>
+              <p className="mt-1 whitespace-pre-wrap">{viewingPlan.description || "No description provided."}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground text-xs">Action Steps</p>
+              <div className="mt-1 space-y-2">
+                {(viewingPlan.actions || []).length > 0 ? (
+                  (viewingPlan.actions || []).map((action, index) => (
+                    <div key={action.id || `${action.title}-${index}`} className="rounded-lg border p-3">
+                      <p className="font-medium">{action.title}</p>
+                      <p className="text-muted-foreground text-xs">{action.status || "pending"}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p>No action steps added.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DetailSheet>
+    </DataTablePage>
+  )
+}

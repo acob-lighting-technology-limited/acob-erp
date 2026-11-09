@@ -1,5 +1,6 @@
 "use client"
 
+import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -179,41 +180,6 @@ export type TimelineContext = {
   exempt_reason: string | null
 }
 
-export const EVENT_LABELS: Record<string, string> = {
-  device_punch_in: "Clocked in (device)",
-  device_punch_out: "Clocked out (device)",
-  self_clock_in: "Clocked in",
-  self_clock_out: "Clocked out",
-  remote_clock_in: "Remote clock-in",
-  remote_clock_out: "Remote clock-out",
-  manual_create: "Manual record created",
-  manual_update: "Manual edit",
-  manual_delete: "Record deleted",
-  bulk_grant: "Bulk grant",
-  bulk_delete: "Bulk removal",
-  appeal_requested: "Appeal requested",
-  appeal_rejected: "Appeal rejected",
-  appeal_approved: "Appeal approved",
-  appeal_auto_resolved: "Appeal auto-approved",
-  leave_granted: "Leave granted",
-  leave_revoked: "Leave revoked",
-  exemption_added: "Exemption added",
-  exemption_removed: "Exemption removed",
-  marked_incomplete: "Auto-marked incomplete",
-}
-
-export function eventBadgeClass(eventType: string): string {
-  if (eventType.startsWith("appeal_")) {
-    if (eventType === "appeal_rejected") return "bg-danger/15 text-danger"
-    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-success/15 text-success"
-    return "bg-warning/15 text-warning"
-  }
-  if (eventType.startsWith("device_")) return "bg-info/15 text-info"
-  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-purple/15 text-purple"
-  if (eventType === "marked_incomplete") return "bg-info/15 text-info"
-  return "bg-muted text-muted-foreground"
-}
-
 type ExemptionsPayload = {
   data?: {
     attendance_exempt?: boolean
@@ -357,6 +323,7 @@ const NO_DEPARTMENTS: string[] = []
 const NO_HOLIDAYS: Array<{ holiday_date: string; name?: string | null }> = []
 
 export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged }: EmployeeExpandProps) {
+  const canEditAttendance = useCanEdit("hr.attendance")
   const daysQuery = useQuery({
     queryKey: QUERY_KEYS.employeeAttendanceDays(report.user_id, yearMonth, Boolean(report.attendance_exempt)),
     queryFn: async () => {
@@ -668,7 +635,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
                     </TooltipTrigger>
                     <TooltipContent side="top">View edit history</TooltipContent>
                   </Tooltip>
-                  {!day.isOnLeave && (
+                  {!day.isOnLeave && canEditAttendance && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -749,7 +716,8 @@ export function AttendanceReportsPage({
   // Admin & HR only: department leads could grant leave from the manager with no
   // approval (see requireAttendanceAdmin). The server enforces it; this hides it.
   const adminScope = useAdminScopeOptional()
-  const canUseAttendanceManager = Boolean(adminScope?.isAdminLike) && !lockedDepartment
+  const canEditAttendance = useCanEdit("hr.attendance")
+  const canUseAttendanceManager = canEditAttendance && Boolean(adminScope?.isAdminLike) && !lockedDepartment
   // Export follows the open tab: on the Change log it exports the log, not attendance.
   const changeLogRef = useRef<ChangeLogViewHandle>(null)
   const [changeLogCount, setChangeLogCount] = useState(0)

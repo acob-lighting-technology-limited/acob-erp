@@ -93,7 +93,7 @@ export default function UserDetailPage() {
         feedback={feedback}
         taskLinkBase="/admin/tasks"
         deviceLinkBase="/admin/devices"
-        assetLinkBase="/admin/assets"
+        assetLinkBase="/admin/accounts/assets"
         docLinkBase="/admin/documentation/personal"
         feedbackLinkBase="/admin/feedback"
         auditLinkBase="/admin/audit-logs"
