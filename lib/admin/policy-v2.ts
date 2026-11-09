@@ -1,4 +1,10 @@
-import { normalizeDepartmentName } from "@/shared/departments"
+import {
+  DEPT_ADMIN_HR,
+  DEPT_CORPORATE_SERVICES,
+  DEPT_ITC,
+  isSameDepartment,
+  normalizeDepartmentName,
+} from "@/shared/departments"
 
 export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
 
@@ -9,6 +15,12 @@ export interface AccessScopeInputV2 {
   adminRoutes: AdminRouteKeyV2[] | null
   scopeMode: "global" | "lead"
   managedDepartments: string[]
+  /** The person's own department; used with isDepartmentLead when lead_departments is empty. */
+  department?: string | null
+  /** profiles.lead_departments. */
+  leadDepartments?: string[]
+  /** Active edit grants / delegations (admin_edit_grants), already filtered for expiry. */
+  editRoutes?: AdminRouteKeyV2[]
 }
 
 export type ActingContextV2 = "global_admin" | "department_lead"
@@ -41,6 +53,7 @@ export type AdminRouteKeyV2 =
   | "hr.pms"
   | "hr.pms.cbt.manage"
   | "inventory.main"
+  | "it.main"
   | "jobdescriptions.main"
   | "notifications.main"
   | "payroll.main"
@@ -82,6 +95,7 @@ export const GRANTABLE_ADMIN_ROUTES: AdminRouteKeyV2[] = [
   "assets.main",
   "assets.issues",
   "inventory.main",
+  "it.main",
   "reports.weekly",
   "reports.other",
   "scorecard.main",
@@ -111,6 +125,61 @@ export interface AccessContextV2 {
   adminRoutes: AdminRouteKeyV2[] | null
   actingContext: ActingContextV2
   managedDepartments: string[]
+  /** Departments this person leads (lead_departments, or their own department for a lead). */
+  ledDepartments?: string[]
+  /** Active edit grants / delegations on the edit-guarded routes. */
+  editRoutes?: AdminRouteKeyV2[]
+}
+
+/**
+ * Routes with separate VIEW and EDIT levels. Everything else is still all-or-nothing:
+ * whoever can open it can change it.
+ *
+ * VIEW is the usual route grant. EDIT is held by the lead(s) of the owning
+ * department(s) below, or by an explicit grant / delegation (admin_edit_grants).
+ * Developers and super admins view every route but get no automatic edit here.
+ */
+export const HR_EDIT_ROUTES: AdminRouteKeyV2[] = [
+  "hr.main",
+  "hr.fleet",
+  "hr.resources",
+  "hr.leave",
+  "hr.attendance",
+  "hr.pms",
+  "hr.pms.cbt.manage",
+  "jobdescriptions.main",
+]
+export const IT_EDIT_ROUTES: AdminRouteKeyV2[] = ["it.main", "security.networkActivity", "security.bypassOverride"]
+export const EDIT_GUARDED_ROUTES: AdminRouteKeyV2[] = [...HR_EDIT_ROUTES, ...IT_EDIT_ROUTES]
+
+/** Who owns each guarded group, by department. Looked up from lead_departments, never by name of person. */
+export const EDIT_OWNER_DEPARTMENTS = {
+  hr: [DEPT_ADMIN_HR, DEPT_CORPORATE_SERVICES],
+  it: [DEPT_ITC],
+} as const
+
+/** Route keys an edit grant may be written for (mirrors admin_edit_grants_route_key_check). */
+export const GRANTABLE_EDIT_ROUTES: AdminRouteKeyV2[] = [
+  "hr.main",
+  "hr.fleet",
+  "hr.leave",
+  "hr.attendance",
+  "hr.pms",
+  "hr.pms.cbt.manage",
+  "jobdescriptions.main",
+  "it.main",
+  "security.networkActivity",
+  "security.bypassOverride",
+]
+
+export function isEditGuardedRoute(route: AdminRouteKeyV2): boolean {
+  return EDIT_GUARDED_ROUTES.includes(route)
+}
+
+export function editOwnerDepartmentsFor(route: AdminRouteKeyV2): readonly string[] {
+  if (HR_EDIT_ROUTES.includes(route)) return EDIT_OWNER_DEPARTMENTS.hr
+  if (IT_EDIT_ROUTES.includes(route)) return EDIT_OWNER_DEPARTMENTS.it
+  return []
 }
 
 export interface RoutePolicyV2 {
@@ -140,6 +209,13 @@ export function buildAccessContextV2(scope: AccessScopeInputV2): AccessContextV2
   const actingContext: ActingContextV2 =
     scope.scopeMode === "lead" || (!isAdminLike && scope.isDepartmentLead) ? "department_lead" : "global_admin"
 
+  const explicitLed = normalizeDepartmentList(scope.leadDepartments ?? [])
+  const ledDepartments = !scope.isDepartmentLead
+    ? []
+    : explicitLed.length > 0
+      ? explicitLed
+      : normalizeDepartmentList(scope.department ? [scope.department] : [])
+
   return {
     baseRole,
     isDepartmentLead: scope.isDepartmentLead,
@@ -147,6 +223,8 @@ export function buildAccessContextV2(scope: AccessScopeInputV2): AccessContextV2
     adminRoutes: scope.adminRoutes,
     actingContext,
     managedDepartments: normalizeDepartmentList(scope.managedDepartments || []),
+    ledDepartments,
+    editRoutes: scope.editRoutes ?? [],
   }
 }
 
@@ -155,11 +233,17 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname === "/admin") return "admin.dashboard"
   if (pathname.startsWith("/admin/audit-logs")) return "auditlogs.main"
   if (pathname.startsWith("/admin/dev")) return "dev.main"
-  if (pathname.startsWith("/admin/it")) return "settings.main"
+  // The IT console. Onboarding, Mailboxes, Starlink and Mail settings are IT's, so
+  // they gate on it.main (owned by the IT and Communications lead). Both the old
+  // and the /admin/it/* paths resolve here: the old ones are redirected in
+  // next.config.mjs, and resolving them identically is defence in depth. These must
+  // stay above the /admin/settings and /admin/accounts rules below.
+  if (pathname.startsWith("/admin/it")) return "it.main"
+  if (pathname.startsWith("/admin/onboarding")) return "it.main"
+  if (pathname.startsWith("/admin/settings/mailboxes")) return "it.main"
+  if (pathname.startsWith("/admin/settings/mail")) return "it.main"
+  if (pathname.startsWith("/admin/accounts/starlink")) return "it.main"
   if (pathname.startsWith("/admin/settings")) return "settings.main"
-  // Onboarding lists every account and its sign-in state — same account-admin
-  // surface as Settings → Users, so it gates on the same route key.
-  if (pathname.startsWith("/admin/onboarding")) return "settings.main"
   if (pathname.startsWith("/admin/communications/meetings")) return "communications.meetings"
   if (pathname.startsWith("/admin/communications/broadcast")) return "communications.broadcast"
   if (pathname.startsWith("/admin/communications")) return "communications.main"
@@ -231,6 +315,8 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
     case "auditlogs.main":
       return { visibility: "none", mutations: "none", adminOnly: true, domain: null }
     case "settings.main":
+      return { visibility: "none", mutations: "none", adminOnly: true, domain: null }
+    case "it.main":
       return { visibility: "none", mutations: "none", adminOnly: true, domain: null }
     case "security.networkActivity":
       return { visibility: "none", mutations: "none", adminOnly: true, domain: null }
@@ -398,6 +484,68 @@ export function canAccessRouteV2(context: AccessContextV2, route: AdminRouteKeyV
   if (!context.isDepartmentLead) return false
   if (policy.adminOnly) return false
   return policy.visibility !== "none"
+}
+
+/** The umbrella key whose grant covers a whole edit-guarded group (hr.main, it.main). */
+function editUmbrellaFor(route: AdminRouteKeyV2): AdminRouteKeyV2 | null {
+  if (HR_EDIT_ROUTES.includes(route)) return "hr.main"
+  if (IT_EDIT_ROUTES.includes(route)) return "it.main"
+  return null
+}
+
+/** Leads the owning department of an edit-guarded route. Pure lead status; never a name. */
+export function isEditOwnerV2(context: AccessContextV2, route: AdminRouteKeyV2): boolean {
+  const owners = editOwnerDepartmentsFor(route)
+  if (owners.length === 0) return false
+  return (context.ledDepartments ?? []).some((led) => owners.some((owner) => isSameDepartment(led, owner)))
+}
+
+/**
+ * Whether the context may CHANGE things on `route` (view is canAccessRouteV2).
+ *
+ * Routes without an edit level behave as before: viewing implies editing. On the
+ * HR and IT routes edit needs to be one of:
+ *   - the lead of the owning department (HR: Admin and HR, Corporate Services;
+ *     IT: IT and Communications),
+ *   - an active edit grant or delegation on the route, or on its group's umbrella
+ *     key (hr.main / it.main).
+ * Developer and super_admin get no automatic edit there, only view.
+ */
+export function canEditRouteV2(context: AccessContextV2, route: AdminRouteKeyV2): boolean {
+  if (!canAccessRouteV2(context, route)) return false
+  if (!isEditGuardedRoute(route)) return true
+  // Department-console callers are governed by their lead scope, not by /admin edit.
+  if (context.actingContext !== "global_admin" || !context.isAdminLike) return false
+  if (isEditOwnerV2(context, route)) return true
+  const umbrella = editUmbrellaFor(route)
+  const granted = context.editRoutes ?? []
+  return granted.includes(route) || (umbrella !== null && granted.includes(umbrella))
+}
+
+/**
+ * The edit-guarded route key a mutating /api request belongs to, or null when the
+ * request is not covered by the central edit check (reads, unguarded sections, and
+ * the routes that enforce their own rules — attendance appeals are approved by
+ * stage, not by page edit).
+ */
+export function resolveApiEditRouteKeyV2(pathname: string): AdminRouteKeyV2 | null {
+  const p = pathname.replace(/\/+$/, "")
+  if (p.startsWith("/api/admin/hr/attendance/appeals")) return null
+  if (p.startsWith("/api/admin/mailboxes")) return "it.main"
+  if (p.startsWith("/api/admin/onboarding")) return "it.main"
+  if (p.startsWith("/api/admin/settings/mail")) return "it.main"
+  if (p.startsWith("/api/starlink")) return "it.main"
+  if (p.startsWith("/api/admin/security/network-activity")) return "security.networkActivity"
+  if (p.startsWith("/api/admin/settings/attendance")) return "hr.attendance"
+  if (p.startsWith("/api/admin/settings/cbt")) return "hr.pms.cbt.manage"
+  if (p.startsWith("/api/admin/hr/attendance")) return "hr.attendance"
+  if (p.startsWith("/api/admin/hr/leave")) return "hr.leave"
+  if (p.startsWith("/api/admin/hr/performance/cbt")) return "hr.pms.cbt.manage"
+  if (p.startsWith("/api/admin/hr/performance")) return "hr.pms"
+  if (p.startsWith("/api/admin/hr/fleet")) return "hr.fleet"
+  if (p.startsWith("/api/admin/job-descriptions")) return "jobdescriptions.main"
+  if (p.startsWith("/api/admin/hr")) return "hr.main"
+  return null
 }
 
 export function getDataScopeV2(context: AccessContextV2, route: AdminRouteKeyV2): DataScopeV2 {

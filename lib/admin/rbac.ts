@@ -8,8 +8,10 @@ import {
 } from "@/shared/departments"
 import {
   GRANTABLE_ADMIN_ROUTES,
+  GRANTABLE_EDIT_ROUTES,
   buildAccessContextV2,
   canAccessRouteV2,
+  canEditRouteV2,
   type AdminRouteKeyV2,
 } from "@/lib/admin/policy-v2"
 
@@ -27,6 +29,7 @@ export type AdminSection =
   | "finance"
   | "hr"
   | "inventory"
+  | "it"
   | "job-descriptions"
   | "notification"
   | "onedrive"
@@ -53,6 +56,11 @@ export interface AdminScope {
   managedOffices: string[]
   isAdminLike: boolean
   adminRoutes: AdminRouteKeyV2[] | null
+  /**
+   * Active edit grants / delegations on the HR and IT routes (admin_edit_grants),
+   * expiry already applied. Separate from adminRoutes, which is VIEW.
+   */
+  editRoutes?: AdminRouteKeyV2[]
   scopeMode: AdminScopeMode
 }
 
@@ -83,6 +91,7 @@ const SECTION_TO_ROUTES: Partial<Record<AdminSection, AdminRouteKeyV2[]>> = {
   finance: ["accounts.main", "finance.main"],
   hr: ["hr.main"],
   inventory: ["inventory.main"],
+  it: ["it.main"],
   "job-descriptions": ["jobdescriptions.main"],
   notification: ["notifications.main"],
   onedrive: [],
@@ -227,6 +236,28 @@ async function resolveManagedOffices(
   return Array.from(offices)
 }
 
+/**
+ * The person's active edit grants and delegations. A failed read (for example the
+ * table not existing yet) returns none: edit then falls back to department-lead
+ * ownership only, which fails closed rather than open.
+ */
+export async function loadActiveEditRoutes(supabase: SupabaseClient, userId: string): Promise<AdminRouteKeyV2[]> {
+  const { data, error } = await supabase
+    .from("admin_edit_grants")
+    .select("route_key, valid_until")
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .returns<Array<{ route_key: string; valid_until: string | null }>>()
+  if (error || !data) return []
+  const now = Date.now()
+  const keys = data
+    .filter((row) => !row.valid_until || new Date(row.valid_until).getTime() > now)
+    .map((row) => row.route_key)
+  return Array.from(new Set(keys)).filter((key): key is AdminRouteKeyV2 =>
+    GRANTABLE_EDIT_ROUTES.includes(key as AdminRouteKeyV2)
+  )
+}
+
 export async function resolveAdminScope(supabase: SupabaseClient, userId: string): Promise<AdminScope | null> {
   const { data: profile } = await supabase
     .from("profiles")
@@ -278,6 +309,7 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
   if (normalizedRole === "admin" && (!adminRoutes || adminRoutes.length === 0) && !isDepartmentLead) {
     return null
   }
+  const editRoutes = isAdminLike ? await loadActiveEditRoutes(supabase, userId) : []
 
   return {
     userId,
@@ -292,6 +324,7 @@ export async function resolveAdminScope(supabase: SupabaseClient, userId: string
     managedOffices,
     isAdminLike,
     adminRoutes,
+    editRoutes,
     scopeMode,
   }
 }
@@ -342,6 +375,16 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
 export function scopeHoldsAdminRoute(scope: AdminScope, route: AdminRouteKeyV2): boolean {
   if (scope.scopeMode === "lead" || !scope.isAdminLike) return false
   return canAccessRouteV2(buildAccessContextV2(scope), route)
+}
+
+/**
+ * True when the scope may CHANGE data on `route` from /admin. On the HR and IT
+ * routes that is department-lead ownership or an edit grant / delegation; on every
+ * other route viewing implies editing, as before. Use this in API handlers that
+ * mutate, on top of the central check in middleware.
+ */
+export function scopeCanEditRoute(scope: AdminScope, route: AdminRouteKeyV2): boolean {
+  return canEditRouteV2(buildAccessContextV2(scope), route)
 }
 
 /**

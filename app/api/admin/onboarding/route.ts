@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
   // Same gate as Settings → Users: this exposes the full account roster, so it
   // is deliberately not department-scoped.
   const scope = await resolveAdminScope(supabase as SupabaseClient, user.id)
-  if (!scope || !canAccessAdminSection(scope, "settings")) {
+  if (!scope || !canAccessAdminSection(scope, "it")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

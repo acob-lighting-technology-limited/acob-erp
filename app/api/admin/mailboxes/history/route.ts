@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { formatBytes } from "@/lib/cpanel/quota"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -169,7 +170,7 @@ export async function GET(request: NextRequest) {
 
   const auth = await requireApiAdminScope()
   if (!auth.ok) return auth.response
-  if (!auth.scope.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!scopeHoldsAdminRoute(auth.scope, "it.main")) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const serviceClient = getServiceRoleClientOrFallback(auth.supabase)
 
