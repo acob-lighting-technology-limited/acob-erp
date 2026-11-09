@@ -21,8 +21,8 @@ export default async function CbtSettingsPage() {
   }
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
-    redirect("/admin/settings")
+  if (!scope || !scopeHoldsAdminRoute(scope, "hr.pms.cbt.manage")) {
+    redirect("/admin")
   }
 
   const db = getServiceRoleClientOrFallback(supabase)
@@ -40,7 +40,7 @@ export default async function CbtSettingsPage() {
         title="CBT Assessment Settings"
         description="Manage default CBT session question counts, duration per question, response visibility, and access permissioning."
         icon={Brain}
-        backLink={{ href: "/admin/settings", label: "Back to Settings" }}
+        backLink={{ href: "/admin/hr/pms/cbt", label: "Back to CBT" }}
       />
       <CbtSettingsForm initialSettings={initialSettings} profiles={profiles || []} />
     </PageWrapper>

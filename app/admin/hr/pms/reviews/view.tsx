@@ -477,7 +477,7 @@ export function AdminPmsReviewsPage({
 
   const goToIndividualCycle = useCallback(
     (cycleId: string) => {
-      router.push(`${reviewCycleBasePath ?? "/admin/pms/reviews"}/${encodeURIComponent(cycleId)}?mode=individual`)
+      router.push(`${reviewCycleBasePath ?? "/admin/hr/pms/reviews"}/${encodeURIComponent(cycleId)}?mode=individual`)
     },
     [router, reviewCycleBasePath]
   )
@@ -485,7 +485,7 @@ export function AdminPmsReviewsPage({
   const goDeptCycle = useCallback(
     (cycleId: string, department: string) => {
       router.push(
-        `${reviewCycleBasePath ?? "/admin/pms/reviews"}/${encodeURIComponent(cycleId)}?mode=department&department=${encodeURIComponent(department)}`
+        `${reviewCycleBasePath ?? "/admin/hr/pms/reviews"}/${encodeURIComponent(cycleId)}?mode=department&department=${encodeURIComponent(department)}`
       )
     },
     [router, reviewCycleBasePath]

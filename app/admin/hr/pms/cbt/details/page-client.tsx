@@ -195,7 +195,7 @@ export default function CbtDetailsLogPage() {
       title="CBT Log Auditing"
       description="Audit logins and detail records entered by candidates for standalone CBT tests."
       icon={FileClock}
-      backLink={{ href: "/admin/pms/cbt", label: "Back to CBT Overview" }}
+      backLink={{ href: "/admin/hr/pms/cbt", label: "Back to CBT Overview" }}
       actions={
         <Button variant="outline" size="sm" onClick={() => void loadAttempts(true)} disabled={isRefreshing}>
           <RefreshCw className="mr-2 h-4 w-4" />

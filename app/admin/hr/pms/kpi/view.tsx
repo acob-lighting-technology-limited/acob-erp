@@ -60,7 +60,7 @@ export function AdminPmsKpiPage({
       {activeTab === "master_kpis" ? (
         <CorporateScorecardRegister />
       ) : activeTab === "goals" ? (
-        <StrategicGoalsView scope="all" backHref={backLinkHref ?? "/admin/pms"} backLabel="Back to PMS" />
+        <StrategicGoalsView scope="all" backHref={backLinkHref ?? "/admin/hr/pms"} backLabel="Back to PMS" />
       ) : (
         <PmsMetricTabsPage
           metric="kpi"

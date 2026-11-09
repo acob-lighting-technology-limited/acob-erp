@@ -433,7 +433,7 @@ export async function updateSession(request: NextRequest) {
   if (isCbtPageOrSessionApi && user) {
     // Scope comes from the profile row, not resolveAdminScope(): that returns
     // null for employees, visitors and route-less admins, which would silently
-    // void every grant configured in /admin/settings/cbt.
+    // void every grant configured in /admin/hr/pms/cbt/settings.
     const dataClient = getServiceRoleClientOrFallback(supabase)
     const [scope, cbtSettings] = await Promise.all([
       resolveCbtAccessScope(dataClient, user.id),

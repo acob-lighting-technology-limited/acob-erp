@@ -265,7 +265,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
       title="Peer Feedback"
       description="Review peer feedback submissions across employees, quarters, and reviewers."
       icon={MessageSquare}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
+      backLink={{ href: backLinkHref ?? "/admin/hr/pms", label: "Back to PMS" }}
       actions={
         <Button
           variant="outline"

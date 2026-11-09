@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Brain, Eye, RefreshCw, RotateCcw } from "lucide-react"
+import { Brain, Eye, RefreshCw, RotateCcw, Settings } from "lucide-react"
 import { CbtAttemptDetail } from "@/components/pms/cbt-attempt-detail"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -211,7 +211,7 @@ const EMPTY_CBT: CbtPayload = { users: [], cycles: [], scores: [] }
 
 export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   const isLeadView = Boolean(deptId)
-  const basePath = deptId ? `/dept/${deptId}/pms/cbt` : "/admin/pms/cbt"
+  const basePath = deptId ? `/dept/${deptId}/pms/cbt` : "/admin/hr/pms/cbt"
   const router = useRouter()
   const [tab, setTab] = useState<TabKey>("individual")
   const [selectedCycleId, setSelectedCycleId] = useState("all")
@@ -692,6 +692,14 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
+          {basePath.startsWith("/admin") ? (
+            <Link href="/admin/hr/pms/cbt/settings">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Settings</span>
+              </Button>
+            </Link>
+          ) : null}
           <Link href={`${basePath}/question`}>
             <Button size="sm">
               <span className="hidden sm:inline">Create Test</span>

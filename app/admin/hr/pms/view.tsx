@@ -13,7 +13,7 @@ import { formatScore } from "@/lib/format"
 const adminPmsLinks = [
   {
     title: "KPI",
-    href: "/admin/pms/kpi",
+    href: "/admin/hr/pms/kpi",
     icon: Target,
     description: "View department KPI drivers and current KPI scores.",
     color: "bg-info/10 text-info border-info/20",
@@ -24,7 +24,7 @@ const adminPmsLinks = [
   },
   {
     title: "Attendance",
-    href: "/admin/pms/attendance",
+    href: "/admin/hr/pms/attendance",
     icon: Clock3,
     description: "Monitor attendance compliance contributing to PMS.",
     color: "bg-warning/10 text-warning border-warning/20",
@@ -35,7 +35,7 @@ const adminPmsLinks = [
   },
   {
     title: "CBT",
-    href: "/admin/pms/cbt",
+    href: "/admin/hr/pms/cbt",
     icon: Brain,
     description: "Track learning capability scores across departments.",
     color: "bg-purple/10 text-purple border-purple/20",
@@ -46,7 +46,7 @@ const adminPmsLinks = [
   },
   {
     title: "Behaviour",
-    href: "/admin/pms/behaviour",
+    href: "/admin/hr/pms/behaviour",
     icon: ShieldCheck,
     description: "Watch behaviour and leadership scoring in scope.",
     color: "bg-purple/10 text-purple border-purple/20",
@@ -57,7 +57,7 @@ const adminPmsLinks = [
   },
   {
     title: "Performance Reviews",
-    href: "/admin/pms/reviews",
+    href: "/admin/hr/pms/reviews",
     icon: FileText,
     description: "Create and manage reviews from the PMS area.",
     color: "bg-indigo-500/10 text-info border-indigo-500/20",
@@ -68,7 +68,7 @@ const adminPmsLinks = [
   },
   {
     title: "Review Cycles",
-    href: "/admin/pms/cycles",
+    href: "/admin/hr/pms/cycles",
     icon: RefreshCw,
     description: "Create and manage performance review cycles.",
     color: "bg-info/10 text-info border-info/20",
@@ -79,7 +79,7 @@ const adminPmsLinks = [
   },
   {
     title: "Analytics",
-    href: "/admin/pms/analytics",
+    href: "/admin/hr/pms/analytics",
     icon: Settings,
     description: "Performance distribution, trends, and calibration data.",
     color: "bg-warning/10 text-warning border-warning/20",
@@ -90,7 +90,7 @@ const adminPmsLinks = [
   },
   {
     title: "Competencies",
-    href: "/admin/pms/competencies",
+    href: "/admin/hr/pms/competencies",
     icon: ShieldCheck,
     description: "Manage behaviour competency keys used in performance reviews.",
     color: "bg-purple/10 text-purple border-purple/20",
@@ -112,7 +112,7 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
   ])
   const canAccessCbtCard = canAccessCbt(scope, cbtSettings)
   const visibleLinks = adminPmsLinks
-    .filter((item) => item.href !== "/admin/pms/cbt" || canAccessCbtCard)
+    .filter((item) => item.href !== "/admin/hr/pms/cbt" || canAccessCbtCard)
     .map((item) => ({ ...item, href: item.href.replace("/admin", base) }))
 
   return (

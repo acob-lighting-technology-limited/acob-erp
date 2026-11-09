@@ -323,14 +323,14 @@ const adminNavigation: NavItem[] = [
   },
   {
     // Split out of HR — it had grown to 11 sub-items nested three levels
-    // deep. Routes are unchanged (still /admin/pms/*), only the sidebar
+    // deep. Routes are unchanged (still /admin/hr/pms/*), only the sidebar
     // grouping moved.
     section: "management",
     name: "PMS",
     description: "Performance Management System",
-    href: "/admin/pms",
+    href: "/admin/hr/pms",
     icon: TrendingUp,
-    children: pmsNavChildren("/admin/pms"),
+    children: pmsNavChildren("/admin/hr/pms"),
   },
   {
     // Accounts also surfaces Purchasing, Inventory and Assets as nested groups
@@ -483,8 +483,6 @@ const adminNavigation: NavItem[] = [
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Access", href: "/admin/settings/access" },
       { name: "Company", href: "/admin/settings/company" },
-      { name: "Attendance", href: "/admin/settings/attendance" },
-      { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/it/mail" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],

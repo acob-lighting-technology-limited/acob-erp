@@ -238,7 +238,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
     const p = new URLSearchParams(searchParams.toString())
     p.set("mode", nextMode)
     if (nextMode !== "department") p.delete("department")
-    router.replace(`/admin/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+    router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
   }
 
   // ── Export rows ──────────────────────────────────────────────────────────
@@ -482,7 +482,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           const p = new URLSearchParams()
           p.set("mode", "individual")
           p.set("department", row.department)
-          router.replace(`/admin/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+          router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
         },
       },
     ],
@@ -553,7 +553,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
       title={cycleName}
       description="Review and edit employee records for this quarter."
       icon={FileText}
-      backLink={{ href: backLinkHref ?? "/admin/pms/reviews", label: "Back to PMS Reviews" }}
+      backLink={{ href: backLinkHref ?? "/admin/hr/pms/reviews", label: "Back to PMS Reviews" }}
       tabs={pageTabs}
       activeTab={mode}
       onTabChange={handleTabChange}
@@ -739,7 +739,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
               const p = new URLSearchParams()
               p.set("mode", "individual")
               p.set("department", r.department)
-              router.replace(`/admin/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+              router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
             },
           }}
           cardRenderer={(r) => (
@@ -749,7 +749,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
                 const p = new URLSearchParams()
                 p.set("mode", "individual")
                 p.set("department", r.department)
-                router.replace(`/admin/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
+                router.replace(`/admin/hr/pms/reviews/${encodeURIComponent(cycleId)}?${p.toString()}`)
               }}
             >
               <div className="flex items-start justify-between">

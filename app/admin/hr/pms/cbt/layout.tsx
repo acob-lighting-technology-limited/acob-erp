@@ -16,7 +16,7 @@ export default async function CbtLayout({ children }: { children: React.ReactNod
 
   const allowed = canAccessCbt(scope, cbtSettings)
   if (!allowed) {
-    redirect("/admin/pms")
+    redirect("/admin/hr/pms")
   }
 
   return <>{children}</>

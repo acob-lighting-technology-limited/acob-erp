@@ -182,50 +182,6 @@ export default async function AdminSettingsPage() {
           </Card>
         )}
 
-        {scopeHoldsAdminRoute(scope, "settings.main") && (
-          <Card className="group">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2.5">
-                <IconFill
-                  icon={Brain}
-                  fillColor="bg-violet-500"
-                  className="border-purple/20 bg-purple/10 text-purple h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
-                  iconClassName="h-4 w-4"
-                />
-                <span className="transition-colors group-hover:text-violet-500">CBT Assessment Settings</span>
-              </CardTitle>
-              <CardDescription>Configure questions per test and duration per question (exam timer).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Link href="/admin/settings/cbt" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
-                Configure CBT Settings
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
-        {scope.isAdminLike && (
-          <Card className="group">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2.5">
-                <IconFill
-                  icon={Clock}
-                  fillColor="bg-emerald-500"
-                  className="text-success border-success/20 bg-success/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
-                  iconClassName="h-4 w-4"
-                />
-                <span className="transition-colors group-hover:text-emerald-500">Attendance Policy</span>
-              </CardTitle>
-              <CardDescription>Configure working hours, grace cutoff, and incomplete penalty.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Link href="/admin/settings/attendance" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
-                Configure Attendance
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
         {scope.role === "developer" && (
           <Card className="group">
             <CardHeader>

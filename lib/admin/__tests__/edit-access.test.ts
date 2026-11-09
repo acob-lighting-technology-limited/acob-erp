@@ -127,6 +127,10 @@ test("IT pages resolve to it.main on both the old and the new paths", () => {
   assert.equal(resolveAdminRouteKeyV2("/admin/accounts/assets"), "assets.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/accounts/assets/issues"), "assets.issues")
   assert.equal(resolveAdminRouteKeyV2("/admin/payroll"), "payroll.main")
+  // Attendance and CBT settings are HR pages now.
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/attendance/settings"), "hr.attendance")
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/cbt/settings"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/settings/cbt"), "hr.pms.cbt.manage")
   assert.equal(resolveAdminRouteKeyV2("/admin/settings/users"), "settings.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/accounts/requisitions"), "accounts.main")
 })

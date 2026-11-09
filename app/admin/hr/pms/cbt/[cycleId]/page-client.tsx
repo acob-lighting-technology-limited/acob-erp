@@ -9,7 +9,7 @@ export default function AdminPmsCbtCycleRedirectPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace("/admin/pms/cbt")
+    router.replace("/admin/hr/pms/cbt")
   }, [router])
 
   return null

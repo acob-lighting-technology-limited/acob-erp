@@ -1,5 +1,5 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
-import AdminPmsCbtPage from "@/app/admin/pms/cbt/page-client"
+import AdminPmsCbtPage from "@/app/admin/hr/pms/cbt/page-client"
 
 export const metadata: Metadata = { title: "Dept CBT" }
 import type { Metadata } from "next"

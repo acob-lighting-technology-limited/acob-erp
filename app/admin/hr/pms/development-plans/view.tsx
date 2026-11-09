@@ -460,7 +460,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
       title="Development Plans"
       description="Create and track employee development plans linked to performance reviews."
       icon={BookOpen}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
+      backLink={{ href: backLinkHref ?? "/admin/hr/pms", label: "Back to PMS" }}
       actions={
         <Button onClick={openCreate} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />

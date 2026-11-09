@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Clock } from "lucide-react"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
@@ -20,8 +20,8 @@ export default async function AttendanceSettingsPage() {
   }
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || !scope.isAdminLike) {
-    redirect("/admin/settings")
+  if (!scope || !scopeHoldsAdminRoute(scope, "hr.attendance")) {
+    redirect("/admin")
   }
 
   const { data: settingRow } = await supabase
@@ -41,7 +41,7 @@ export default async function AttendanceSettingsPage() {
         title="Attendance Policy Settings"
         description="Configure workday start/end times, late grace period, and incomplete punch credit penalties."
         icon={Clock}
-        backLink={{ href: "/admin/settings", label: "Back to Settings" }}
+        backLink={{ href: "/admin/hr/attendance", label: "Back to Attendance" }}
       />
       <div className="mx-auto max-w-2xl py-8">
         <AttendanceForm initialPolicy={initialPolicy} />

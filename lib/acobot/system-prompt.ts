@@ -43,7 +43,7 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "HR → Leave — org-wide leave requests and balances. Filter by status or department; use the Approval Queue tab to approve/reject requests; Export to download records.",
   ],
   [
-    "/admin/pms",
+    "/admin/hr/pms",
     "HR → Performance Management (PMS) — KPI targets, behaviour assessments, peer feedback, and calibration cycles.",
   ],
   ["/admin/hr/exit", "HR → Exit Management — staff exit requests and offboarding checklists."],
@@ -381,7 +381,7 @@ Whenever you point the user to a page, write it as a **clickable markdown link**
   - Employees — \`/admin/hr/employees\`
   - Attendance — \`/admin/hr/attendance\`
   - Leave — \`/admin/hr/leave\`
-  - PMS — \`/admin/pms\`
+  - PMS — \`/admin/hr/pms\`
   - Exit Management — \`/admin/hr/exit\`
   - Departments — \`/admin/hr/departments\`
   - Offices & Rooms — \`/admin/hr/offices-rooms\`

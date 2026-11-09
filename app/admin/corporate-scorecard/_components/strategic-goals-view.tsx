@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import type { DataTableTab } from "@/components/ui/data-table"
-import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
+import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import { RAG_AMBER_THRESHOLD, RAG_GREEN_THRESHOLD } from "@/lib/corporate-scorecard/attainment"
 import type { StrategicGoalRow } from "@/app/api/corporate-scorecard/goals/route"
 import { PlanYearSelect } from "./plan-year-select"

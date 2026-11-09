@@ -239,6 +239,12 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   // next.config.mjs, and resolving them identically is defence in depth. These must
   // stay above the /admin/settings and /admin/accounts rules below.
   // Network Activity and Bypass & Override keep their own grants inside the IT console.
+  // Attendance and CBT settings moved out of /admin/settings onto their HR pages.
+  if (pathname.startsWith("/admin/hr/attendance/settings")) return "hr.attendance"
+  if (pathname.startsWith("/admin/settings/attendance")) return "hr.attendance"
+  if (pathname.startsWith("/admin/hr/pms/cbt/settings")) return "hr.pms.cbt.manage"
+  if (pathname.startsWith("/admin/pms/cbt/settings")) return "hr.pms.cbt.manage"
+  if (pathname.startsWith("/admin/settings/cbt")) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/it/network-activity")) return "security.networkActivity"
   if (pathname.startsWith("/admin/it/bypass-override")) return "security.bypassOverride"
   if (pathname.startsWith("/admin/it")) return "it.main"
@@ -274,8 +280,8 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/hr/employees/payroll")) return "payroll.main"
   // Must stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/hr/job-descriptions")) return "jobdescriptions.main"
-  // PMS is its own console at /admin/pms. The /admin/hr/pms paths are the
-  // pre-move URLs, redirected in next.config.mjs, and resolve identically as
+  // PMS lives under HR at /admin/hr/pms. The /admin/pms paths are the short-lived
+  // own-console URLs, redirected in next.config.mjs, and resolve identically as
   // defence in depth. Both must stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/hr/pms/cbt/question")) return "hr.pms.cbt.manage"
