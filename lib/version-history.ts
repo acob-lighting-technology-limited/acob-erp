@@ -60,6 +60,12 @@ export const RELEASES: Release[] = [
         ],
       },
       {
+        area: "Tasks",
+        items: [
+          "New tasks default to 'Does not repeat' with start date and 5-working-day deadline displayed and automatically selected",
+        ],
+      },
+      {
         area: "Leave Management",
         items: [
           "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
