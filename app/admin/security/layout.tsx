@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { ViewOnlyNotice } from "@/components/admin/view-only-notice"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
 export const metadata: Metadata = {
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   await requireAdminSectionAccess("security")
-  return children
+  return (
+    <>
+      <ViewOnlyNotice route="it.main" />
+      {children}
+    </>
+  )
 }
