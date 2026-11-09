@@ -546,6 +546,8 @@ export function canEditRouteV2(context: AccessContextV2, route: AdminRouteKeyV2)
 export function resolveApiEditRouteKeyV2(pathname: string): AdminRouteKeyV2 | null {
   const p = pathname.replace(/\/+$/, "")
   if (p.startsWith("/api/admin/hr/attendance/appeals")) return null
+  // Naming department leads is role management (Settings > Roles), checked by its own route.
+  if (p.startsWith("/api/admin/hr/department-leads")) return null
   if (p.startsWith("/api/admin/mailboxes")) return "it.main"
   if (p.startsWith("/api/admin/onboarding")) return "it.main"
   if (p.startsWith("/api/admin/settings/mail")) return "it.main"

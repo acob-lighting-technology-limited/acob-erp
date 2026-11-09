@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { ownerLeadChangeBlock } from "@/lib/admin/edit-grants"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { serverError, validationError } from "@/lib/api/errors"
@@ -27,7 +28,7 @@ async function requireGlobalAdmin() {
   if (!result.scope.isAdminLike || result.scope.scopeMode === "lead") {
     return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
-  return { supabase: result.supabase }
+  return { supabase: result.supabase, role: String(result.scope.role) }
 }
 
 /**
@@ -93,6 +94,20 @@ export async function POST(request: NextRequest) {
   }
   const parsed = AssignSchema.safeParse(body)
   if (!parsed.success) return validationError(parsed.error.issues)
+
+  // Leading an owning department (Admin and HR, Corporate Services, IT and Communications)
+  // carries edit access and approval rights, so only a developer or super admin changes it.
+  const { data: department } = await getServiceRoleClientOrFallback(auth.supabase)
+    .from("departments")
+    .select("name")
+    .eq("id", parsed.data.departmentId)
+    .maybeSingle<{ name: string }>()
+  const blocked = ownerLeadChangeBlock({
+    actorRole: auth.role,
+    before: [],
+    after: department?.name ? [department.name] : [],
+  })
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 403 })
 
   // assign_department_lead checks the caller's role from auth.uid(), so it runs
   // with the admin's session rather than the service role.

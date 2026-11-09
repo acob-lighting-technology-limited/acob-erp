@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { buildAccessContextV2, type AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
-import { canRevokeEditGrant, checkEditGrantRequest, type EditGrantRequest } from "@/lib/admin/edit-grants"
+import {
+  canRevokeEditGrant,
+  checkEditGrantRequest,
+  ownerLeadChangeBlock,
+  type EditGrantRequest,
+} from "@/lib/admin/edit-grants"
 
 const NOW = new Date("2026-11-09T09:00:00Z")
 const IN_30_DAYS = new Date("2026-12-09T09:00:00Z")
@@ -112,4 +117,18 @@ test("revoking: the granter, the delegator, or a developer / super admin", () =>
   assert.equal(canRevokeEditGrant({ actorId: "other", actorRole: "admin", row }), false)
   assert.equal(canRevokeEditGrant({ actorId: "other", actorRole: "developer", row }), true)
   assert.equal(canRevokeEditGrant({ actorId: "other", actorRole: "super_admin", row }), true)
+})
+
+test("naming or removing an owning-department lead is for developers and super admins only", () => {
+  const change = (actorRole: string, before: string[], after: string[]) =>
+    ownerLeadChangeBlock({ actorRole, before, after })
+  assert.match(change("admin", [], ["Admin and HR"]) ?? "", /developer or super admin/)
+  assert.match(change("admin", ["IT and Communications"], []) ?? "", /developer or super admin/)
+  assert.match(change("admin", [], ["Corporate Services"]) ?? "", /developer or super admin/)
+  assert.equal(change("super_admin", [], ["Admin and HR"]), null)
+  assert.equal(change("developer", ["Admin and HR"], []), null)
+  // A lead of some other department is anyone-with-the-employee-editor territory, as before.
+  assert.equal(change("admin", [], ["Project"]), null)
+  // Leaving an owning department as it was is not a change.
+  assert.equal(change("admin", ["Admin and HR"], ["Admin and HR", "Project"]), null)
 })

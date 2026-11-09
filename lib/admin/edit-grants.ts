@@ -6,7 +6,9 @@ import {
   isEditOwnerV2,
   type AccessContextV2,
   type AdminRouteKeyV2,
+  EDIT_OWNER_DEPARTMENTS,
 } from "@/lib/admin/policy-v2"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 export type EditGrantMode = "grant" | "delegate"
 
@@ -100,4 +102,29 @@ export function canRevokeEditGrant(params: {
 }): boolean {
   if (params.actorRole === "developer" || params.actorRole === "super_admin") return true
   return params.row.granted_by === params.actorId || params.row.delegated_from === params.actorId
+}
+
+/**
+ * Who leads the HR and IT owning departments decides who may edit HR and IT, so naming
+ * or removing one of those leads is limited to a developer or super admin. Without this
+ * anyone who can edit an employee's profile could make themselves a lead and inherit the
+ * edit access, and the Admin & HR Lead's approvals, that comes with it.
+ *
+ * `before` and `after` are the departments the person leads before and after the change.
+ * Returns the refusal message, or null when the change does not touch an owning department
+ * or the actor may make it.
+ */
+export function ownerLeadChangeBlock(params: { actorRole: string; before: string[]; after: string[] }): string | null {
+  if (params.actorRole === "developer" || params.actorRole === "super_admin") return null
+  const owners = new Set<string>(
+    [...EDIT_OWNER_DEPARTMENTS.hr, ...EDIT_OWNER_DEPARTMENTS.it].map((name) => normalizeDepartmentName(name))
+  )
+  const ownedOf = (names: string[]) =>
+    names
+      .map((name) => normalizeDepartmentName(name))
+      .filter((name) => owners.has(name))
+      .sort()
+      .join("|")
+  if (ownedOf(params.before) === ownedOf(params.after)) return null
+  return "Only a developer or super admin can change who leads Admin and HR, Corporate Services, or IT and Communications."
 }

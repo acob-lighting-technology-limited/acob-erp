@@ -125,3 +125,28 @@ the expiry deadline.
 - **Production changes**: build and commit everything, then present all migrations and the HR/IT
   cut-over list together for one explicit yes before anything is applied.
 - **Delivery**: new branch from `origin/main`, pushed, one PR. The owner merges.
+
+## As built (9 Nov 2026)
+
+Differences from the plan above, so the next reader is not surprised:
+
+- **Grants table**: `admin_edit_grants` holds EDIT only (explicit grants and delegations). VIEW is still
+  `profiles.admin_routes`; nothing was copied across. Owners (leads of the owning department) get edit
+  from `lead_departments`, never from a stored row. Seeding nobody means the day-one cut-over is: edit
+  is held by the Admin and HR, Corporate Services and IT and Communications leads only.
+- **Where grants are managed**: Settings > Access (developers and super admins, all grants) and Settings >
+  Delegation in the staff settings (anyone who owns or holds an explicit grant, for their own area). The
+  Settings > Users edit dialog does not have a None/View/Edit choice.
+- **Viewers**: a `ViewOnlyNotice` names who can change things on the HR, PMS and IT consoles, and every
+  mutating call is refused server-side. Individual buttons are not disabled.
+- **Delegates work on /admin**: the Admin & HR Lead's delegate decides the second stage from the Appeals
+  tab on /admin/hr/attendance. The Admin & HR Lead also sees second-stage items on her department
+  console. Delegates do not get access to the delegator's department console.
+- **Single-day status changes** from /admin are refused (they start with the lead). Manual leave, OOS,
+  exemptions and bulk ranges stay available to HR edit holders: leads cannot do them, so refusing them
+  would leave nobody able to.
+- **Who leads an owning department** is developer / super admin only (department-leads and employee
+  profile routes), because lead status carries edit access and the Admin & HR Lead's approvals.
+- **Expiry**: first run records the start and lists the backlog; nothing expires for a week after.
+- **Not in the migrations**: no data is changed. The 19 admin-started appeals in flight finish under the
+  old rule.

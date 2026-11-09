@@ -144,6 +144,7 @@ test("API edit routes: mailbox, starlink, HR sections; appeals and unguarded pat
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/performance/cbt/attempts"), "hr.pms.cbt.manage")
   // Appeals are decided by stage rules, not page edit.
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/attendance/appeals"), null)
+  assert.equal(resolveApiEditRouteKeyV2("/api/admin/hr/department-leads"), null)
   assert.equal(resolveApiEditRouteKeyV2("/api/admin/assets"), null)
   assert.equal(resolveApiEditRouteKeyV2("/api/v1/hr/employees/x/status"), null)
 })
