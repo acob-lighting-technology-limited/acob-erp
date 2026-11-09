@@ -361,7 +361,7 @@ export function StarlinkKitsPage() {
               onClick: (k) =>
                 k.payment &&
                 router.push(
-                  `/admin/accounts/payments/${k.payment.id}?from=${encodeURIComponent("/admin/accounts/starlink")}`
+                  `/admin/accounts/payments/${k.payment.id}?from=${encodeURIComponent("/admin/it/starlink")}`
                 ),
             },
           ]}

@@ -16,7 +16,7 @@ const IT_ITEMS = [
   {
     name: "Onboarding",
     description: "Staff profiles, including not-yet-onboarded placeholders, and whether each is set up",
-    href: "/admin/onboarding",
+    href: "/admin/it/onboarding",
     icon: UserPlus,
     color: "text-blue-500",
     bgColor: "bg-info/15",
@@ -24,7 +24,7 @@ const IT_ITEMS = [
   {
     name: "Mailboxes",
     description: "Staff and project mailboxes on cPanel, with storage and quota",
-    href: "/admin/settings/mailboxes",
+    href: "/admin/it/mailboxes",
     icon: Mail,
     color: "text-emerald-500",
     bgColor: "bg-success/15",
@@ -32,7 +32,7 @@ const IT_ITEMS = [
   {
     name: "Starlink Kits",
     description: "Each kit, the project it serves and how its bills stand",
-    href: "/admin/accounts/starlink",
+    href: "/admin/it/starlink",
     icon: Satellite,
     color: "text-indigo-500",
     bgColor: "bg-info/15",
@@ -40,7 +40,7 @@ const IT_ITEMS = [
   {
     name: "Network Activity",
     description: "Office network logs, archived daily",
-    href: "/admin/security/network-activity",
+    href: "/admin/it/network-activity",
     icon: Network,
     color: "text-teal-500",
     bgColor: "bg-success/15",
@@ -48,7 +48,7 @@ const IT_ITEMS = [
   {
     name: "Bypass & Override",
     description: "Audit trail of manual policy changes and emergency bypasses",
-    href: "/admin/security/bypass-override",
+    href: "/admin/it/bypass-override",
     icon: ShieldAlert,
     color: "text-amber-600",
     bgColor: "bg-warning/15",

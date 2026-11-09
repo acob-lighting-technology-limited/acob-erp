@@ -23,6 +23,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
 import { editRouteLabel } from "@/lib/admin/edit-route-labels"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatWATDate } from "@/lib/utils/date"
 
 export interface EditGrantRowView {
   id: string
@@ -54,7 +55,7 @@ interface EditAccessManagerProps {
 
 function formatDate(value: string | null) {
   if (!value) return "No end date"
-  return new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  return formatWATDate(value)
 }
 
 /** End of the chosen day in West Africa Time, as an ISO string with offset. */

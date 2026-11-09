@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger"
 import { DEPT_EXECUTIVE_MANAGEMENT } from "@/shared/departments"
 import { createNotification } from "@/lib/notifications/create"
 import { loadDepartmentLeads } from "@/lib/hr/attendance-appeals"
-import { toLocalISODate } from "@/lib/utils/date"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("self-approved-appeals")
 
@@ -93,10 +93,10 @@ export function previousMonthWindow(now: Date): { fromIso: string; toIso: string
   // WAT is UTC+1: a WAT midnight is 23:00 UTC the day before.
   const start = new Date(Date.UTC(prevYear, prevMonth - 1, 1) - 60 * 60 * 1000)
   const end = new Date(Date.UTC(year, month - 1, 1) - 60 * 60 * 1000)
-  const label = new Date(Date.UTC(prevYear, prevMonth - 1, 1)).toLocaleDateString("en-GB", {
+  const label = formatWATDate(new Date(Date.UTC(prevYear, prevMonth - 1, 1)), {
     month: "long",
     year: "numeric",
-    timeZone: "UTC",
+    day: undefined,
   })
   return { fromIso: start.toISOString(), toIso: end.toISOString(), label }
 }

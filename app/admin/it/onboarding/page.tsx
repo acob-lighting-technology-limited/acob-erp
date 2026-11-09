@@ -6,7 +6,7 @@ import type { Metadata } from "next"
 export const metadata: Metadata = { title: "Admin Onboarding" }
 
 export default async function OnboardingPage() {
-  await requireAdminSectionAccess("settings")
+  await requireAdminSectionAccess("it")
 
   return <OnboardingContent />
 }

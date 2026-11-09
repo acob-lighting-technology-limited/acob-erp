@@ -8,14 +8,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { ATTENDANCE_STATUS_LABELS, type UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import type { SelfApprovedAppeal } from "@/lib/hr/self-approved"
+import { formatWATDate } from "@/lib/utils/date"
 
 function monthLabel(month: string) {
   const [year, m] = month.split("-").map(Number)
-  return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  })
+  return formatWATDate(new Date(Date.UTC(year, m - 1, 1)), { month: "long", year: "numeric", day: undefined })
 }
 
 function statusLabel(status: string) {
@@ -61,8 +58,7 @@ export function MdDeskSelfApproved({ rows }: { rows: SelfApprovedAppeal[] }) {
       label: "Approved on",
       sortable: true,
       accessor: (row) => row.reviewed_at,
-      render: (row) =>
-        new Date(row.reviewed_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      render: (row) => formatWATDate(row.reviewed_at),
     },
     {
       key: "appeal_reason",

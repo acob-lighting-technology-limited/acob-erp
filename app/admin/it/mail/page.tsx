@@ -18,8 +18,8 @@ export default async function MailSettingsPage() {
   if (!user) redirect("/auth/login")
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
-    redirect("/admin/settings")
+  if (!scope || !scopeHoldsAdminRoute(scope, "it.main")) {
+    redirect("/admin/it")
   }
 
   return (
@@ -28,7 +28,7 @@ export default async function MailSettingsPage() {
         title="Mail Settings"
         description="Control which modules can send in-app and email notifications system-wide."
         icon={Mail}
-        backLink={{ href: "/admin/settings", label: "Back to Settings" }}
+        backLink={{ href: "/admin/it", label: "Back to IT" }}
       />
 
       <Card>

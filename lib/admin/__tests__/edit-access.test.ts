@@ -117,6 +117,10 @@ test("IT pages resolve to it.main on both the old and the new paths", () => {
   ]) {
     assert.equal(resolveAdminRouteKeyV2(path), "it.main", path)
   }
+  // Network Activity and Bypass & Override keep their own keys inside the IT console.
+  assert.equal(resolveAdminRouteKeyV2("/admin/it/network-activity"), "security.networkActivity")
+  assert.equal(resolveAdminRouteKeyV2("/admin/it/bypass-override"), "security.bypassOverride")
+  assert.equal(resolveAdminRouteKeyV2("/admin/security/network-activity"), "security.networkActivity")
   assert.equal(resolveAdminRouteKeyV2("/admin/settings/users"), "settings.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/accounts/requisitions"), "accounts.main")
 })

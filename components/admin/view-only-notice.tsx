@@ -13,6 +13,7 @@ import {
 } from "@/lib/admin/policy-v2"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { formatWATDate } from "@/lib/utils/date"
 
 interface ViewOnlyNoticeProps {
   /** The group's umbrella key: "hr.main" or "it.main". */
@@ -21,7 +22,7 @@ interface ViewOnlyNoticeProps {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return null
-  return new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  return formatWATDate(value)
 }
 
 function describeHolders(holders: EditHolder[]) {

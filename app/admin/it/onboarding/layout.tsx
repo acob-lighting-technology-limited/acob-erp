@@ -7,6 +7,6 @@ export const metadata: Metadata = {
 }
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
-  await requireAdminSectionAccess("settings")
+  await requireAdminSectionAccess("it")
   return children
 }

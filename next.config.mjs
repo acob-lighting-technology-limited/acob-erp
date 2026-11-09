@@ -148,7 +148,16 @@ const nextConfig = {
       { source: "/admin/reports/meeting-documents", destination: "/admin/reports/general-meeting/kss", permanent: true },
       { source: "/admin/reports/mail", destination: "/admin/communications/meetings/mail", permanent: true },
       { source: "/admin/security", destination: "/admin/audit-logs", permanent: true },
-      { source: "/admin/it", destination: "/admin/onboarding", permanent: true },
+      // IT pages moved under /admin/it.
+      { source: "/admin/onboarding", destination: "/admin/it/onboarding", permanent: true },
+      { source: "/admin/onboarding/:path*", destination: "/admin/it/onboarding/:path*", permanent: true },
+      { source: "/admin/settings/mailboxes", destination: "/admin/it/mailboxes", permanent: true },
+      { source: "/admin/settings/mailboxes/:path*", destination: "/admin/it/mailboxes/:path*", permanent: true },
+      { source: "/admin/settings/mail", destination: "/admin/it/mail", permanent: true },
+      { source: "/admin/accounts/starlink", destination: "/admin/it/starlink", permanent: true },
+      { source: "/admin/accounts/starlink/:path*", destination: "/admin/it/starlink/:path*", permanent: true },
+      { source: "/admin/security/network-activity", destination: "/admin/it/network-activity", permanent: true },
+      { source: "/admin/security/bypass-override", destination: "/admin/it/bypass-override", permanent: true },
       { source: "/admin/tools/reference-generator", destination: "/admin/correspondence", permanent: true },
       { source: "/dept/:dept_id/pms/goals", destination: "/dept/:dept_id/pms/kpi?tab=goals", permanent: true },
       {

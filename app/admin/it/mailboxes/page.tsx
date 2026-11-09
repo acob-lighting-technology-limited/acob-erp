@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getRequestScope } from "@/lib/admin/api-scope"
+import { scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { MailboxesPage } from "./view"
 
 export const metadata: Metadata = {
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
 }
 
 export default async function MailboxesRoute() {
-  // Settings is open to department leads for some pages; mailboxes span the whole org.
+  // Mailboxes span the whole org and belong to IT: viewing needs the IT route (it.main).
   const scope = await getRequestScope()
-  if (!scope?.isAdminLike) redirect("/admin/settings")
+  if (!scope || !scopeHoldsAdminRoute(scope, "it.main")) redirect("/admin")
   return <MailboxesPage />
 }

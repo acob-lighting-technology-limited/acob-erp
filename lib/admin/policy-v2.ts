@@ -238,6 +238,9 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   // and the /admin/it/* paths resolve here: the old ones are redirected in
   // next.config.mjs, and resolving them identically is defence in depth. These must
   // stay above the /admin/settings and /admin/accounts rules below.
+  // Network Activity and Bypass & Override keep their own grants inside the IT console.
+  if (pathname.startsWith("/admin/it/network-activity")) return "security.networkActivity"
+  if (pathname.startsWith("/admin/it/bypass-override")) return "security.bypassOverride"
   if (pathname.startsWith("/admin/it")) return "it.main"
   if (pathname.startsWith("/admin/onboarding")) return "it.main"
   if (pathname.startsWith("/admin/settings/mailboxes")) return "it.main"

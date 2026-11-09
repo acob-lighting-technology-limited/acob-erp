@@ -151,7 +151,7 @@ export default async function AdminSettingsPage() {
               <CardDescription>Control system-wide in-app/email notification delivery by module.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Link href="/admin/settings/mail" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+              <Link href="/admin/it/mail" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
                 Open Mail Settings
               </Link>
             </CardContent>
@@ -175,7 +175,7 @@ export default async function AdminSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Link href="/admin/settings/mailboxes" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+              <Link href="/admin/it/mailboxes" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
                 Open Mailboxes
               </Link>
             </CardContent>
