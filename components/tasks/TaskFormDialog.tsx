@@ -55,8 +55,12 @@ interface KpiOption {
 }
 
 const taskFormSchema = z.object({
-  title: z.string().min(1, "Task title is required"),
-  description: z.string().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Task title must be at least 3 characters")
+    .max(200, "Task title must be at most 200 characters"),
+  description: z.string().trim().max(5000, "Task description cannot exceed 5,000 characters").optional(),
   priority: z.string().default("medium"),
   status: z.string().default("pending"),
   assigned_to: z.string().optional(),
@@ -184,6 +188,10 @@ export function TaskFormDialog({
   // Recurrence is creation-only: an existing repeat is managed from its series.
   const [repeat, setRepeat] = useState<Required<RepeatFormFields>>(DEFAULT_REPEAT_FIELDS)
 
+  const initialStartDate = taskForm.task_start_date || (!selectedTask ? toLocalISODate() : "")
+  const initialDueDate =
+    taskForm.due_date || (!selectedTask && initialStartDate ? latestTaskDeadline(initialStartDate) : "")
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -193,7 +201,7 @@ export function TaskFormDialog({
       status: taskForm.status,
       assigned_to: taskForm.assigned_to,
       department: taskForm.department,
-      due_date: taskForm.due_date,
+      due_date: initialDueDate,
       assignment_type: taskForm.assignment_type,
       goal_id: taskForm.goal_id,
       kpi_id: taskForm.kpi_id,
@@ -201,7 +209,7 @@ export function TaskFormDialog({
       plan_id: lockedPlanId || taskForm.plan_id,
       portfolio_id: lockedPortfolioId || (lockedProjectId ? "" : taskForm.portfolio_id),
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
+      task_start_date: initialStartDate,
       task_end_date: taskForm.task_end_date,
     },
   })
@@ -218,6 +226,10 @@ export function TaskFormDialog({
   useEffect(() => {
     if (!isOpen) return
 
+    const defaultStartDate = taskForm.task_start_date || (!selectedTask ? toLocalISODate() : "")
+    const defaultDueDate =
+      taskForm.due_date || (!selectedTask && defaultStartDate ? latestTaskDeadline(defaultStartDate) : "")
+
     reset({
       title: taskForm.title,
       description: taskForm.description,
@@ -225,7 +237,7 @@ export function TaskFormDialog({
       status: taskForm.status || "pending",
       assigned_to: taskForm.assigned_to || "",
       department: taskForm.department || "",
-      due_date: taskForm.due_date || "",
+      due_date: defaultDueDate,
       assignment_type: taskForm.assignment_type || "individual",
       goal_id: taskForm.goal_id || "",
       kpi_id: taskForm.kpi_id || "",
@@ -233,7 +245,7 @@ export function TaskFormDialog({
       plan_id: lockedPlanId || taskForm.plan_id || "",
       portfolio_id: lockedPortfolioId || (lockedProjectId ? "" : taskForm.portfolio_id || ""),
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
+      task_start_date: defaultStartDate,
       task_end_date: taskForm.task_end_date || "",
     })
 
@@ -270,6 +282,7 @@ export function TaskFormDialog({
   const portfolioId = watch("portfolio_id")
   const weightValue = watch("weight")
   const titleValue = watch("title")
+  const descriptionValue = watch("description")
   const statusValue = watch("status")
   const startDateValue = watch("task_start_date")
   const dueDateValue = watch("due_date")
@@ -296,10 +309,23 @@ export function TaskFormDialog({
   })
 
   const effectiveStartDate = startDateValue || toLocalISODate()
-  // Repeat has no default on a new task: the dates stay hidden until it is chosen.
+  // Repeat defaults to "none" ("Does not repeat"): dates show immediately.
   const repeatUnchosen = isCreating && repeat.repeat === ""
   const isRepeating = isCreating && repeat.repeat !== "" && repeat.repeat !== "none"
   const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
+
+  // Keep the new task's due date aligned with the 5 working days deadline (accounting for holidays)
+  // if the due date is still unset or matches the pre-holiday default.
+  useEffect(() => {
+    if (!isOpen || !isCreating) return
+    const currentDue = getValues("due_date")
+    const noHolidayDue = latestTaskDeadline(effectiveStartDate, NO_HOLIDAYS)
+    if (!currentDue || currentDue === noHolidayDue) {
+      setValue("due_date", latestTaskDeadline(effectiveStartDate, holidays), {
+        shouldValidate: true,
+      })
+    }
+  }, [holidays, isOpen, isCreating, effectiveStartDate, getValues, setValue])
   const deadlineError =
     isCreating && !isRepeating && dueDateValue
       ? taskDeadlineWindowError({ startIso: effectiveStartDate, dueIso: dueDateValue }, holidays)
@@ -518,12 +544,16 @@ export function TaskFormDialog({
 
           <FormSection title="What">
             <div>
-              <Label htmlFor="title" className="text-xs font-semibold">
-                Task Title <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="title" className="text-xs font-semibold">
+                  Task Title <span className="text-destructive">*</span>
+                </Label>
+                <span className="text-muted-foreground text-xs font-normal">{(titleValue || "").length}/200</span>
+              </div>
               <Input
                 id="title"
                 {...register("title")}
+                maxLength={200}
                 placeholder="e.g. Prepare monthly revenue reconciliation report"
                 className="mt-1"
               />
@@ -531,16 +561,23 @@ export function TaskFormDialog({
             </div>
 
             <div>
-              <Label htmlFor="description" className="text-xs font-semibold">
-                Description
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="description" className="text-xs font-semibold">
+                  Description
+                </Label>
+                <span className="text-muted-foreground text-xs font-normal">
+                  {(descriptionValue || "").length}/5000
+                </span>
+              </div>
               <Textarea
                 id="description"
                 {...register("description")}
+                maxLength={5000}
                 placeholder="Describe expected scope, deliverables, and instructions..."
                 rows={3}
                 className="mt-1"
               />
+              {errors.description && <p className="text-destructive mt-1 text-xs">{errors.description.message}</p>}
             </div>
           </FormSection>
 
@@ -684,7 +721,22 @@ export function TaskFormDialog({
 
           <FormSection title="When">
             {/* New tasks only; a repeat is managed from its series */}
-            {isCreating && <TaskRepeatFields repeat={repeat} onChange={setRepeat} />}
+            {isCreating && (
+              <TaskRepeatFields
+                repeat={repeat}
+                onChange={(next) => {
+                  setRepeat((prev) => {
+                    const updated = typeof next === "function" ? next(prev) : next
+                    if (updated.repeat === "none" && prev.repeat !== "none" && !getValues("due_date")) {
+                      setValue("due_date", latestTaskDeadline(effectiveStartDate, holidays), {
+                        shouldValidate: true,
+                      })
+                    }
+                    return updated
+                  })
+                }}
+              />
+            )}
 
             {!repeatUnchosen && (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -695,7 +747,17 @@ export function TaskFormDialog({
                   <Input
                     id="task_start_date"
                     type="date"
-                    {...register("task_start_date")}
+                    {...register("task_start_date", {
+                      onChange: (e) => {
+                        const nextStart = e.target.value
+                        if (isCreating && nextStart && /^\d{4}-\d{2}-\d{2}$/.test(nextStart)) {
+                          setValue("due_date", latestTaskDeadline(nextStart, holidays), {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }
+                      },
+                    })}
                     disabled={lockLevel !== "none"}
                     className="mt-1 text-xs"
                   />
@@ -791,6 +853,9 @@ export function TaskFormDialog({
             disabled={
               isSaving ||
               !titleValue ||
+              titleValue.trim().length < 3 ||
+              titleValue.trim().length > 200 ||
+              Boolean(descriptionValue && descriptionValue.length > 5000) ||
               Boolean(deadlineError) ||
               repeatUnchosen ||
               isMissingDueDate ||

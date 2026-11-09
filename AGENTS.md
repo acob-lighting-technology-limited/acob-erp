@@ -913,7 +913,9 @@ the expected stats count, tabs, filter count, action count, and table density.
 
 ### UI guard — audit and ratchet
 
-`npm run ui:guard` runs in the pre-push hook and in CI. It is two checks:
+The pre-push hook runs the UI guard against the pushed commit (exporting its tree to a temp dir
+so uncommitted working-tree work does not block a push); in CI and locally `npm run ui:guard` checks
+the tree. It is two checks:
 
 - **`ui:audit`** (`scripts/ui/audit-reusables.mjs`): every page has a `loading.tsx` (a page that only
   redirects is exempt), uses the shared page header, and tables, stat cards and dialogs use the shared
@@ -927,7 +929,6 @@ the expected stats count, tabs, filter count, action count, and table density.
 | `tiny-text` | `text-[9px]` to `text-[11px]` | `text-xs` is the minimum |
 | `locale-without-en-ng` | a date or time `toLocale*String()` with neither `en-NG` nor a `timeZone` | `@/lib/utils/date` helpers, or `en-NG` and `timeZone: "Africa/Lagos"` |
 | `raw-img` | `<img>` outside email/PDF/OG renderers | `next/image` |
-| `window-dialogs` | `window.confirm/alert/prompt`, bare `alert()` | `AlertDialog`, sonner |
 | `key-index` | `key={i}`, `key={idx}`, `key={index}` | a stable id |
 | `dialog-in-page` | `<DialogContent>` in a page/view/`*-content` file | move to `_components/` |
 | `explicit-any` | `: any`, `as any`, `any[]` | a real type or `unknown` |
@@ -942,6 +943,10 @@ the expected stats count, tabs, filter count, action count, and table density.
 | `page-missing-metadata` | server `page.tsx` without `metadata` | export a title |
 | `title-brand-suffix` | a page title that already ends in `| Matrix` or `| ACOB…` | the root layout adds the brand; write only the page name |
 | `file-lines` | a file over 1,000 lines, by its length | extract; never grow it |
+| `api-error-message` | `NextResponse.json({ error: <ident>.message` | log with logger, return generic message |
+| `route-without-zod` | API route calling `request.json()` with no zod validation | validate the body with zod |
+| `local-number-format` | `new Intl.NumberFormat` in app/components/hooks | use `@/lib/utils` shared formatters |
+| `hand-h1` | `<h1\b` outside allowlisted standalone pages | `PageHeader` |
 
 Working with it:
 

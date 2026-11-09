@@ -211,6 +211,7 @@ export function LeaveCalendarView({
   const [selectedUserId, setSelectedUserId] = useState<string>("all")
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
+  const [includeLwop, setIncludeLwop] = useState<boolean>(false)
 
   // Day expansion modal for crowded days
   const [expandedDay, setExpandedDay] = useState<{
@@ -236,6 +237,7 @@ export function LeaveCalendarView({
       selectedUserId,
       selectedLeaveTypeId,
       selectedStatus,
+      includeLwop,
     }),
     queryFn: async (): Promise<CalendarData> => {
       const params = new URLSearchParams({ year_month: calendarMonth })
@@ -243,6 +245,7 @@ export function LeaveCalendarView({
       if (selectedUserId && selectedUserId !== "all") params.set("user_id", selectedUserId)
       if (selectedLeaveTypeId && selectedLeaveTypeId !== "all") params.set("leave_type_id", selectedLeaveTypeId)
       if (selectedStatus && selectedStatus !== "all") params.set("status", selectedStatus)
+      if (includeLwop) params.set("include_lwop", "true")
       const endpoint = apiBasePath.includes("/dept/")
         ? `${apiBasePath}/calendar?${params.toString()}`
         : `/api/admin/hr/leave/calendar?${params.toString()}`
@@ -280,12 +283,20 @@ export function LeaveCalendarView({
     return map
   }, [calendarData?.holidays])
 
+  // Helper to identify unpaid/LWOP leave items
+  const isLwopItem = (item: LeaveItem) => {
+    const norm = String(item.leave_type?.name || "").toLowerCase()
+    const code = String(item.leave_type?.code || "").toLowerCase()
+    return norm.includes("unpaid") || norm.includes("lwop") || code === "lwop"
+  }
+
   // Map leaves by ISO date (a leave spanning from start_date to end_date applies to all days in between)
   const leavesByDate = useMemo(() => {
     const map = new Map<string, LeaveItem[]>()
     const list = Array.isArray(calendarData?.leaves) ? calendarData.leaves : []
     for (const item of list) {
       if (!item.start_date || !item.end_date) continue
+      if (!includeLwop && selectedLeaveTypeId === "all" && isLwopItem(item)) continue
       const start = new Date(`${item.start_date}T00:00:00`)
       const end = new Date(`${item.end_date}T00:00:00`)
 
@@ -297,19 +308,21 @@ export function LeaveCalendarView({
       }
     }
     return map
-  }, [calendarData?.leaves])
+  }, [calendarData?.leaves, includeLwop, selectedLeaveTypeId])
 
   const hasActiveFilters =
     (!lockedDepartment && selectedDept !== "all") ||
     selectedUserId !== "all" ||
     selectedLeaveTypeId !== "all" ||
-    selectedStatus !== "all"
+    selectedStatus !== "all" ||
+    includeLwop
 
   const handleResetFilters = () => {
     if (!lockedDepartment) setSelectedDept("all")
     setSelectedUserId("all")
     setSelectedLeaveTypeId("all")
     setSelectedStatus("all")
+    setIncludeLwop(false)
   }
 
   return (
@@ -403,6 +416,18 @@ export function LeaveCalendarView({
               <SelectItem value="pending">Pending</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* LWOP Visibility Toggle (hidden by default) */}
+          <Button
+            type="button"
+            variant={includeLwop ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setIncludeLwop((v) => !v)}
+            className="h-8 text-xs font-medium"
+            title={includeLwop ? "Hide Leave Without Pay" : "Show Leave Without Pay (hidden by default)"}
+          >
+            {includeLwop ? "Hide LWOP" : "Show LWOP"}
+          </Button>
 
           {/* Reset Button */}
           {hasActiveFilters && (
@@ -628,12 +653,14 @@ export function LeaveCalendarView({
         <div className="bg-card flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5 text-xs">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-muted-foreground font-medium">Leave Types:</span>
-            {Object.entries(LEAVE_TYPE_COLORS).map(([key, item]) => (
-              <div key={key} className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${item.dot}`} />
-                <span className="text-foreground text-xs">{item.label}</span>
-              </div>
-            ))}
+            {Object.entries(LEAVE_TYPE_COLORS)
+              .filter(([key]) => key !== "unpaid" || includeLwop)
+              .map(([key, item]) => (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+                  <span className="text-foreground text-xs">{item.label}</span>
+                </div>
+              ))}
           </div>
 
           <div className="flex items-center gap-3 border-t pt-1.5 sm:border-t-0 sm:pt-0">

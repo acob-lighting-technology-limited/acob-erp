@@ -9,9 +9,7 @@ import { apiJson } from "@/lib/api-client"
 import type { SeriesFrequency, SeriesMonthMode } from "@/lib/tasks/recurrence"
 
 /**
- * "" means not chosen yet. A new task starts there on purpose: Repeat has no
- * default, so whoever creates a task decides whether it repeats before the
- * dates appear, rather than leaving a new feature unnoticed.
+ * "" means not chosen yet. Repeat defaults to "none" ("Does not repeat") on a new task.
  */
 export type RepeatChoice = "" | "none" | SeriesFrequency
 
@@ -27,7 +25,7 @@ export type RepeatFormFields = {
 }
 
 export const DEFAULT_REPEAT_FIELDS: Required<RepeatFormFields> = {
-  repeat: "",
+  repeat: "none",
   repeat_weekday: 5,
   repeat_month_mode: "last_day",
   repeat_month_day: 1,

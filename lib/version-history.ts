@@ -47,19 +47,58 @@ export const RELEASES: Release[] = [
         ],
       },
       {
-        area: "Lists & Sheets",
+        area: "Starlink & Payments",
         items: [
-          "Lists and side sheets across Payroll, Attendance, Tasks and other modules offer one-click actions and full record details, with consistent status colours across Leave, Payroll, Reviews, Help Desk and CBT",
-          "Department short codes show in lists and on phones, with full names in sheets and search",
+          "Populated missing states across Starlink accounts (Adewole, Bondu, Olooji, Sule) to match their community projects",
+          "Improved Starlink Kits table: added kit count to tab, displayed kit numbers alongside account IDs, and rearranged columns so status and schedule appear before monthly billing amounts",
+          "Converted payment details from an overlaid modal into a dedicated full page with return navigation to Starlink when opened via Open Payment",
         ],
       },
       {
-        area: "Attendance & Lunch",
+        area: "Projects",
         items: [
-          "Admin attendance records group exceptions by what needs attention, approved exceptions and covered days",
-          "Minutes summaries open with a clearer header and cards for quick scanning",
-          "Lunch voting shows when each vote was cast",
+          "Registered missing operational and under-construction mini-grid projects (Onipanu, Erinla, and Bondu) in the projects catalogue",
         ],
+      },
+      {
+        area: "UI & Badges",
+        items: [
+          "Standardized status badges across Leave, Fleet, Reviews, Help Desk, Payroll, CBT, and Admin tables to use semantic status colors (green for approved/completed/active, amber for pending, purple for contract) rather than defaulting to uniform gold or dark primary badges",
+          "Enhanced list views and side sheets across Impersonation, Payroll, Attendance, Stock Movements, Challenges, and Tasks with one-click actions, expandable details, and full record properties",
+          "Adopted standardized department short codes in list views and card subtitles across Impersonation, User Settings, Challenges, CBT logs, and Leave Management to eliminate text truncation on mobile while retaining full department names in side sheets and search filters",
+          "Removed duplicate inline Action columns on desktop data tables where rowActions was active, keeping a single standardized trailing Action column",
+        ],
+      },
+      {
+        area: "Tasks",
+        items: [
+          "New tasks default to 'Does not repeat' with start date and 5-working-day deadline displayed and automatically selected",
+          "Enforced a 3 to 200 character limit on task titles with live counter feedback, and capped task descriptions at 5,000 characters to keep lists and table views clean and scannable",
+          "Differentiated recurring cadence badges from linked project and portfolio metadata with neutral styling to keep action buttons distinct from structural context",
+          "The User Task Plan table now automatically seeds its time period filter to the current week on load, showing active weekly tasks immediately without manual filtering",
+        ],
+      },
+      {
+        area: "Leave Management",
+        items: [
+          "Fixed contrast and color clashing on leave rejection banners, approval stage notes, and concurrent leave notices in both dark and light modes",
+          "Leave Without Pay (LWOP) is now automatically hidden from the admin leave calendar by default, with a dedicated toolbar toggle to show or hide it on demand",
+        ],
+      },
+      {
+        area: "Attendance",
+        items: [
+          "Separated Attendance Appeals filtering into distinct Status and Stage controls, defaulting to open appeals in actionable stages ('Pending Admin' and 'Pending Lead & Admin') on load.",
+          "Admin attendance records group exceptions by what needs attention, approved exceptions and covered days",
+        ],
+      },
+      {
+        area: "Lunch",
+        items: ["Lunch voting shows when each vote was cast"],
+      },
+      {
+        area: "Reports & Meetings",
+        items: ["Minutes summaries open with a clearer header and cards for quick scanning"],
       },
       {
         area: "Requisitions & Signing",
