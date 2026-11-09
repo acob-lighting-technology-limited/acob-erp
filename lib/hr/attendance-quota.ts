@@ -7,6 +7,10 @@ const log = logger("attendance-quota")
  * Department leads can grant a maximum of 3 LWP/AWP permissions per employee per month.
  * Any additional permission beyond 3 must be approved by a global admin.
  * Admin-initiated manual alterations and Out-of-Station (OOS) are uncapped.
+ *
+ * A day whose appeal ended "resolved" does not count. Resolved means the day was closed
+ * outside the appeal: the clock-in device failed and the punches arrived late, or Admin & HR
+ * corrected the day themselves. Neither is the employee using up a permission.
  */
 export async function validateLwpAwpMonthlyQuota(params: {
   dataClient: SupabaseClient
@@ -45,7 +49,7 @@ export async function validateLwpAwpMonthlyQuota(params: {
   try {
     let query = params.dataClient
       .from("attendance_records")
-      .select("id", { count: "exact", head: true })
+      .select("id, date")
       .eq("user_id", params.userId)
       .in("status", PERMISSION_STATUS_LIST)
       .gte("date", monthStart)
@@ -55,7 +59,7 @@ export async function validateLwpAwpMonthlyQuota(params: {
       query = query.neq("id", params.excludeRecordId)
     }
 
-    const { count, error } = await query
+    const { data: permissionDays, error } = await query.returns<Array<{ id: string; date: string }>>()
 
     if (error) {
       log.error(
@@ -65,7 +69,27 @@ export async function validateLwpAwpMonthlyQuota(params: {
       return { allowed: true }
     }
 
-    const currentCount = count ?? 0
+    let counted = permissionDays ?? []
+    if (counted.length > 0) {
+      const { data: resolved, error: resolvedError } = await params.dataClient
+        .from("attendance_appeals")
+        .select("appeal_date")
+        .eq("user_id", params.userId)
+        .eq("status", "resolved")
+        .in(
+          "appeal_date",
+          counted.map((day) => day.date)
+        )
+        .returns<Array<{ appeal_date: string }>>()
+      if (resolvedError) {
+        log.error({ err: resolvedError.message, userId: params.userId }, "Error reading resolved appeals for quota")
+      } else {
+        const resolvedDates = new Set((resolved ?? []).map((row) => row.appeal_date))
+        counted = counted.filter((day) => !resolvedDates.has(day.date))
+      }
+    }
+
+    const currentCount = counted.length
     if (currentCount >= 3) {
       return {
         allowed: false,

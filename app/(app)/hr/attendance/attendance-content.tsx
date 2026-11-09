@@ -286,9 +286,11 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   const [isCancellingAppeal, setIsCancellingAppeal] = useState(false)
   const currentMonthLwpAwpCount = useMemo(() => {
     const currentYM = toLocalYearMonth()
+    // A day whose appeal ended "resolved" (device failure, or Admin & HR corrected it) is not a permission used.
+    const resolvedDates = new Set(appeals.filter((a) => a.status === "resolved").map((a) => a.appeal_date))
     let count = 0
     for (const day of unifiedDays ?? []) {
-      if (day.date.startsWith(currentYM)) {
+      if (day.date.startsWith(currentYM) && !resolvedDates.has(day.date)) {
         if (
           day.status === "lateness_with_permission" ||
           day.status === "incomplete_with_permission" ||
@@ -299,7 +301,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
       }
     }
     return count
-  }, [unifiedDays])
+  }, [unifiedDays, appeals])
 
   const fetchAttendanceData = useCallback(() => void daysQuery.refetch(), [daysQuery])
   const fetchAppeals = useCallback(() => void appealsQuery.refetch(), [appealsQuery])
