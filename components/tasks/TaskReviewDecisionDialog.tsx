@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { RatingInput } from "@/components/ui/rating-input"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
@@ -376,22 +377,7 @@ export function TaskReviewDecisionDialog({
               {actionType === "approve" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Performance Rating *</Label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {Array.from({ length: TASK_RATING_MAX - TASK_RATING_MIN + 1 }, (_, i) => TASK_RATING_MIN + i).map(
-                      (value) => (
-                        <Button
-                          key={value}
-                          type="button"
-                          variant={rating === value ? "default" : "outline"}
-                          size="sm"
-                          className="h-10 w-full min-w-0 text-sm font-semibold"
-                          onClick={() => setRating(value)}
-                        >
-                          {value}
-                        </Button>
-                      )
-                    )}
-                  </div>
+                  <RatingInput value={rating} onChange={setRating} min={TASK_RATING_MIN} max={TASK_RATING_MAX} />
                   <p className="text-muted-foreground text-xs leading-relaxed">
                     {`Worth up to ${task.weight ?? TASK_WEIGHT_DEFAULT} points toward the assignee's KPI score (task weight ${task.weight ?? TASK_WEIGHT_DEFAULT})`}
                     {rating

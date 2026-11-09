@@ -361,5 +361,6 @@ export const QUERY_KEYS = {
   meetingMinutesSummaries: (...parts: unknown[]) => ["meeting-minutes-summaries", ...parts],
   requisitionTabCount: (...parts: unknown[]) => ["requisition-tab-count", ...parts],
   signingStatus: (...parts: unknown[]) => ["signing-status", ...parts],
+  helpDeskAssignees: (department: string) => ["help-desk-assignees", department],
   maintenance: (...parts: unknown[]) => ["maintenance", ...parts],
 } as const

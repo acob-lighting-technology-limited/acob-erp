@@ -47,6 +47,7 @@ import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { ExitConfirmDialog } from "@/components/hr/exit-confirm-dialog"
 import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
+import { RowsSkeleton } from "@/components/skeletons"
 const log = logger("manage-users-dialog")
 
 // ─── Exit reasons ──────────────────────────────────────────────────────────────
@@ -814,9 +815,8 @@ export function ManageUsersDialog({
                   <ScrollArea className="flex-1">
                     <div className="divide-border divide-y">
                       {isLoadingPending ? (
-                        <div className="flex flex-col items-center gap-3 p-10 opacity-50">
-                          <Loader2 className="text-primary h-5 w-5 animate-spin" />
-                          <p className="text-xs">Loading…</p>
+                        <div className="p-4">
+                          <RowsSkeleton rows={3} />
                         </div>
                       ) : pendingUsers.length === 0 ? (
                         <div className="space-y-2 p-10 text-center opacity-40">

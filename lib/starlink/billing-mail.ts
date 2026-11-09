@@ -155,10 +155,7 @@ export function parseStarlinkMail(
           : null
   // A reminder's amount follows its period on the same line, so skip past the dates.
   const amountSource = kind === "reminder" && period ? text.slice(text.indexOf(period[0]) + period[0].length) : text
-  const money =
-    kind === "ending"
-      ? null
-      : firstAmount(amountSource, kind === "reminder" && period ? null : amountLabel)
+  const money = kind === "ending" ? null : firstAmount(amountSource, kind === "reminder" && period ? null : amountLabel)
 
   return {
     kind,

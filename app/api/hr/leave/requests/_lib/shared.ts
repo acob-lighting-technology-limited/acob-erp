@@ -197,6 +197,7 @@ export type LeaveRequestRow = LeaveRequestStageState & {
   days_count?: number | null
   reason?: string | null
   handover_note?: string | null
+  admin_manual?: boolean | null
 }
 
 export type LeavePolicySummary = {

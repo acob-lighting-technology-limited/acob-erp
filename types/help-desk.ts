@@ -6,7 +6,7 @@ export interface HelpDeskTicket {
   ticket_number: string
   title: string
   description: string | null
-  request_type: "support" | "procurement"
+  request_type?: string | null
   category: string | null
   service_department: string
   priority: HelpDeskPriority
@@ -21,7 +21,7 @@ export interface HelpDeskTicket {
   requester_department?: string | null
   handling_mode?: string | null
   support_mode?: string | null
-  approval_required: boolean
+  approval_required?: boolean
   sla_target_at: string | null
   submitted_at: string
   assigned_at: string | null
@@ -32,6 +32,15 @@ export interface HelpDeskTicket {
   closed_at: string | null
   csat_rating: number | null
   csat_feedback: string | null
+  rating?: number | null
+  rating_comment?: string | null
+  rated_by?: string | null
+  rated_at?: string | null
+  resolved_by?: string | null
+  closed_by?: string | null
+  converted_task_id?: string | null
+  converted_task_number?: string | null
+  metadata?: Record<string, unknown> | null
   comment_count?: number
   created_at: string
   updated_at: string

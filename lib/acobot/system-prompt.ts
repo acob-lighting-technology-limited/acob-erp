@@ -262,8 +262,9 @@ function getAdminGuidance(path: string, isDeptConsole: boolean): string {
     return `
 ## ${surface} — Help Desk page guidance
 - **Tabs**: Open Tickets | Assigned to Me | Closed | All.
-- **Assign**: Click a ticket to open it and assign it to an agent.
-- **Status flow**: New → In Progress → Resolved → Closed.
+- **Assign**: Click a ticket to open it and assign or reassign it to an agent.
+- **Status flow**: New → In Progress (or Paused) → Resolved (by assignee) → Closed (by requester/lead with 1–5 service rating) or Converted (to task).
+- **Standalone**: Tickets do not create mirror tasks. If extensive work is needed, leads/admins can convert tickets to tasks.
 - **SLA**: Tickets show time-to-resolve. Overdue tickets are flagged in red.
 - **Export**: Download ticket data as CSV.`
   }

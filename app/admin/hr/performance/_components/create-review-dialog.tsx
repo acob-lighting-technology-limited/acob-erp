@@ -15,6 +15,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import type { QueryClient } from "@tanstack/react-query"
 import { apiFetch, apiJson } from "@/lib/api-client"
 
+import { LinesSkeleton, RowsSkeleton } from "@/components/skeletons"
 interface User {
   id: string
   first_name: string
@@ -342,9 +343,8 @@ function CreateReviewForm({
       </DialogHeader>
 
       {isLoading ? (
-        <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading employees and review cycles...
+        <div className="py-4">
+          <RowsSkeleton rows={3} />
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -437,9 +437,8 @@ function CreateReviewForm({
             </Card>
           ) : !isSelectionDataReady ? (
             <Card>
-              <CardContent className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading selected employee quarter data...
+              <CardContent className="py-6">
+                <LinesSkeleton lines={4} />
               </CardContent>
             </Card>
           ) : (

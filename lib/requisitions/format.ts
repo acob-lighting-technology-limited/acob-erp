@@ -1,5 +1,5 @@
 import { FORM_LABELS } from "./limits"
-import { STAGE_LABELS } from "./routing"
+import { STAGE_LABELS, STAGE_VERBS } from "./routing"
 import type { Requisition, RequisitionStage, RequisitionStatus } from "./types"
 
 export function formatNaira(value: number | string | null | undefined): string {
@@ -30,7 +30,8 @@ export function progressLabel(req: Requisition): string {
   const stage = [...(req.stages || [])].sort((a, b) => a.position - b.position).find((s) => s.state === "pending")
   if (!stage) return STATUS_LABELS.pending
   const who = stage.assignee?.full_name || "unassigned"
-  return `Awaiting ${STAGE_LABELS[stage.stage_code].toLowerCase()}: ${who}`
+  // STAGE_LABELS are past tense ("Reviewed"), which read as "Awaiting reviewed"; the verb reads right.
+  return `To ${STAGE_VERBS[stage.stage_code]}: ${who}`
 }
 
 /** What the requisition is for, in one line, for lists and notifications. */

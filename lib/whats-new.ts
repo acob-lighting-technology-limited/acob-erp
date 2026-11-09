@@ -9,7 +9,7 @@
  * so someone who joins months later isn't greeted with stale news.
  */
 
-import { EyeOff, type LucideIcon } from "lucide-react"
+import { EyeOff, Ticket, type LucideIcon } from "lucide-react"
 
 export interface Announcement {
   /** Stable key recorded once seen. Never change or reuse one. */
@@ -28,6 +28,15 @@ export interface Announcement {
 export const WHATS_NEW_WINDOW_DAYS = 30
 
 export const ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: "2026-11-help-desk-standalone",
+    date: "2026-11-04",
+    title: "Dedicated Help Desk & Service Ratings",
+    icon: Ticket,
+    body: "Help Desk tickets are now fully standalone and no longer clutter your task board. When support finishes your ticket, you'll be invited to rate the service (1–5 stars) to close it.",
+    href: "/help-desk",
+    cta: "Open Help Desk",
+  },
   {
     id: "2026-10-lunch-hide-name",
     date: "2026-10-26",

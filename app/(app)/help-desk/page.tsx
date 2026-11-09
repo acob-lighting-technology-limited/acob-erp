@@ -62,22 +62,8 @@ async function getData() {
     new Map((personalTickets || []).map((ticket) => [ticket.id, ticket])).values()
   ) as HelpDeskTicket[]
 
-  const goalIds = Array.from(
-    new Set(
-      mergedTickets
-        .map((ticket) => String((ticket as { goal_id?: string | null }).goal_id || "").trim())
-        .filter(Boolean)
-    )
-  )
-  const { data: goalsData } =
-    goalIds.length > 0
-      ? await dataClient.from("goals_objectives").select("id, title").in("id", goalIds)
-      : { data: [] as Array<{ id: string; title: string }> }
-  const goalTitleById = new Map(
-    ((goalsData as Array<{ id: string; title: string }> | null) || []).map((goal) => [goal.id, goal.title])
-  )
-
   const ticketIds = mergedTickets.map((ticket) => ticket.id)
+
   const { data: commentRows } =
     ticketIds.length > 0
       ? await dataClient.from("help_desk_comments").select("ticket_id").in("ticket_id", ticketIds)
@@ -108,10 +94,8 @@ async function getData() {
     tickets: mergedTickets.map((ticket) => ({
       ...ticket,
       comment_count: commentCountMap.get(ticket.id) || 0,
-      goal_title: (ticket as { goal_id?: string | null }).goal_id
-        ? goalTitleById.get(String((ticket as { goal_id?: string | null }).goal_id || "")) || null
-        : null,
     })),
+
     loadError:
       personalError || departmentError
         ? `Failed to load help desk tickets: ${(personalError || departmentError)?.message}`

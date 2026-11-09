@@ -43,13 +43,13 @@ npm run test:admin-scope              # or the relevant test script
 The only exception is debugging a failure that *only* reproduces in a
 production build — and then say why before running it.
 
-## Commit when the work is tangible
+## Commit only when the user says a piece is done
 
-Commit a complete, verified unit — a fix, a feature slice, a refactor, with its
-migration — once the fast checks pass. Not before (no WIP or half-done commits),
-and do not hand back to the user with a finished unit left uncommitted. Group
-commits by feature as described in `AGENTS.md`, stage only your own paths, and
-never add a `Co-Authored-By` trailer.
+Leave changes uncommitted while the user is still reviewing or asking for tweaks.
+When the user says a feature or request is done, make one commit for it, after
+the fast checks pass. Group commits by feature as described in `AGENTS.md`,
+stage only your own paths, and never add a `Co-Authored-By` trailer. Do not commit
+WIP or half-done work, and do not push unless asked.
 
 ## Production changes need an explicit yes
 

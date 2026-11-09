@@ -5,13 +5,20 @@ export interface HelpDeskTicket {
   ticket_number: string
   title: string
   requester_department: string | null
+  requester_id?: string | null
   service_department: string
   priority: "low" | "medium" | "high" | "urgent"
   status: string
   handling_mode: "individual" | "queue" | "department" | null
   current_approval_stage: string | null
   assigned_to: string | null
-  request_type: "support" | "procurement"
+  request_type?: "support" | "procurement" | string | null
+  description?: string | null
+  rating?: number | null
+  rating_comment?: string | null
+  csat_rating?: number | null
+  csat_feedback?: string | null
+  converted_task_id?: string | null
   sla_target_at: string | null
 }
 

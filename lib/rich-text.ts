@@ -148,7 +148,10 @@ function stripLeadingChars(element: Element, count: number) {
 const SECTION_NUMBER = /^\d+(\.\d+)*\.?$/
 
 /** A short line with letters and no lowercase ("OPENING", "ANY OTHER BUSINESS"). */
-const isCapsHeading = (line: string) => line.length <= 80 && /\p{L}/u.test(line) && !/\p{Ll}/u.test(line)
+/** A possessive "’s" is lowercase even in an all-caps title ("CEO’s REMARK:"). */
+const POSSESSIVE_S = /['’]s\b/g
+const isCapsHeading = (line: string) =>
+  line.length <= 80 && /\p{L}/u.test(line) && !/\p{Ll}/u.test(line.replace(POSSESSIVE_S, ""))
 
 /**
  * Text copied from a PDF comes as lines with hard breaks rather than
@@ -406,11 +409,22 @@ function dropLeadingChars(runs: SlideTextRun[], count: number): SlideTextRun[] {
 function assignSlideTextRoles(blocks: SlideTextBlock[]): SlideTextBlock[] {
   const out: SlideTextBlock[] = []
   for (const block of blocks) {
+    const text = block.runs.map((run) => run.text).join("")
+    // A bold all-caps numbered line is a section title saved as a list item
+    // (pasted before the paste step made it a heading): show it as one.
+    if (
+      block.kind === "number" &&
+      (block.numberStyle ?? "arabicPeriod") === "arabicPeriod" &&
+      block.runs.every((run) => run.bold) &&
+      isCapsHeading(text.trim())
+    ) {
+      out.push({ kind: "heading", runs: [{ text: `${block.number ?? 1}. ${text.trim()}` }] })
+      continue
+    }
     if (block.kind !== "paragraph") {
       out.push(block)
       continue
     }
-    const text = block.runs.map((run) => run.text).join("")
     if (block.runs.every((run) => run.bold) && isCapsHeading(text.trim())) {
       out.push({ kind: "label", runs: block.runs.map(({ text: runText }) => ({ text: runText })) })
       continue

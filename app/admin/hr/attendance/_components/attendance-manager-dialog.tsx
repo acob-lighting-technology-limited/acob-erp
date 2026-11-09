@@ -36,6 +36,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 
+import { LinesSkeleton, RowsSkeleton } from "@/components/skeletons"
 const log = logger("attendance-manager-dialog")
 
 // ────────────────────────────────────────────────────────────
@@ -180,7 +181,7 @@ function EntriesPanel({
       )}
       <div className="max-h-56 space-y-1 overflow-auto rounded border p-2">
         {loading ? (
-          <p className="text-muted-foreground py-2 text-center text-sm">Loading…</p>
+          <RowsSkeleton rows={3} className="py-2" />
         ) : count === 0 ? (
           <p className="text-muted-foreground py-2 text-center text-sm">{search?.trim() ? "No matches" : emptyText}</p>
         ) : (
@@ -965,7 +966,7 @@ function HolidayTab({ onChanged }: { onChanged: () => void }) {
         />
         <div className="max-h-60 space-y-2 overflow-auto rounded border p-2">
           {allHolidays === null ? (
-            <p className="text-muted-foreground py-2 text-center text-sm">Loading…</p>
+            <LinesSkeleton lines={3} />
           ) : monthKeys.length === 0 ? (
             <p className="text-muted-foreground py-2 text-center text-sm">
               {listQuery ? "No matches" : "No holidays configured"}

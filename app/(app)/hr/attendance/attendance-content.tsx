@@ -20,7 +20,6 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
-import { AppealAuditTrail } from "@/components/hr/appeal-audit-trail"
 import { DeviceStatusDialog } from "@/components/hr/device-status-banner"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -766,10 +765,8 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
               })
             }
             isLoading={unifiedDays === null}
-            emptyTitle={unifiedDays === null ? "Loading attendance..." : "No attendance records"}
-            emptyDescription={
-              unifiedDays === null ? "Fetching your attendance status..." : "No records are available yet."
-            }
+            emptyTitle="No attendance records"
+            emptyDescription="No records are available yet."
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{
@@ -911,61 +908,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
             viewToggle
             contactsView
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-            expandable={{
-              render: (row) => {
-                const rowAppeals = appeals
-                  .filter((a) => a.appeal_date === row.date)
-                  .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
-                const latestAppeal = rowAppeals[0]
-
-                return (
-                  <div className="space-y-3 text-xs">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <div>
-                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock In</span>
-                        <span className="font-mono font-medium">{formatClockTime(row.clock_in)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock Out</span>
-                        <span className="font-mono font-medium">{getClockOutLabel(row)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Work Hours</span>
-                        <span className="font-medium">
-                          {row.workHours != null ? `${row.workHours.toFixed(2)} hrs` : "-"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-xs font-semibold uppercase">
-                          Missed Hours
-                        </span>
-                        <span className="font-medium">
-                          {(row.missedHoursValue ?? 0) > 0 ? `${row.missedHoursValue!.toFixed(2)} hrs` : "0.00 hrs"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {latestAppeal ? (
-                      <div className="space-y-3.5 border-t pt-3.5 text-sm">
-                        <div>
-                          <span className="text-muted-foreground mb-1 block text-xs font-semibold">
-                            {latestAppeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
-                          </span>
-                          <p className="text-foreground text-sm font-medium whitespace-pre-wrap">
-                            {latestAppeal.appeal_reason || "No reason specified"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <span className="text-muted-foreground mb-2 block text-xs font-semibold">Audit History</span>
-                          <AppealAuditTrail appeal={latestAppeal} />
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              },
-            }}
             cardRenderer={(row) => {
               const rowAppeals = appeals.filter((a) => a.appeal_date === row.date)
               const pendingAppeal = rowAppeals.find((a) => a.status === "pending")

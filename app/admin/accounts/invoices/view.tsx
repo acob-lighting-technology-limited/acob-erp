@@ -321,28 +321,6 @@ export function InvoicesPage({
             onClick: (invoice) => router.push(`${financeBasePath ?? "/admin/accounts"}/invoices/${invoice.id}`),
           },
         ]}
-        expandable={{
-          render: (invoice) => (
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Customer</p>
-                <p className="mt-2 text-sm font-medium">{invoice.customer_name}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Email</p>
-                <p className="mt-2 text-sm">{invoice.customer_email || "No email on file"}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Paid</p>
-                <p className="mt-2 text-sm">{formatCurrency(invoice.amount_paid, invoice.currency)}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Balance Due</p>
-                <p className="mt-2 text-sm font-medium">{formatCurrency(invoice.balance_due, invoice.currency)}</p>
-              </div>
-            </div>
-          ),
-        }}
         viewToggle
         contactsView
         stickyToolbar

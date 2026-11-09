@@ -96,6 +96,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server.
 [local_smtp]
+[local_smtp]
 enabled = true
 port = 54324
 # Uncomment to expose additional ports for testing user applications that send emails.

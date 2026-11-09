@@ -300,6 +300,15 @@ html.dark:has(.admin-shell[data-scope="lead"]) {
     width: 100%;
   }
 
+  /* Radix scroll lock (sheets, dialogs) puts overflow:hidden on <body> and marks it
+     data-scroll-locked. Because <html> sets its own overflow above, body's overflow no longer
+     propagates to the viewport, so the page scrollbar (painted on <html>) stayed visible and the
+     page behind an open sheet still scrolled. Lock <html> too. Radix already pads <body> by the
+     scrollbar width, so the layout does not shift. */
+  html:has(body[data-scroll-locked]) {
+    overflow: hidden;
+  }
+
   body {
     overflow-x: clip;
     width: 100%;

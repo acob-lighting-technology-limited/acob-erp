@@ -33,6 +33,7 @@ export const TaskBodySchema = z.object({
   task_start_date: z.string().optional().nullable(),
   task_end_date: z.string().optional().nullable(),
   source_type: z.enum(["manual", "help_desk", "action_item"]).default("manual"),
+  source_id: z.string().uuid().optional().nullable(),
 })
 
 export type TaskInput = z.infer<typeof TaskBodySchema>

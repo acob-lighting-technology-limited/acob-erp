@@ -116,7 +116,6 @@ const CommonFields = {
     .optional()
     .default([]),
   funding_category_id: z.string().uuid().nullish(),
-  help_desk_ticket_id: z.string().uuid().nullish(),
 }
 
 export const PaymentRequestSchema = z

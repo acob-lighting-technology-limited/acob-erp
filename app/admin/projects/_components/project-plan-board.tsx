@@ -66,6 +66,7 @@ import type { Project } from "@/components/projects/project-list-content"
 import { fetchProjectTasks, projectTasksKey, type WorkTask } from "@/lib/projects/work-tasks"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { RowsSkeleton } from "@/components/skeletons"
 type Plan = {
   id: string
   project_id: string
@@ -634,9 +635,8 @@ export function ProjectPlanBoard({
       </div>
 
       {plansLoading || tasksLoading ? (
-        <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading plans...
+        <div className="py-6">
+          <RowsSkeleton rows={3} />
         </div>
       ) : (
         <div className="space-y-2">

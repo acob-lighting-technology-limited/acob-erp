@@ -286,7 +286,11 @@ export const guideFaqGroups: GuideFaqGroup[] = [
       },
       {
         q: "Something is broken. Who do I tell?",
-        a: "Raise a Help Desk ticket with what you were doing and a screenshot if you can. Tickets are tracked, so nothing gets lost in a chat.",
+        a: "Raise a Help Desk ticket with what you were doing and a screenshot if you can. Tickets are tracked directly with an HD- number, separate from Tasks. When support resolves it, you'll be asked to provide a 1–5 service rating to close the ticket.",
+      },
+      {
+        q: "Do Help Desk tickets create Tasks on my task board?",
+        a: "No. Help Desk tickets are dedicated support requests and do not create mirror tasks on your task board. If a ticket develops into an extensive project, a department lead or admin can convert it into a formal task.",
       },
       {
         q: "Is my data private?",

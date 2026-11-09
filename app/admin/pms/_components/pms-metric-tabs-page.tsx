@@ -31,6 +31,7 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { LinesSkeleton } from "@/components/skeletons"
 type MetricKey = "kpi" | "goals" | "attendance" | "behaviour"
 type TabKey = "individual" | "department" | "cycle"
 type IconKey = "kpi" | "goals" | "attendance" | "behaviour"
@@ -331,9 +332,8 @@ function MetricAddForm({
       </div>
 
       {loading ? (
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading existing data...
+        <div className="w-64">
+          <LinesSkeleton lines={1} />
         </div>
       ) : null}
 

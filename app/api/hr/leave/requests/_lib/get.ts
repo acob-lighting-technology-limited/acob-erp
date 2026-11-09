@@ -6,6 +6,7 @@ import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-gu
 import { applyDataScopeV2 } from "@/lib/admin/policy-v2"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { findStagedLeaveAdminEntries, stagedLeaveEntryKey } from "@/lib/hr/attendance-appeals"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { getPaginationRange, PaginationSchema } from "@/lib/pagination"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -151,6 +152,14 @@ export async function GET(request: NextRequest) {
       approvalRows = approvalsData || []
     }
 
+    // Manual leaves: the admin who entered it lives on the linked appeal, not the leave row.
+    const stagedAdminEntries = await findStagedLeaveAdminEntries(
+      dataClient,
+      requestRows
+        .filter((row) => row.admin_manual && row.user_id)
+        .map((row) => ({ user_id: row.user_id as string, start_date: row.start_date ?? "" }))
+    )
+
     const profileIdSet = new Set<string>()
     for (const row of requestRows) {
       if (row.user_id) profileIdSet.add(row.user_id)
@@ -158,6 +167,10 @@ export async function GET(request: NextRequest) {
       if (row.supervisor_id) profileIdSet.add(row.supervisor_id)
       if (row.approved_by) profileIdSet.add(row.approved_by)
       if (row.current_approver_user_id) profileIdSet.add(row.current_approver_user_id)
+      if (row.admin_manual && row.user_id) {
+        const entry = stagedAdminEntries.get(stagedLeaveEntryKey(row.user_id, row.start_date ?? ""))
+        if (entry) profileIdSet.add(entry.reviewerId)
+      }
     }
     for (const approval of approvalRows) {
       if (approval.approver_id) profileIdSet.add(approval.approver_id)
@@ -248,6 +261,20 @@ export async function GET(request: NextRequest) {
           reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
           supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
           approved_by_profile: leaveRequest.approved_by ? profileMap.get(leaveRequest.approved_by) || null : null,
+          admin_entry_by_profile: (() => {
+            const entry =
+              leaveRequest.admin_manual && leaveRequest.user_id
+                ? stagedAdminEntries.get(stagedLeaveEntryKey(leaveRequest.user_id, leaveRequest.start_date ?? ""))
+                : undefined
+            return entry ? profileMap.get(entry.reviewerId) || null : null
+          })(),
+          admin_entry_at: (() => {
+            const entry =
+              leaveRequest.admin_manual && leaveRequest.user_id
+                ? stagedAdminEntries.get(stagedLeaveEntryKey(leaveRequest.user_id, leaveRequest.start_date ?? ""))
+                : undefined
+            return entry?.reviewedAt ?? null
+          })(),
           current_approver: leaveRequest.current_approver_user_id
             ? profileMap.get(leaveRequest.current_approver_user_id) || null
             : null,

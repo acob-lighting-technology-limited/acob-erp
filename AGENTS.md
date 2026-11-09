@@ -12,7 +12,7 @@ Do not treat a task as complete until all required checks pass. Run them on the 
 
 **Never run `npm run build`.** It takes ~3 minutes and fights the running dev server for `.next/`. Nothing builds locally or in CI — Vercel is the only place `next build` runs. The only exception is debugging a failure that reproduces *only* in a production build; say why before running it.
 
-- **Commit when the work is tangible.** A commit is a complete, verified unit someone could review and revert on its own: a fix, a feature slice, a refactor — with its migration, passing the checks above. Commit it then, following the [Commit Grouping Strategy](#commit-grouping-strategy--mandatory-before-any-commit). Do **not** commit half-done work, exploratory edits, or "WIP" to save progress, and do not leave a finished unit uncommitted when you hand back to the user.
+- **Commit only when the user says a piece is done.** Leave changes uncommitted while the user is reviewing or asking for tweaks. When they say a feature or request is done, make one commit for it (its code, its migration and its version-history line), following the [Commit Grouping Strategy](#commit-grouping-strategy--mandatory-before-any-commit). Do **not** commit each tweak as it lands, half-done work, exploratory edits, or "WIP".
 - **Database Migration Execution**: If any new `.sql` migrations were created or modified under `supabase/migrations/`:
   - **Always run `npx supabase migration list` to determine actual deployment status.** This is the sole source of truth — not `git status`.
   - A migration file that is untracked or unstaged in git is **not** automatically pending. Check the output of `migration list`: if the `remote` column is populated for that version, it has already been applied. Only flag a migration as pending if its `remote` field is empty.
@@ -196,7 +196,8 @@ Every rule here exists because breaking it already cost us something.
 
 ## Git and Hook Policy
 
-- Commit tangible, verified units of work (see Delivery Standard). Never commit half-done work.
+- Commit only when the user says a feature or request is done, one commit per feature. Never commit half-done work or each tweak separately.
+- Do not squash or rewrite commits that have been pushed. Squash local, unpushed commits only when the user asks.
 - Never use `git commit --no-verify`.
 - Never use `git push --no-verify`.
 - Do not bypass failing hooks. Fix the underlying issue.
@@ -209,7 +210,7 @@ Every rule here exists because breaking it already cost us something.
 
 ## Commit Grouping Strategy — Mandatory Before Any Commit
 
-**Never commit all uncommitted changes in a single `git add -A && git commit`.** You MUST commit every good unit of work done upon completing a task, feature, or fix. Always follow this workflow before committing:
+**Never commit all uncommitted changes in a single `git add -A && git commit`.** Commit when the user says the feature or request is done, as one commit per feature. Always follow this workflow before committing:
 
 ### Step 1 — Analyse before staging
 Run `git diff --stat HEAD` and `git status --short` to get the full list of modified and untracked files. Do **not** stage anything yet.
@@ -231,21 +232,30 @@ Stage and commit each group one at a time using `git add <specific files>` — n
 - ❌ Committing all changes in one shot without grouping analysis
 - ❌ Splitting a feature's migration into a separate commit from its app code
 
-## Version History — Update It With Every User-Facing Change (Mandatory)
+## Version History — Add a Line per Feature, Not per Tweak
 
 `/admin/version-history` is Matrix's release notes, read by admins. Its single
-source is `RELEASES` in `lib/version-history.ts`. A change staff or admins will
-notice is not finished until it has a line there, **in the same commit** as the
-feature or fix.
+source is `RELEASES` in `lib/version-history.ts`.
 
+- **When to add a line:** when a feature ships that staff or admins would notice
+  as something new or changed, such as a new capability, a changed workflow or a
+  visible behaviour change. Add it in the commit for that feature.
+- **One line per feature.** Several tweaks to the same feature are one line, not
+  one line each. Do not add a line for each commit.
+- **Skip:** refactors, lint, types, tests, tooling, migrations with no visible
+  effect, small visual tweaks (colour, contrast, spacing, copy), and fixes to
+  something that never reached users.
+- **Quick test:** would someone say "that's new" or "that changed" when they look
+  at the screen? If not, no line.
 - **One release per month, versioned `YYYY.MM`.** Add your line to the current
   month's release under the right `area`. When the month turns, add a new
-  release at the **top** with a `title` and one-sentence `summary`. Never
-  renumber or rewrite an old release, and do not invent semver numbers.
+  release at the **top** with a `title` and one-sentence `summary`. Do not invent
+  semver numbers.
+- **Condense long months.** When a month grows past about 12 lines, merge related
+  lines into fewer staff-facing ones. Keep every real capability; drop wording
+  about how it was built. Old months may be condensed the same way.
 - **Write for the reader, not the reviewer.** Say what people now see or can
   do ("Staff can hide their name on lunch votes"), not how it was built.
-- **Leave out** refactors, lint, types, tests, tooling, migrations with no
-  visible effect, and fixes to something that never reached users.
 - **Bigger changes for staff also get a `lib/whats-new.ts` entry**, which shows
   a one-time popup. That popup is not the history: an entry there still needs
   its line in `RELEASES`.
@@ -1267,3 +1277,13 @@ Before adding a new email template (Next.js `lib/email-templates/`, `lib/*-maile
   - `send-weekly-report` (uses `processRecipientBatch` to send to each recipient individually).
   - `send-communications-mail` (uses `processRecipientBatch` to send to each recipient individually).
 
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -309,28 +309,6 @@ export function BillsPage({
             },
           },
         ]}
-        expandable={{
-          render: (bill) => (
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Supplier</p>
-                <p className="mt-2 text-sm font-medium">{bill.supplier_name}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Total Amount</p>
-                <p className="mt-2 text-sm font-medium">{formatCurrency(bill.total_amount, bill.currency)}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Balance Due</p>
-                <p className="mt-2 text-sm font-medium">{formatCurrency(bill.balance_due, bill.currency)}</p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Due Window</p>
-                <p className="mt-2 text-sm font-medium">{getDateBand(bill)}</p>
-              </div>
-            </div>
-          ),
-        }}
         viewToggle
         contactsView
         stickyToolbar
