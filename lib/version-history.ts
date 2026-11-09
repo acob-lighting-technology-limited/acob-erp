@@ -37,6 +37,28 @@ export const RELEASES: Release[] = [
     summary: "Visual contrast improvements across status banners and approval workflows.",
     areas: [
       {
+        area: "Attendance",
+        items: [
+          "Attendance appeals now go to the department lead and then to the Admin & HR Lead, or the person they have delegated to; holding the admin role no longer lets someone approve them",
+          "A day's status is now changed first by the employee's department lead, not from the admin attendance page",
+          "A lead filing an appeal for their staff no longer counts against the three permission days a month",
+          "Appeals nobody decided by the end of the month after the day now expire; the day stays as recorded and the employee is told",
+          "Leads' daily summary lists overdue appeals (five working days) and those expiring this week",
+          "Overriding an approval is only open once it is stuck: five working days with no decision, or the approver on leave with no delegate",
+          "Appeals approved by the person they are about are marked Self-approved and listed for the MD under MD's Desk, with a monthly notice",
+          "Attendance policy settings are now in the Attendance page menu, and CBT settings are a button on the CBT page",
+        ],
+      },
+      {
+        area: "Admin access",
+        items: [
+          "HR and IT pages now separate viewing from editing: the lead of the owning department edits, everyone else with the admin role views, and a notice names who can make changes",
+          "Settings > Access lists who has been given edit access; leads hand their own access to a delegate, with an end date, from Settings > Delegation",
+          "Mailbox changes now need IT edit access, not just the admin role",
+          "IT pages (Onboarding, Mailboxes, Mail, Starlink, Network Activity, Bypass & Override) moved under IT, Payroll, Inventory and Assets under Accounts, and PMS under HR; old links still work",
+        ],
+      },
+      {
         area: "Starlink & Payments",
         items: [
           "Populated missing states across Starlink accounts (Adewole, Bondu, Olooji, Sule) to match their community projects",

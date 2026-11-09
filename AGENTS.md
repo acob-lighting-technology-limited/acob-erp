@@ -489,6 +489,29 @@ prevent lead-mode access to sections that should be admin-only.
 
 ---
 
+## Edit Access on HR and IT Routes — View Is Not Edit (Mandatory)
+
+On the HR routes (`hr.*`, `jobdescriptions.main`) and the IT routes (`it.main`,
+`security.networkActivity`, `security.bypassOverride`), holding the route in `admin_routes`
+means VIEW only. EDIT belongs to the lead of the owning department (HR: Admin and HR and
+Corporate Services; IT: IT and Communications, read from `lead_departments`, never a name),
+or to someone with an active row in `admin_edit_grants` (a developer / super admin grant, or a
+delegation from a holder). Developers and super admins view everything and get no automatic edit.
+
+- `canEditRouteV2` / `scopeCanEditRoute` in `lib/admin/policy-v2.ts` and `lib/admin/rbac.ts` are the only
+  check. Do not test `isAdminLike` or a role to decide who may change HR or IT data.
+- Mutating `/api/admin/**` calls on these sections are checked centrally in
+  `lib/supabase/middleware.ts` via `resolveApiEditRouteKeyV2`. A new mutating admin API for HR or IT
+  must map to a route key there; one that is not a page edit (an approval decided by stage, like
+  attendance appeals) is deliberately left out and enforces its own rule.
+- A new HR or IT page needs its route key in `resolveAdminRouteKeyV2`, and its layout should render
+  `ViewOnlyNotice`. A new route key also extends the `admin_routes` CHECK constraint.
+- Grants are written only through `/api/admin/access/grants` (`lib/admin/edit-grants.ts` holds the rules:
+  never to yourself, only to someone with the admin role who can already view the area, a delegation
+  needs an end date and cannot be delegated on).
+- Attendance appeals: the second stage belongs to the Admin & HR Lead and her delegates, not the admin
+  role (`appealReviewBlock`); override is for a stuck approval only (`overrideBlock`).
+
 ## Table Page Standard — Mandatory for All List/Data Pages
 
 Every page that shows a list of records **must** use `DataTablePage` + `DataTable`
@@ -1266,4 +1289,3 @@ Before adding a new email template (Next.js `lib/email-templates/`, `lib/*-maile
   - `send-attendance-daily-report` (loops through `recipientEmails` individually).
   - `send-weekly-report` (uses `processRecipientBatch` to send to each recipient individually).
   - `send-communications-mail` (uses `processRecipientBatch` to send to each recipient individually).
-
