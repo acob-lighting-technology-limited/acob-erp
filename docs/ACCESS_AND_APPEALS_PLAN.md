@@ -166,6 +166,11 @@ department's console pages to someone, until a date.
   refuses other API calls from the console unless the call belongs to a ticked page, or (for calls that belong to no
   known page) the page it was made from is ticked. That last rule rests on the Referer header, so a delegate crafting
   requests by hand could reach any API that honours the department context for this one department.
-- **Admin edit grants** (HR and IT pages under `/admin`) are separate and unchanged: Settings > Delegation.
+- **One dialog**: the same "Delegate access" dialog also hands over /admin edit access. A console page that has an
+  admin-side twin (Employees, Attendance, Leave, Offices & Rooms, PMS) hands that over too when the lead owns it, and a
+  lead who owns HR or IT also sees the admin-only pages (Departments, Job Descriptions, Lunch Register, Resource Booking,
+  the IT pages). Those grants point at the delegation (`admin_edit_grants.dept_delegation_id`) so withdrawing it, or its
+  end date, removes both. A delegate without the admin role gets the department pages only, and the dialog says so.
+  Settings > Delegation no longer exists; Settings > Access stays for developers and super admins to grant edit outright.
 - **Not built**: "on behalf of" in the audit log for actions a delegate takes; delegations do not end on their own
   when the lead changes (a new lead withdraws them from the same dialog).

@@ -8,6 +8,7 @@ import {
   type AdminRouteKeyV2,
 } from "@/lib/admin/policy-v2"
 import { canRevokeEditGrant, checkEditGrantRequest } from "@/lib/admin/edit-grants"
+import { loadOwnGrantRoutes, upsertEditGrants } from "@/lib/admin/edit-grants-store"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -128,16 +129,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle<{ id: string; role: string | null; admin_routes: string[] | null; full_name: string | null }>()
   if (!target) return NextResponse.json({ error: "Person not found" }, { status: 404 })
 
-  const { data: ownRows } = await client
-    .from("admin_edit_grants")
-    .select("route_key, valid_until")
-    .eq("user_id", scope.userId)
-    .is("revoked_at", null)
-    .is("delegated_from", null)
-    .returns<Array<{ route_key: string; valid_until: string | null }>>()
-  const actorOwnGrantRoutes = (ownRows ?? [])
-    .filter((row) => !row.valid_until || new Date(row.valid_until).getTime() > now.getTime())
-    .map((row) => row.route_key as AdminRouteKeyV2)
+  const actorOwnGrantRoutes = await loadOwnGrantRoutes(client, scope.userId, now)
 
   const validUntil = body.validUntil ? new Date(body.validUntil) : null
   const problem = checkEditGrantRequest({
@@ -160,30 +152,14 @@ export async function POST(request: NextRequest) {
   if (problem) return NextResponse.json({ error: problem }, { status: 400 })
 
   const delegatedFrom = body.mode === "delegate" ? scope.userId : null
-  for (const route of routes) {
-    let existing = client
-      .from("admin_edit_grants")
-      .select("id")
-      .eq("user_id", target.id)
-      .eq("route_key", route)
-      .is("revoked_at", null)
-    existing = delegatedFrom ? existing.eq("delegated_from", delegatedFrom) : existing.is("delegated_from", null)
-    const { data: found } = await existing.limit(1).maybeSingle<{ id: string }>()
-
-    const { error } = found
-      ? await client
-          .from("admin_edit_grants")
-          .update({ valid_until: validUntil ? validUntil.toISOString() : null, granted_by: scope.userId })
-          .eq("id", found.id)
-      : await client.from("admin_edit_grants").insert({
-          user_id: target.id,
-          route_key: route,
-          delegated_from: delegatedFrom,
-          granted_by: scope.userId,
-          valid_until: validUntil ? validUntil.toISOString() : null,
-        })
-    if (error) return serverError(log, error)
-  }
+  const { error } = await upsertEditGrants(client, {
+    targetId: target.id,
+    routes,
+    validUntil,
+    grantedBy: scope.userId,
+    delegatedFrom,
+  })
+  if (error) return serverError(log, error)
 
   await writeAuditLog(
     supabase,

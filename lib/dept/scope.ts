@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { consolePageKeys } from "@/lib/dept/delegated-pages"
 import { normalizeDepartmentName, normalizeDepartmentList, isSameDepartment } from "@/shared/departments"
 
 /** Set when the person is not the lead but holds a department delegation from the lead. */
@@ -124,7 +125,8 @@ async function loadDelegation(
 
   const rows = data ?? []
   if (rows.length === 0) return null
-  const pages = Array.from(new Set(rows.flatMap((row) => row.pages ?? [])))
+  // Admin-side page keys ride along in the same row; only console pages open the console.
+  const pages = consolePageKeys(Array.from(new Set(rows.flatMap((row) => row.pages ?? []))))
   if (pages.length === 0) return null
   const latest = rows.reduce((a, b) => (new Date(a.valid_until) > new Date(b.valid_until) ? a : b))
   return { fromUserId: latest.delegator_id, pages, validUntil: latest.valid_until }

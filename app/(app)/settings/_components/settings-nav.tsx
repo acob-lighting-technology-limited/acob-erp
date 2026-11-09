@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { User, KeyRound, Bell, PenLine, Users } from "lucide-react"
+import { User, KeyRound, Bell, PenLine } from "lucide-react"
 
 const SETTINGS_TABS = [
   {
@@ -29,11 +29,9 @@ const SETTINGS_TABS = [
   },
 ]
 
-export function SettingsNav({ showDelegation = false }: { showDelegation?: boolean }) {
+export function SettingsNav() {
   const pathname = usePathname()
-  const tabs = showDelegation
-    ? [...SETTINGS_TABS, { name: "Delegation", href: "/settings/delegation", icon: Users }]
-    : SETTINGS_TABS
+  const tabs = SETTINGS_TABS
 
   return (
     <div className="bg-muted text-muted-foreground inline-flex h-11 max-w-full items-center justify-start overflow-x-auto rounded-lg p-1">

@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
-import { DEPT_DELEGABLE_PAGES } from "@/lib/dept/delegated-pages"
+import { ADMIN_ONLY_PAGES, DEPT_DELEGABLE_PAGES } from "@/lib/dept/delegated-pages"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
 
@@ -35,14 +35,35 @@ interface Candidate {
   id: string
   name: string
   department: string | null
+  is_admin: boolean
+}
+
+interface AdminPage {
+  key: string
+  label: string
+  group: string
 }
 
 interface DelegationData {
   delegations: DelegationRow[]
   candidates: Candidate[]
+  /** Admin-side pages this lead is able to hand over. */
+  adminPages: AdminPage[]
+  /** The /admin edit routes this lead can pass on, including those behind console pages. */
+  adminRoutes: string[]
 }
 
-const PAGE_LABEL = new Map(DEPT_DELEGABLE_PAGES.map((page) => [page.key, page.label]))
+interface PageOption {
+  key: string
+  label: string
+  /** Also hands over the matching page on the admin side. */
+  alsoAdmin: boolean
+}
+
+const PAGE_LABEL = new Map<string, string>([
+  ...DEPT_DELEGABLE_PAGES.map((page) => [page.key, page.label] as const),
+  ...ADMIN_ONLY_PAGES.map((page) => [page.key, page.label] as const),
+])
 
 /** End of the chosen day in West Africa Time, as an ISO string with offset. */
 function endOfDayWat(date: string) {
@@ -55,9 +76,11 @@ async function readError(res: Response, fallback: string) {
 }
 
 /**
- * "Delegate access" on a department page. The lead picks who, which of their department's pages,
- * and until when; that person then sees this department with only those pages. Also lists what
- * is currently handed out, with a way to take it back.
+ * "Delegate access" on a department page: the one place a lead hands work to someone else. The lead
+ * picks who, which pages, and until when. Console pages open that department for the delegate;
+ * pages that also exist on the admin side hand over edit there too, and admin-only pages (Lunch
+ * Register and the like) are listed for leads who own them. Also lists what is handed out, with a
+ * way to take it back.
  */
 export function DeptDelegationButton({ deptId }: { deptId: string }) {
   const queryClient = useQueryClient()
@@ -78,10 +101,28 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
   })
 
   const groups = useMemo(() => {
-    const map = new Map<string, typeof DEPT_DELEGABLE_PAGES>()
-    for (const page of DEPT_DELEGABLE_PAGES) map.set(page.group, [...(map.get(page.group) ?? []), page])
+    const adminRoutes = data?.adminRoutes ?? []
+    const map = new Map<string, PageOption[]>()
+    const add = (group: string, option: PageOption) => map.set(group, [...(map.get(group) ?? []), option])
+    for (const page of DEPT_DELEGABLE_PAGES) {
+      add(page.group, {
+        key: page.key,
+        label: page.label,
+        alsoAdmin: (page.adminRoutes ?? []).some((route) => adminRoutes.includes(route)),
+      })
+    }
+    for (const page of data?.adminPages ?? []) add(page.group, { key: page.key, label: page.label, alsoAdmin: false })
     return Array.from(map.entries())
-  }, [])
+  }, [data])
+
+  const person = data?.candidates.find((candidate) => candidate.id === personId)
+  const needsAdminRole = useMemo(() => {
+    const onAdminSide = new Set<string>([...(data?.adminPages ?? []).map((page) => page.key)])
+    for (const page of DEPT_DELEGABLE_PAGES) {
+      if ((page.adminRoutes ?? []).some((route) => data?.adminRoutes.includes(route))) onAdminSide.add(page.key)
+    }
+    return pages.some((key) => onAdminSide.has(key))
+  }, [data, pages])
 
   const save = useMutation({
     mutationFn: async () => {
@@ -91,9 +132,11 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
         body: JSON.stringify({ delegateId: personId, pages, validUntil: endOfDayWat(until) }),
       })
       if (!res.ok) throw await readError(res, "Could not save")
+      return (await res.json()) as { skipped?: Array<{ label: string; reason: string }> }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success("Access delegated")
+      for (const item of result.skipped ?? []) toast.warning(`${item.label} not included: ${item.reason}`)
       setPersonId("")
       setPages([])
       setUntil("")
@@ -116,6 +159,11 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
 
   const canSubmit = Boolean(personId) && pages.length > 0 && Boolean(until)
 
+  function toggleGroup(options: PageOption[], on: boolean) {
+    const keys = options.map((option) => option.key)
+    setPages((prev) => (on ? Array.from(new Set([...prev, ...keys])) : prev.filter((key) => !keys.includes(key))))
+  }
+
   return (
     <>
       <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setOpen(true)}>
@@ -128,8 +176,8 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
           <DialogHeader>
             <DialogTitle>Delegate access</DialogTitle>
             <DialogDescription>
-              Let someone work in this department for you. They see only the pages you tick, until the date you choose.
-              You can take it back any time.
+              Let someone do part of your work for you. Tick what they may use, and the date it ends. You can take it
+              back any time.
             </DialogDescription>
           </DialogHeader>
 
@@ -141,33 +189,58 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
                 onValueChange={setPersonId}
                 placeholder="Choose a person"
                 searchPlaceholder="Search people..."
-                options={(data?.candidates ?? []).map((person) => ({
-                  value: person.id,
-                  label: person.department ? `${person.name} (${person.department})` : person.name,
+                options={(data?.candidates ?? []).map((candidate) => ({
+                  value: candidate.id,
+                  label: candidate.department ? `${candidate.name} (${candidate.department})` : candidate.name,
                 }))}
               />
+              {person && !person.is_admin && needsAdminRole && (
+                <p className="text-warning text-xs">
+                  {person.name} is not an admin, so pages marked &quot;admin side&quot; will not be included. They get
+                  the department pages only.
+                </p>
+              )}
             </section>
 
             <section className="space-y-3">
-              <Label>2. Which pages?</Label>
-              {groups.map(([group, groupPages]) => (
-                <div key={group} className="space-y-2 rounded-lg border p-3">
-                  <p className="text-sm font-semibold">{group}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {groupPages.map((page) => (
-                      <label key={page.key} className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={pages.includes(page.key)}
-                          onCheckedChange={(checked) =>
-                            setPages((prev) => (checked ? [...prev, page.key] : prev.filter((key) => key !== page.key)))
-                          }
-                        />
-                        {page.label}
-                      </label>
-                    ))}
+              <Label>2. What can they use?</Label>
+              {groups.map(([group, options]) => {
+                const allOn = options.every((option) => pages.includes(option.key))
+                return (
+                  <div key={group} className="space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{group}</p>
+                      <button
+                        type="button"
+                        className="text-primary text-xs hover:underline"
+                        onClick={() => toggleGroup(options, !allOn)}
+                      >
+                        {allOn ? "Clear" : "Select all"}
+                      </button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {options.map((option) => (
+                        <label key={option.key} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={pages.includes(option.key)}
+                            onCheckedChange={(checked) =>
+                              setPages((prev) =>
+                                checked ? [...prev, option.key] : prev.filter((key) => key !== option.key)
+                              )
+                            }
+                          />
+                          <span>
+                            {option.label}
+                            {option.alsoAdmin && (
+                              <span className="text-muted-foreground block text-xs">Also on the admin side</span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </section>
 
             <section className="space-y-2">

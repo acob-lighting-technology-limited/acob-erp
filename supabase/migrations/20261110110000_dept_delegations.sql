@@ -41,3 +41,13 @@ CREATE POLICY dept_delegations_read ON public.dept_delegations
     OR delegator_id = (SELECT auth.uid())
     OR public.is_admin_like()
   );
+
+-- A delegation from the department page can also hand over /admin edit access (Lunch Register,
+-- Attendance edit and so on). Those grants point back at the delegation so that withdrawing it,
+-- or its end date, takes both away together.
+ALTER TABLE public.admin_edit_grants
+  ADD COLUMN IF NOT EXISTS dept_delegation_id uuid REFERENCES public.dept_delegations(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_admin_edit_grants_dept_delegation
+  ON public.admin_edit_grants (dept_delegation_id)
+  WHERE dept_delegation_id IS NOT NULL;

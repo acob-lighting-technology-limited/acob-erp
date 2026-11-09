@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         area: "Admin access",
         items: [
           "HR and IT pages now separate viewing from editing: the lead of the owning department edits, everyone else with the admin role views, and a notice names who can make changes",
-          "Settings > Access lists who has been given edit access; leads hand their own access to a delegate, with an end date, from Settings > Delegation",
+          "Settings > Access lists every admin with a View or Edit choice for HR and IT; leads hand work to a delegate, with an end date, from Delegate access on their department page",
           "Mailbox changes now need IT edit access, not just the admin role",
           "IT pages (Onboarding, Mailboxes, Mail, Starlink, Network Activity, Bypass & Override) moved under IT, Payroll, Inventory and Assets under Accounts, and PMS under HR; old links still work",
         ],

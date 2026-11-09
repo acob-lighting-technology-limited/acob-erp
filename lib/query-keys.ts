@@ -183,9 +183,7 @@ export const QUERY_KEYS = {
   adminUsersSettings: () => ["admin-users-settings"],
   adminRolesSettings: () => ["admin-roles-settings"],
   adminAccessGrants: () => ["admin-access-grants"],
-  adminAccessCandidates: () => ["admin-access-candidates"],
   adminAccessPeople: () => ["admin-access-people"],
-  adminAccessDelegable: () => ["admin-access-delegable"],
   deptDelegations: (deptId: string) => ["dept-delegations", deptId],
 
   // Inventory pages

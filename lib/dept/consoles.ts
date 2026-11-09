@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { consolePageKeys } from "@/lib/dept/delegated-pages"
 import { normalizeDepartmentName } from "@/shared/departments"
 import type { Database } from "@/types/database"
 
@@ -42,13 +43,14 @@ export async function resolveDeptConsoles(
 async function resolveDelegatedConsoles(supabase: SupabaseClient<Database>, userId: string): Promise<DeptConsole[]> {
   const { data } = await supabase
     .from("dept_delegations" as never)
-    .select("department_id")
+    .select("department_id, pages")
     .eq("delegate_id", userId)
     .is("revoked_at", null)
     .gt("valid_until", new Date().toISOString())
-  const ids = Array.from(
-    new Set(((data ?? []) as unknown as Array<{ department_id: string }>).map((row) => row.department_id))
+  const live = ((data ?? []) as unknown as Array<{ department_id: string; pages: string[] | null }>).filter(
+    (row) => consolePageKeys(row.pages ?? []).length > 0
   )
+  const ids = Array.from(new Set(live.map((row) => row.department_id)))
   if (ids.length === 0) return []
   const { data: depts } = await supabase.from("departments").select("id, name").in("id", ids)
   type DeptRow = Pick<Database["public"]["Tables"]["departments"]["Row"], "id" | "name">

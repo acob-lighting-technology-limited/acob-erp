@@ -1,23 +1,9 @@
 import type { ReactNode } from "react"
-import { createClient } from "@/lib/supabase/server"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { loadDelegableRoutes } from "@/lib/admin/delegable-routes"
 import { SettingsNav } from "./_components/settings-nav"
 import { Settings } from "lucide-react"
 
-export default async function SettingsLayout({ children }: { children: ReactNode }) {
-  // The Delegation tab is only for people who hold edit access they can hand on.
-  let showDelegation = false
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) showDelegation = (await loadDelegableRoutes(supabase, user.id)).length > 0
-  } catch {
-    showDelegation = false
-  }
-
+export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
@@ -26,7 +12,7 @@ export default async function SettingsLayout({ children }: { children: ReactNode
         icon={Settings}
         backLink={{ href: "/profile", label: "Back to Home" }}
       />
-      <SettingsNav showDelegation={showDelegation} />
+      <SettingsNav />
       <div className="pt-2">{children}</div>
     </PageWrapper>
   )

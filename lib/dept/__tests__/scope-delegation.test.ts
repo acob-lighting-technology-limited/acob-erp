@@ -83,3 +83,16 @@ test("without a live delegation a non-lead gets nothing", async () => {
   )
   assert.equal(scope, null)
 })
+
+test("a delegation that holds only admin-side pages does not open the department console", async () => {
+  const scope = await resolveDeptScope(
+    client({
+      profiles: STAFF_PROFILE,
+      departments: DEPT,
+      dept_delegations: [{ delegator_id: "lead-1", pages: ["hr.lunch"], valid_until: "2027-01-31T23:59:59Z" }],
+    }),
+    "rafiat",
+    "dept-1"
+  )
+  assert.equal(scope, null)
+})
