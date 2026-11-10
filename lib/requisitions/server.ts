@@ -197,11 +197,14 @@ export async function withSignedUrls(admin: SupabaseClient, req: Requisition): P
     })
   )
 
-  // The requester signs the form too: "Requested by" on a voucher, and any
-  // stage they hold themselves (an HR Lead's or the MD's own request).
+  // The requester signs the form too: "Requested by", and any stage they hold themselves
+  // (an HR Lead's or the MD's own request). The signature stamped at submission is used;
+  // requisitions raised before that existed fall back to the requester's current one.
   let requesterSignatureUrl: string | null = null
   try {
-    requesterSignatureUrl = (await getSigningStatus(admin, req.user_id)).signature_url
+    requesterSignatureUrl = req.requester_signature_path
+      ? await signedStorageUrl(admin, SIGNATURE_BUCKET, req.requester_signature_path)
+      : (await getSigningStatus(admin, req.user_id)).signature_url
   } catch (err) {
     log.warn("Failed to load the requester's signature", { requisitionId: req.id, err })
   }

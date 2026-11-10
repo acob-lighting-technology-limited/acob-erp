@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import {
   ArrowLeft,
@@ -28,6 +30,7 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { PinInput } from "@/components/approval-signing/pin-input"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira } from "@/lib/requisitions/format"
 import {
@@ -242,6 +245,13 @@ export function NewRequisitionDialog({
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // Submitting signs "Requested by": the requester confirms with their approval PIN.
+  const [pin, setPin] = useState("")
+  const [signing, setSigning] = useState<{ has_signature: boolean; has_pin: boolean } | null>(null)
+  const pathname = usePathname()
+  const signingMissing = signing
+    ? [!signing.has_signature && "signature", !signing.has_pin && "PIN"].filter(Boolean)
+    : []
   const [banks, setBanks] = useState<NigerianBank[]>([...NIGERIAN_BANKS])
   const [lookups, setLookups] = useState<Record<string, AccountLookup>>({})
 
@@ -258,6 +268,11 @@ export function NewRequisitionDialog({
     setBeneficiaries([emptyBeneficiary()])
     setAttachments([])
     setLookups({})
+    setPin("")
+    apiFetch("/api/profile/signing")
+      .then((res) => res.json())
+      .then((json) => setSigning(json?.data ?? null))
+      .catch(() => setSigning(null))
     setLoadingProjects(true)
 
     apiFetch("/api/requisitions/banks")
@@ -471,6 +486,11 @@ export function NewRequisitionDialog({
       return
     }
 
+    if (pin.length !== 6) {
+      toast.error("Enter your 6-digit approval PIN to sign the request")
+      return
+    }
+
     const beneficiaryPayload = beneficiaries.map((b) => ({
       account_name: b.account_name,
       account_number: b.account_number.replace(/\s/g, ""),
@@ -480,6 +500,7 @@ export function NewRequisitionDialog({
       ...(showSplit && b.amount ? { amount: Number(b.amount) } : {}),
     }))
     const common = {
+      pin,
       beneficiary_details: beneficiaryPayload,
       attachments,
     }
@@ -513,6 +534,7 @@ export function NewRequisitionDialog({
       onSuccess?.(json.data)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not submit the requisition")
+      setPin("")
     } finally {
       setSubmitting(false)
     }
@@ -836,6 +858,23 @@ export function NewRequisitionDialog({
                 </ul>
               </div>
             ) : null}
+
+            <div className="space-y-2 rounded-md border p-3">
+              <Label htmlFor="req-pin">Sign and submit</Label>
+              {signingMissing.length ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                  <span>Before you can submit, set up your {signingMissing.join(" and ")}.</span>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/settings/signing?return=${encodeURIComponent(pathname)}`}>Set up signing</Link>
+                  </Button>
+                </div>
+              ) : (
+                <PinInput id="req-pin" value={pin} onChange={setPin} />
+              )}
+              <p className="text-muted-foreground text-xs">
+                Your signature goes on the form as &ldquo;Requested by&rdquo;, with your name and today&apos;s date.
+              </p>
+            </div>
           </div>
         )}
 
@@ -846,10 +885,18 @@ export function NewRequisitionDialog({
             </Button>
             <Button
               onClick={submit}
-              disabled={submitting || uploading || Boolean(rangeProblem) || total <= 0 || isPaymentRequestIncomplete}
+              disabled={
+                submitting ||
+                uploading ||
+                Boolean(rangeProblem) ||
+                total <= 0 ||
+                isPaymentRequestIncomplete ||
+                signingMissing.length > 0 ||
+                pin.length !== 6
+              }
             >
               {submitting || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Submit {FORM_LABELS[formType]}
+              Sign and submit {FORM_LABELS[formType]}
             </Button>
           </DialogFooter>
         ) : null}

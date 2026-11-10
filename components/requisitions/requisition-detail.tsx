@@ -11,8 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira, progressLabel, STATUS_LABELS } from "@/lib/requisitions/format"
 import { downloadRequisitionPdf } from "@/lib/requisitions/document-pdf"
+import { attachmentHref, attachmentKind } from "@/lib/requisitions/attachment-types"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
+import { RequisitionAttachments } from "./requisition-attachments"
 import { RequisitionDocument } from "./requisition-document"
 import { RequisitionStageList, when } from "./requisition-stage-list"
 import { PaymentDialog } from "./payment-dialog"
@@ -42,7 +44,15 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
     setDownloading(true)
     try {
       // Slashes are not allowed in file names: PR/HR/26/001 saves as PR-HR-26-001.pdf.
-      await downloadRequisitionPdf(sheetRef.current, `${requisition.requisition_number.replace(/\//g, "-")}.pdf`)
+      await downloadRequisitionPdf(
+        sheetRef.current,
+        `${requisition.requisition_number.replace(/\//g, "-")}.pdf`,
+        (requisition.attachments || []).map((file, i) => ({
+          name: file.file_name,
+          kind: attachmentKind(file.file_name, file.file_type),
+          href: attachmentHref(requisition.id, i),
+        }))
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create the PDF")
     } finally {
@@ -107,12 +117,17 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
         />
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={statusBadgeVariant(requisition.status)}>{STATUS_LABELS[requisition.status]}</Badge>
-          <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
+          {progressLabel(requisition) !== STATUS_LABELS[requisition.status] ? (
+            <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
+          ) : null}
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <RequisitionDocument ref={sheetRef} requisition={requisition} />
+        <div className="min-w-0 space-y-6">
+          <RequisitionDocument ref={sheetRef} requisition={requisition} />
+          <RequisitionAttachments requisition={requisition} />
+        </div>
 
         <aside className="space-y-4">
           {canSign || viewer.can_record_payment ? (
@@ -225,20 +240,16 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
                 <CardTitle className="text-base">Supporting documents</CardTitle>
               </CardHeader>
               <CardContent className="max-h-60 space-y-2 overflow-y-auto pr-1">
-                {requisition.attachments.map((file) =>
-                  file.signed_url ? (
-                    <a
-                      key={file.file_path}
-                      href={file.signed_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:bg-muted flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                    >
-                      <FileText className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{file.file_name}</span>
-                    </a>
-                  ) : null
-                )}
+                {requisition.attachments.map((file, i) => (
+                  <a
+                    key={`${file.file_path}-${i}`}
+                    href={`#attachment-${i}`}
+                    className="hover:bg-muted flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                  >
+                    <FileText className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
+                    <span className="truncate">{file.file_name}</span>
+                  </a>
+                ))}
               </CardContent>
             </Card>
           ) : null}

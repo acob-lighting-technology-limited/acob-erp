@@ -80,6 +80,8 @@ function checkBeneficiarySplit(
 }
 
 const CommonFields = {
+  /** The requester's approval PIN: submitting signs "Requested by". Checked by the server, never stored. */
+  pin: PIN,
   beneficiary_details: z.array(BeneficiarySchema).min(1, "Add at least one beneficiary"),
   // Supporting documents are optional — up to 20 files, max 20 MB combined.
   attachments: z
