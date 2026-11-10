@@ -13,6 +13,7 @@ import type {
   RequisitionAttachment,
   RequisitionFormType,
   RequisitionPayment,
+  RequisitionPerson,
   RequisitionStage,
   RequisitionViewerActions,
 } from "./types"
@@ -135,6 +136,21 @@ export async function loadRequisition(admin: SupabaseClient, id: string): Promis
 }
 
 /** Adds short-lived signed URLs for attachments, signatures and receipts. */
+/** Payment officers per form, for showing who pays next. */
+export async function loadPaymentOfficers(admin: SupabaseClient): Promise<Record<string, RequisitionPerson[]>> {
+  const { data } = await admin
+    .from("requisition_payment_processors")
+    .select(
+      "form_type, person:profiles!requisition_payment_processors_profile_id_fkey(id, full_name, department, designation)"
+    )
+    .order("created_at")
+  const byForm: Record<string, RequisitionPerson[]> = {}
+  for (const row of (data || []) as unknown as { form_type: string; person: RequisitionPerson | null }[]) {
+    if (row.person) (byForm[row.form_type] ||= []).push(row.person)
+  }
+  return byForm
+}
+
 export async function withSignedUrls(admin: SupabaseClient, req: Requisition): Promise<Requisition> {
   const onedrive = getOneDriveService()
   const onedriveEnabled = onedrive.isEnabled()
@@ -211,7 +227,9 @@ export async function withSignedUrls(admin: SupabaseClient, req: Requisition): P
     log.warn("Failed to load the requester's signature", { requisitionId: req.id, err })
   }
 
-  return { ...req, attachments, stages, payments, requester_signature_url: requesterSignatureUrl }
+  const payment_officers = (await loadPaymentOfficers(admin))[req.form_type] ?? []
+
+  return { ...req, attachments, stages, payments, payment_officers, requester_signature_url: requesterSignatureUrl }
 }
 
 /** The stage a person would sign now, and what signing it would bypass. Mirrors requisition_sign. */

@@ -13,6 +13,7 @@ import {
   REQUISITION_LIST_SELECT,
   findSignableStage,
   getViewerContext,
+  loadPaymentOfficers,
   loadRequisition,
   loadRoutingLeads,
 } from "@/lib/requisitions/server"
@@ -95,8 +96,14 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.returns<Requisition[]>()
     if (error) throw error
     // sign_stage_id lets the table offer Sign and Reject on the rows she can act on.
+    const officers = await loadPaymentOfficers(admin)
     const rows = (data || []).map((req) => ({
       ...req,
+      payment_officers: officers[req.form_type] ?? [],
+      can_pay:
+        viewer.paymentFormTypes.includes(req.form_type) &&
+        req.user_id !== user.id &&
+        (req.status === "awaiting_payment" || req.status === "partly_paid"),
       stages: [...(req.stages || [])].sort((a, b) => a.position - b.position),
       sign_stage_id: findSignableStage(req, user.id)?.stage.id ?? null,
     }))

@@ -51,6 +51,7 @@ import type {
   RequisitionViewerActions,
 } from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
+import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
@@ -133,6 +134,17 @@ export function RequisitionsListPage({
     viewer: RequisitionViewerActions
     mode: SignMode
   } | null>(null)
+
+  const [paying, setPaying] = useState<{ requisition: Requisition; viewer: RequisitionViewerActions } | null>(null)
+
+  async function openPay(row: Requisition) {
+    try {
+      const json = await apiJson<{ data: Requisition; viewer: RequisitionViewerActions }>(`/api/requisitions/${row.id}`)
+      setPaying({ requisition: json.data, viewer: json.viewer })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not open this requisition")
+    }
+  }
 
   // Opens the sign or reject dialog for a row. The detail record carries the
   // viewer's signing state, which the dialog needs.
@@ -413,6 +425,7 @@ export function RequisitionsListPage({
                 requisition={r}
                 onOpen={() => setPreviewId(r.id)}
                 onSign={r.sign_stage_id ? (mode) => void openSign(r, mode) : undefined}
+                onPay={r.can_pay ? () => void openPay(r) : undefined}
               />
             ),
           }}
@@ -435,6 +448,12 @@ export function RequisitionsListPage({
               variant: "destructive",
               onClick: (r) => void openSign(r, "reject"),
               hidden: (r) => !r.sign_stage_id,
+            },
+            {
+              label: "Record payment",
+              icon: Wallet,
+              onClick: (r) => void openPay(r),
+              hidden: (r) => !r.can_pay,
             },
             { label: "View", icon: Eye, onClick: (r) => setPreviewId(r.id) },
           ]}
@@ -525,6 +544,19 @@ export function RequisitionsListPage({
         />
       ) : null}
 
+      {paying ? (
+        <PaymentDialog
+          open
+          onOpenChange={(open) => !open && setPaying(null)}
+          requisition={paying.requisition}
+          viewer={paying.viewer}
+          onDone={() => {
+            setPaying(null)
+            void fetchRows()
+          }}
+        />
+      ) : null}
+
       <NewRequisitionDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
@@ -538,6 +570,7 @@ export function RequisitionsListPage({
         onSign={(req, viewerActions, mode) => {
           setSigning({ requisition: req, viewer: viewerActions, mode })
         }}
+        onPay={(req, viewerActions) => setPaying({ requisition: req, viewer: viewerActions })}
       />
       <ExportOptionsDialog
         open={isExportOpen}
