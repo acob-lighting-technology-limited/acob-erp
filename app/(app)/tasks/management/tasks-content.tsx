@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { isTaskOverdue as isTaskPastDeadline, isTaskEscalated } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
-import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
@@ -24,7 +23,7 @@ import {
 } from "lucide-react"
 
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
-import { loadUserTasks } from "@/components/tasks/user-tasks-data"
+import { useTaskUpdatesQuery, useUserTasksQuery, type TaskUpdate } from "@/components/tasks/use-user-tasks-query"
 import { Button } from "@/components/ui/button"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -52,23 +51,7 @@ export type { Task, TaskUserProfile } from "@/types/task"
 
 const log = logger("tasks-management-tasks-content")
 
-export interface TaskUpdate {
-  id: string
-  content?: string
-  update_type: string
-  created_at: string
-  old_value?: string | null
-  new_value?: string | null
-  user?: {
-    first_name: string
-    last_name: string
-  }
-}
-
-type TaskUpdateRow = Omit<TaskUpdate, "user"> & {
-  user_id?: string | null
-  user?: Array<{ first_name: string; last_name: string }> | { first_name: string; last_name: string } | null
-}
+export type { TaskUpdate }
 
 interface TasksContentProps {
   initialTasks: Task[]
@@ -122,7 +105,8 @@ function isTaskOverdue(task: Task): boolean {
 }
 
 export function TasksContent({ initialTasks, userId, userProfile }: TasksContentProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const tasksQuery = useUserTasksQuery(userId, userProfile, initialTasks)
+  const tasks = tasksQuery.data
   const staffAvatars = useStaffAvatars()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
@@ -130,10 +114,10 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   // Series you hold whose next task is not created yet; table rows only, never the stats.
   const scheduledRows = useScheduledSeriesRows(tasks, { mine: true })
   const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])
-  const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
+  const taskUpdatesQuery = useTaskUpdatesQuery(selectedTask?.id ?? null)
+  const taskUpdates = taskUpdatesQuery.data ?? []
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isPostingComment, setIsPostingComment] = useState(false)
-  const supabase = createClient()
 
   const isLeadOrAdminUser = useMemo(() => {
     const role = String(userProfile?.role || "").toLowerCase()
@@ -183,70 +167,23 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     [tasks]
   )
 
+  // Refetches the list and returns it, so the open details sheet can pick up the fresh row.
   const loadTasks = async () => {
-    try {
-      const loaded = await loadUserTasks(supabase, userId, userProfile)
-      setTasks(loaded)
-      return loaded
-    } catch (error: unknown) {
-      log.error("Error loading tasks:", error)
+    const result = await tasksQuery.refetch()
+    if (result.error) {
+      log.error("Error loading tasks:", result.error)
       toast.error("Failed to load tasks")
       return null
     }
+    return result.data ?? null
   }
 
-  const loadTaskUpdates = useCallback(
-    async (taskId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from("task_updates")
-          .select("id, content, update_type, created_at, old_value, new_value, user_id")
-          .eq("task_id", taskId)
-          .order("created_at", { ascending: false })
-
-        if (error) throw error
-
-        const rows = (data as TaskUpdateRow[] | null) || []
-        const userIds = Array.from(new Set(rows.map((entry) => entry.user_id).filter(Boolean))) as string[]
-        const { data: profiles } =
-          userIds.length > 0
-            ? await supabase.from("profiles").select("id, first_name, last_name").in("id", userIds)
-            : { data: [] }
-        const profileMap = new Map(
-          ((profiles as Array<{ id: string; first_name: string; last_name: string }> | null) || []).map((profile) => [
-            profile.id,
-            { first_name: profile.first_name, last_name: profile.last_name },
-          ])
-        )
-
-        const normalizedUpdates = rows.map((entry) => ({
-          id: entry.id,
-          content: entry.content,
-          update_type: entry.update_type,
-          created_at: entry.created_at,
-          old_value: entry.old_value,
-          new_value: entry.new_value,
-          user: entry.user_id ? profileMap.get(entry.user_id) : undefined,
-        }))
-        setTaskUpdates(normalizedUpdates)
-      } catch (error) {
-        log.error("Error loading task updates:", error)
-        setTaskUpdates([])
-      }
-    },
-    [supabase]
-  )
-
-  const openTaskDetails = useCallback(
-    async (task: Task) => {
-      // A scheduled row is a series whose task is not created yet: open the series instead.
-      if (isScheduledTask(task)) return setOpenSeriesId(task.series_id ?? null)
-      setSelectedTask(task)
-      await loadTaskUpdates(task.id)
-      setIsDetailsOpen(true)
-    },
-    [loadTaskUpdates]
-  )
+  const openTaskDetails = useCallback((task: Task) => {
+    // A scheduled row is a series whose task is not created yet: open the series instead.
+    if (isScheduledTask(task)) return setOpenSeriesId(task.series_id ?? null)
+    setSelectedTask(task)
+    setIsDetailsOpen(true)
+  }, [])
 
   const searchParams = useSearchParams()
   useEffect(() => {
@@ -274,7 +211,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       })
       if (!res.ok) throw new Error("Failed to add comment")
       toast.success("Comment added")
-      await loadTaskUpdates(selectedTask.id)
+      await taskUpdatesQuery.refetch()
       await loadTasks()
     } catch {
       toast.error("Failed to add comment")
