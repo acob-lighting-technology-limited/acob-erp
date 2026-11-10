@@ -11,6 +11,7 @@ import type { RoutingProfile } from "./routing"
 import type {
   Requisition,
   RequisitionAttachment,
+  RequisitionFormType,
   RequisitionPayment,
   RequisitionStage,
   RequisitionViewerActions,
@@ -56,7 +57,8 @@ export interface ViewerContext {
   userId: string
   department: string | null
   isAdminLike: boolean
-  isPaymentProcessor: boolean
+  /** The forms this person records payments for (chosen in Admin > Requisitions > Settings). */
+  paymentFormTypes: RequisitionFormType[]
   /** Departments this person leads (normalised). */
   leadDepartments: string[]
 }
@@ -73,7 +75,7 @@ export async function getViewerContext(admin: SupabaseClient, userId: string): P
         is_department_lead: boolean | null
         lead_departments: string[] | null
       }>(),
-    admin.rpc("is_requisition_payment_processor", { p_user_id: userId }),
+    admin.from("requisition_payment_processors").select("form_type").eq("profile_id", userId),
   ])
 
   const leadDepartments = profile?.is_department_lead
@@ -90,7 +92,7 @@ export async function getViewerContext(admin: SupabaseClient, userId: string): P
     userId,
     department: profile?.department ?? null,
     isAdminLike: isAdminLikeRole(profile?.role),
-    isPaymentProcessor: processor === true,
+    paymentFormTypes: (processor || []).map((row) => row.form_type as RequisitionFormType),
     leadDepartments,
   }
 }
@@ -98,7 +100,7 @@ export async function getViewerContext(admin: SupabaseClient, userId: string): P
 /** Whether this person may see a requisition. Mirrors public.can_view_requisition. */
 export function canViewRequisition(req: Requisition, viewer: ViewerContext): boolean {
   if (req.user_id === viewer.userId) return true
-  if (viewer.isAdminLike || viewer.isPaymentProcessor) return true
+  if (viewer.isAdminLike || viewer.paymentFormTypes.length > 0) return true
   if (viewer.leadDepartments.includes(normalizeDepartmentName(req.department))) return true
   return (req.stages || []).some((s) => s.assignee_id === viewer.userId || s.acted_by === viewer.userId)
 }
@@ -229,7 +231,7 @@ export async function getViewerActions(
 ): Promise<RequisitionViewerActions> {
   const signable = findSignableStage(req, viewer.userId)
   const canPay =
-    viewer.isPaymentProcessor &&
+    viewer.paymentFormTypes.includes(req.form_type) &&
     req.user_id !== viewer.userId &&
     (req.status === "awaiting_payment" || req.status === "partly_paid")
   return {

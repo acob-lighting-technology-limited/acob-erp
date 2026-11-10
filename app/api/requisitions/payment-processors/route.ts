@@ -9,11 +9,11 @@ import {
 } from "@/lib/requisitions/route-helpers"
 
 /**
- * Staff who record payments on fully signed requisitions. The Accounts lead is
- * always allowed as well and is not listed here.
- *   GET     list
- *   POST    { profile_id }   add (finance admins)
- *   DELETE  ?profile_id=     remove (finance admins)
+ * Payment officers: who records payments on fully signed requisitions, chosen
+ * separately for Payment Requests and Petty Cash. Nobody is allowed by default.
+ *   GET     list (each row has its form_type)
+ *   POST    { profile_id, form_type }              add (finance admins)
+ *   DELETE  ?profile_id=&form_type=                remove (finance admins)
  */
 export async function GET() {
   const auth = await requireRequisitionUser()
@@ -22,7 +22,7 @@ export async function GET() {
     const { data, error } = await auth.admin
       .from("requisition_payment_processors")
       .select(
-        "profile_id, created_at, person:profiles!requisition_payment_processors_profile_id_fkey(id, full_name, department, designation)"
+        "profile_id, form_type, created_at, person:profiles!requisition_payment_processors_profile_id_fkey(id, full_name, department, designation)"
       )
       .order("created_at")
     if (error) throw error
@@ -45,7 +45,10 @@ export async function POST(request: NextRequest) {
   try {
     const { error } = await auth.admin
       .from("requisition_payment_processors")
-      .upsert({ profile_id: parsed.data.profile_id, added_by: auth.user.id }, { onConflict: "profile_id" })
+      .upsert(
+        { profile_id: parsed.data.profile_id, form_type: parsed.data.form_type, added_by: auth.user.id },
+        { onConflict: "profile_id,form_type" }
+      )
     if (error) throw error
     await writeAuditLog(
       auth.supabase,
@@ -53,6 +56,7 @@ export async function POST(request: NextRequest) {
         action: "assign",
         entityType: "requisition_payment_processor",
         entityId: parsed.data.profile_id,
+        newValues: { form_type: parsed.data.form_type },
         context: { actorId: auth.user.id, source: "api", route: "/api/requisitions/payment-processors" },
       },
       { failOpen: true }
@@ -69,8 +73,10 @@ export async function DELETE(request: NextRequest) {
   if (!(await canManageRequisitionSettings())) {
     return apiError("Only finance admins can change payment processors.", ApiErrorCode.FORBIDDEN, 403)
   }
+  const query = new URL(request.url).searchParams
   const parsed = PaymentProcessorSchema.safeParse({
-    profile_id: new URL(request.url).searchParams.get("profile_id"),
+    profile_id: query.get("profile_id"),
+    form_type: query.get("form_type"),
   })
   if (!parsed.success) return apiError("Pick someone to remove", ApiErrorCode.VALIDATION_ERROR, 400)
   try {
@@ -78,6 +84,7 @@ export async function DELETE(request: NextRequest) {
       .from("requisition_payment_processors")
       .delete()
       .eq("profile_id", parsed.data.profile_id)
+      .eq("form_type", parsed.data.form_type)
     if (error) throw error
     await writeAuditLog(
       auth.supabase,
@@ -85,6 +92,7 @@ export async function DELETE(request: NextRequest) {
         action: "unassign",
         entityType: "requisition_payment_processor",
         entityId: parsed.data.profile_id,
+        newValues: { form_type: parsed.data.form_type },
         context: { actorId: auth.user.id, source: "api", route: "/api/requisitions/payment-processors" },
       },
       { failOpen: true }

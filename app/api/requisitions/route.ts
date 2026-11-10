@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const viewer = await getViewerContext(admin, user.id)
-    const viewerFlags = { is_admin: viewer.isAdminLike, is_payment_processor: viewer.isPaymentProcessor }
+    const viewerFlags = { is_admin: viewer.isAdminLike, is_payment_processor: viewer.paymentFormTypes.length > 0 }
     const empty = () => NextResponse.json({ data: [], viewer: viewerFlags })
     let query = admin.from("requisitions").select(REQUISITION_LIST_SELECT).order("created_at", { ascending: false })
 
@@ -73,10 +73,14 @@ export async function GET(request: NextRequest) {
       if (!ids.length) return empty()
       query = query.in("id", ids)
     } else if (view === "payment") {
-      if (!viewer.isPaymentProcessor) return empty()
-      query = query.in("status", ["awaiting_payment", "partly_paid"]).neq("user_id", user.id)
+      // Each officer's queue holds only the forms they were chosen for.
+      if (!viewer.paymentFormTypes.length) return empty()
+      query = query
+        .in("status", ["awaiting_payment", "partly_paid"])
+        .in("form_type", viewer.paymentFormTypes)
+        .neq("user_id", user.id)
     } else if (view === "all") {
-      if (!viewer.isAdminLike && !viewer.isPaymentProcessor) {
+      if (!viewer.isAdminLike && !viewer.paymentFormTypes.length) {
         return apiError("You cannot view every requisition", ApiErrorCode.FORBIDDEN, 403)
       }
     } else {

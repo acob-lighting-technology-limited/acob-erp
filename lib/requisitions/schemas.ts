@@ -190,4 +190,5 @@ export const RecordPaymentSchema = z.object({
 /** POST /api/requisitions/payment-processors */
 export const PaymentProcessorSchema = z.object({
   profile_id: z.string().uuid("Pick someone"),
+  form_type: z.enum(["payment_request", "petty_cash"], { message: "Pick Payment Request or Petty Cash" }),
 })
