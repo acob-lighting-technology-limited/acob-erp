@@ -67,7 +67,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const problem = amountChangeMessage(req.form_type, Number(req.amount), newAmount)
       if (problem) return apiError(problem, ApiErrorCode.VALIDATION_ERROR, 400)
 
-      const beneficiaries = change.beneficiary_details ?? req.beneficiary_details
+      // A signer only re-splits the amounts; who gets paid (and the bank's
+      // confirmation of it) stays exactly as raised.
+      if (change.beneficiary_details && change.beneficiary_details.length !== req.beneficiary_details.length) {
+        return apiError("A signer cannot add or remove beneficiaries.", ApiErrorCode.VALIDATION_ERROR, 400)
+      }
+      const resplit = change.beneficiary_details
+        ? req.beneficiary_details.map((b, i) => ({ ...b, amount: change.beneficiary_details![i].amount }))
+        : null
+      const beneficiaries = resplit ?? req.beneficiary_details
       if (beneficiaries.length > 1 && beneficiaries.some((b) => b.amount != null)) {
         const split = lineItemsTotal(beneficiaries.map((b) => ({ amount: b.amount ?? 0 })))
         if (Math.abs(split - newAmount) > 0.001) {
@@ -84,7 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         amount_in_words: numberToNairaWords(newAmount),
         reason: change.reason,
         ...(lineItems ? { line_items: lineItems } : {}),
-        ...(change.beneficiary_details ? { beneficiary_details: change.beneficiary_details } : {}),
+        ...(resplit ? { beneficiary_details: resplit } : {}),
       }
     }
 

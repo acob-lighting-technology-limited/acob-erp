@@ -12,7 +12,6 @@ import {
   FileText,
   Folder,
   Loader2,
-  MapPin,
   PenLine,
   User,
   Wallet,
@@ -191,12 +190,6 @@ export function RequisitionPreviewSheet({
                 <div className="text-muted-foreground flex items-center gap-2">
                   <Folder className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <span className="truncate">{requisition.project_name}</span>
-                </div>
-              ) : null}
-              {requisition.site_location ? (
-                <div className="text-muted-foreground flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">{requisition.site_location}</span>
                 </div>
               ) : null}
             </div>

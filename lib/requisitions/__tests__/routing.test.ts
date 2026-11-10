@@ -153,7 +153,7 @@ test("line item totals round to kobo", () => {
   assert.equal(lineItemsTotal([{ amount: 0.1 }, { amount: 0.2 }, { amount: "1000" }]), 1000.3)
 })
 
-test("payment request requires site location", () => {
+test("payment request takes a listed project or a typed one, and no site location", () => {
   const base = {
     form_type: "payment_request" as const,
     project_name: "Solar Expansion",
@@ -162,12 +162,8 @@ test("payment request requires site location", () => {
     beneficiary_details: [{ account_name: "Vendor Ltd", account_number: "0123456789", bank_name: "Access Bank" }],
   }
 
-  const missingSite = PaymentRequestSchema.safeParse(base)
-  assert.equal(missingSite.success, false)
-
-  const emptySite = PaymentRequestSchema.safeParse({ ...base, site_location: "   " })
-  assert.equal(emptySite.success, false)
-
-  const valid = PaymentRequestSchema.safeParse({ ...base, site_location: "Abuja HQ" })
-  assert.equal(valid.success, true)
+  assert.equal(PaymentRequestSchema.safeParse(base).success, true)
+  const listed = PaymentRequestSchema.safeParse({ ...base, project_id: "6f1c1d2e-3b4a-4c5d-8e9f-0a1b2c3d4e5f" })
+  assert.equal(listed.success, true)
+  assert.equal(PaymentRequestSchema.safeParse({ ...base, project_name: "  " }).success, false)
 })

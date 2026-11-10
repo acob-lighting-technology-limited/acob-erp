@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
+import { confirmBeneficiaries } from "@/lib/requisitions/paystack"
 import { resolveRequisitionStages } from "@/lib/requisitions/routing"
 import { parseCreateRequisition } from "@/lib/requisitions/schemas"
 import {
@@ -20,7 +21,7 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { normalizeDepartmentName } from "@/shared/departments"
 
 const ListQuerySchema = z.object({
-  view: z.enum(["mine", "action", "payment", "all", "department"]).default("mine"),
+  view: z.enum(["mine", "action", "signed", "payment", "all", "department"]).default("mine"),
   department: z.string().trim().max(120).optional(),
 })
 
@@ -28,6 +29,7 @@ const ListQuerySchema = z.object({
  * GET /api/requisitions?view=
  *   mine        what I raised
  *   action      what is waiting on my signature
+ *   signed      what I signed, overrode, rejected or recorded a payment on
  *   payment     what is waiting to be paid (payment processors)
  *   all         everything (admins, payment processors)
  *   department  one department (&department=; its lead or an admin)
@@ -59,6 +61,16 @@ export async function GET(request: NextRequest) {
       const ids = Array.from(new Set((stages || []).map((s) => s.requisition_id as string)))
       if (!ids.length) return empty()
       query = query.in("id", ids).eq("status", "pending").neq("user_id", user.id)
+    } else if (view === "signed") {
+      const [{ data: acted, error: actedError }, { data: paid, error: paidError }] = await Promise.all([
+        admin.from("requisition_stages").select("requisition_id").eq("acted_by", user.id),
+        admin.from("requisition_payments").select("requisition_id").eq("recorded_by", user.id),
+      ])
+      if (actedError) throw actedError
+      if (paidError) throw paidError
+      const ids = Array.from(new Set([...(acted || []), ...(paid || [])].map((r) => r.requisition_id as string)))
+      if (!ids.length) return empty()
+      query = query.in("id", ids)
     } else if (view === "payment") {
       if (!viewer.isPaymentProcessor) return empty()
       query = query.in("status", ["awaiting_payment", "partly_paid"]).neq("user_id", user.id)
@@ -128,18 +140,21 @@ export async function POST(request: NextRequest) {
       return apiError("Attach only files you uploaded", ApiErrorCode.VALIDATION_ERROR, 400)
     }
 
-    let fundingCategoryName: string | null = null
-    if (input.funding_category_id) {
-      const { data: category } = await admin
-        .from("requisition_funding_categories")
-        .select("name, is_active")
-        .eq("id", input.funding_category_id)
+    // A listed project supplies its own name; the browser's copy is not trusted. Its location is
+    // kept on the requisition for the record, though forms no longer show a site location.
+    let project: { project_name: string; location: string | null } | null = null
+    if (input.form_type === "payment_request" && input.project_id) {
+      const { data } = await admin
+        .from("projects")
+        .select("project_name, location")
+        .eq("id", input.project_id)
         .maybeSingle()
-      if (!category?.is_active) {
-        return apiError("That funding category is no longer available", ApiErrorCode.VALIDATION_ERROR, 400)
-      }
-      fundingCategoryName = category.name
+      if (!data) return apiError("That project no longer exists. Pick it again.", ApiErrorCode.VALIDATION_ERROR, 400)
+      project = data
     }
+
+    const confirmed = await confirmBeneficiaries(input.beneficiary_details)
+    if (!confirmed.ok) return apiError(confirmed.message, ApiErrorCode.VALIDATION_ERROR, 400)
 
     const amount = input.form_type === "petty_cash" ? lineItemsTotal(input.line_items) : input.amount
     const stages = resolveRequisitionStages(
@@ -153,16 +168,14 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         form_type: input.form_type,
         department,
-        project_name: input.form_type === "payment_request" ? input.project_name : null,
+        project_name: input.form_type === "payment_request" ? project?.project_name || input.project_name : null,
         purpose: input.form_type === "payment_request" ? input.purpose : null,
-        site_location: input.form_type === "payment_request" ? input.site_location || null : null,
+        site_location: input.form_type === "payment_request" ? project?.location || null : null,
         amount,
         amount_in_words: numberToNairaWords(amount),
         line_items: input.form_type === "petty_cash" ? input.line_items : [],
-        beneficiary_details: input.beneficiary_details,
+        beneficiary_details: confirmed.beneficiaries,
         attachments: input.attachments || [],
-        funding_category_id: input.funding_category_id || null,
-        funding_category_name: fundingCategoryName,
       },
       p_stages: stages,
     })

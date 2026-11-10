@@ -41,7 +41,8 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
     if (!sheetRef.current || !requisition) return
     setDownloading(true)
     try {
-      await downloadRequisitionPdf(sheetRef.current, `${requisition.requisition_number}.pdf`)
+      // Slashes are not allowed in file names: PR/HR/26/001 saves as PR-HR-26-001.pdf.
+      await downloadRequisitionPdf(sheetRef.current, `${requisition.requisition_number.replace(/\//g, "-")}.pdf`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create the PDF")
     } finally {

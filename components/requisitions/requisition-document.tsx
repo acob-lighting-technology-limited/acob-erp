@@ -3,6 +3,7 @@ import type { Ref } from "react"
 import { Globe, Mail, MapPin, Phone } from "lucide-react"
 import type { Requisition, RequisitionStage, RequisitionStageCode } from "@/lib/requisitions/types"
 import { formatNaira } from "@/lib/requisitions/format"
+import { accountNamesMatch } from "@/lib/requisitions/nuban"
 import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
 
@@ -60,17 +61,29 @@ function Letterhead({ cells }: { cells: RefCell[] }) {
           ))}
         </address>
       </div>
-      <div className="mt-3 grid grid-cols-1 border border-slate-500 text-xs @xl:grid-cols-3">
-        {cells.map((cell, i) => (
-          <div
-            key={`cell-${cell.label}`}
-            className={cn("px-2.5 py-1.5", i > 0 && "border-t border-slate-500 @xl:border-t-0 @xl:border-l")}
-          >
-            <span className="font-bold uppercase">{cell.label}:</span>{" "}
-            <span className="font-semibold">{cell.value}</span>
-          </div>
-        ))}
-      </div>
+      {cells.length === 2 ? (
+        // Two references, each in its own box, at either end of the line.
+        <div className="mt-3 flex flex-col gap-2 text-xs @xl:flex-row @xl:justify-between">
+          {cells.map((cell) => (
+            <div key={`cell-${cell.label}`} className="border border-slate-500 px-2.5 py-1.5">
+              <span className="font-bold uppercase">{cell.label}:</span>{" "}
+              <span className="font-semibold">{cell.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-1 border border-slate-500 text-xs @xl:grid-cols-3">
+          {cells.map((cell, i) => (
+            <div
+              key={`cell-${cell.label}`}
+              className={cn("px-2.5 py-1.5", i > 0 && "border-t border-slate-500 @xl:border-t-0 @xl:border-l")}
+            >
+              <span className="font-bold uppercase">{cell.label}:</span>{" "}
+              <span className="font-semibold">{cell.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </header>
   )
 }
@@ -106,25 +119,37 @@ function FieldLine({ label, value }: { label: string; value: string | null | und
 
 function BeneficiaryTable({ req }: { req: Requisition }) {
   const showAmounts = req.beneficiary_details.length > 1 && req.beneficiary_details.some((b) => b.amount != null)
+  const showPurpose = req.beneficiary_details.some((b) => b.purpose)
   return (
-    <div className="flex flex-col gap-2 @xl:flex-row">
-      <p className="w-28 shrink-0 text-xs font-bold uppercase">Beneficiary details:</p>
-      <div className="min-w-0 flex-1">
+    <div className="space-y-1.5">
+      <p className="text-xs font-bold uppercase">Beneficiary details:</p>
+      <div className="min-w-0">
         <table className="w-full border-collapse border border-slate-500 text-xs break-words">
           <thead>
             <tr className="font-bold uppercase">
               <th className="border border-slate-500 p-1.5">Account name</th>
               <th className="border border-slate-500 p-1.5">Account no</th>
               <th className="border border-slate-500 p-1.5">Bank name</th>
+              {showPurpose && <th className="border border-slate-500 p-1.5">Purpose</th>}
               {showAmounts && <th className="border border-slate-500 p-1.5">Amount</th>}
             </tr>
           </thead>
           <tbody>
             {req.beneficiary_details.map((b, i) => (
               <tr key={`row-${i}`}>
-                <td className="border border-slate-500 p-1.5">{b.account_name}</td>
+                <td className="border border-slate-500 p-1.5">
+                  {b.account_name}
+                  {b.verified_account_name ? (
+                    <span className="block text-slate-500">
+                      {accountNamesMatch(b.account_name, b.verified_account_name)
+                        ? "✓ Confirmed by the bank"
+                        : `Bank has: ${b.verified_account_name}`}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
                 <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
+                {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}
                 {showAmounts && (
                   <td className="border border-slate-500 p-1.5 text-right">
                     {b.amount != null ? formatNaira(b.amount) : ""}
@@ -256,7 +281,6 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
         cells={[
           { label: "No", value: req.requisition_number },
           { label: "Department", value: req.department },
-          { label: "Site location", value: req.site_location || "" },
         ]}
       />
       <FormTitle>Payment Request Form</FormTitle>
@@ -264,6 +288,7 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
         <FieldLine label="Requested by" value={req.requester?.full_name} />
         <FieldLine label="Amount in words" value={req.amount_in_words} />
         <FieldLine label="Purpose" value={req.purpose} />
+        {/* The project is the site; there is no separate site location. */}
         <div className="grid grid-cols-1 gap-2 @xl:grid-cols-[2fr_1fr_1fr]">
           <div className="border border-slate-500 px-2 py-1.5 text-xs">
             <span className="font-bold uppercase">Project:</span> {req.project_name}

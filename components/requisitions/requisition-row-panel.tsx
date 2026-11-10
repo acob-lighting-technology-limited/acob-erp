@@ -18,8 +18,8 @@ function overviewItems(r: Requisition): DetailListItem[] {
   }
   return [
     { label: "Project", value: r.project_name },
-    { label: "Site location", value: r.site_location },
-    { label: "Funding", value: r.funding_category_name },
+    // No longer collected; shown only on older requisitions that have one.
+    ...(r.funding_category_name ? [{ label: "Funding", value: r.funding_category_name }] : []),
     { label: "Amount", value: formatNaira(r.amount) },
     { label: "Paid", value: paid },
     { label: "Purpose", value: <span className="whitespace-pre-line">{r.purpose}</span>, wide: true },

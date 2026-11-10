@@ -10,6 +10,7 @@ import {
   Eye,
   FastForward,
   FileCheck2,
+  History,
   Inbox,
   PenLine,
   Plus,
@@ -60,7 +61,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
-type View = "mine" | "action" | "payment" | "all" | "department"
+type View = "mine" | "action" | "signed" | "payment" | "all" | "department"
 
 interface ViewerFlags {
   is_admin: boolean
@@ -76,6 +77,7 @@ export interface ExtraTab {
 const VIEW_TABS: Record<View, DataTableTab> = {
   mine: { key: "mine", label: "My requisitions", icon: FileCheck2 },
   action: { key: "action", label: "Needs my signature", icon: PenLine },
+  signed: { key: "signed", label: "Signed by me", icon: History },
   payment: { key: "payment", label: "Awaiting payment", icon: Wallet },
   all: { key: "all", label: "All requisitions", icon: Inbox },
   department: { key: "department", label: "Department", icon: FileCheck2 },
@@ -108,9 +110,9 @@ export function RequisitionsListPage({
   const views: View[] = useMemo(() => {
     if (surface === "dept") return ["department", "action"]
     if (surface === "admin") return ["all", "action", "payment"]
-    const list: View[] = ["mine", "action"]
+    // Everything company-wide lives in the admin console; a person's page holds only what is theirs.
+    const list: View[] = ["mine", "action", "signed"]
     if (viewer.is_payment_processor) list.push("payment")
-    if (viewer.is_admin || viewer.is_payment_processor) list.push("all")
     return list
   }, [surface, viewer])
 
@@ -388,7 +390,14 @@ export function RequisitionsListPage({
           getRowId={(r) => r.id}
           searchPlaceholder="Search reference, person, project, purpose..."
           searchFn={(r, q) =>
-            [r.requisition_number, r.requester?.full_name, r.department, r.project_name, requisitionSummary(r)]
+            [
+              r.requisition_number,
+              r.previous_number,
+              r.requester?.full_name,
+              r.department,
+              r.project_name,
+              requisitionSummary(r),
+            ]
               .filter(Boolean)
               .some((v) => String(v).toLowerCase().includes(q))
           }
@@ -445,14 +454,22 @@ export function RequisitionsListPage({
             onSelect: (r) => setPreviewId(r.id),
           }}
           emptyTitle={
-            tab === "action" ? "Nothing waiting on you" : tab === "payment" ? "Nothing to pay" : "No requisitions"
+            tab === "action"
+              ? "Nothing waiting on you"
+              : tab === "signed"
+                ? "Nothing signed yet"
+                : tab === "payment"
+                  ? "Nothing to pay"
+                  : "No requisitions"
           }
           emptyDescription={
             tab === "action"
               ? "Requisitions that need your signature will appear here."
-              : tab === "payment"
-                ? "Fully signed requisitions appear here until they are paid."
-                : "Raise a Payment Request or Petty Cash with New requisition."
+              : tab === "signed"
+                ? "Requisitions you sign, override, reject or pay appear here."
+                : tab === "payment"
+                  ? "Fully signed requisitions appear here until they are paid."
+                  : "Raise a Payment Request or Petty Cash with New requisition."
           }
           emptyIcon={FileCheck2}
           skeletonRows={6}
