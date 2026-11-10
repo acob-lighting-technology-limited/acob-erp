@@ -1,4 +1,4 @@
-import { Check, Eye, FastForward, Paperclip, X } from "lucide-react"
+import { Check, Eye, FastForward, Paperclip, Wallet, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DetailList, SectionHeading, type DetailListItem } from "@/components/ui/detail-list"
 import { formatNaira, stagesOverriddenBy } from "@/lib/requisitions/format"
@@ -34,11 +34,14 @@ export function RequisitionRowPanel({
   requisition: r,
   onOpen,
   onSign,
+  onPay,
 }: {
   requisition: Requisition
   onOpen: () => void
   /** Set when the viewer can sign this requisition now. */
   onSign?: (mode: SignMode) => void
+  /** Set when the viewer can record a payment on this requisition now. */
+  onPay?: () => void
 }) {
   const overridden = stagesOverriddenBy(r, r.sign_stage_id)
   return (
@@ -88,6 +91,14 @@ export function RequisitionRowPanel({
       </div>
 
       <RequisitionStageList requisition={r} />
+
+      {onPay ? (
+        <div className="flex gap-2 border-t pt-3 md:col-span-2">
+          <Button onClick={onPay} className="gap-2">
+            <Wallet className="h-4 w-4" /> Record payment
+          </Button>
+        </div>
+      ) : null}
 
       {onSign ? (
         <div className="flex gap-2 border-t pt-3 md:col-span-2">

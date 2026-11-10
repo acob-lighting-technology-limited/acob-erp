@@ -38,6 +38,7 @@ export interface RequisitionPreviewSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSign?: (requisition: Requisition, viewer: RequisitionViewerActions, mode: SignMode) => void
+  onPay?: (requisition: Requisition, viewer: RequisitionViewerActions) => void
   /** Where the full page lives on this surface (staff, admin or a department console). */
   detailBasePath?: string
 }
@@ -52,6 +53,7 @@ export function RequisitionPreviewSheet({
   open,
   onOpenChange,
   onSign,
+  onPay,
   detailBasePath = STAFF_REQUISITIONS_PATH,
 }: RequisitionPreviewSheetProps) {
   const { data, isLoading, error, refetch } = useQuery({
@@ -98,6 +100,12 @@ export function RequisitionPreviewSheet({
           </Button>
 
           <div className="flex items-center gap-2">
+            {requisition && viewer?.can_record_payment && onPay ? (
+              <Button size="sm" className="h-8 text-xs" onClick={() => onPay(requisition, viewer)}>
+                <Wallet className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Record payment
+              </Button>
+            ) : null}
             {requisition && viewer?.sign_stage_id && onSign ? (
               <>
                 <Button

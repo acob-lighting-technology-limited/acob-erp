@@ -167,6 +167,24 @@ const BADGE_CLASS = {
   warning: "border-warning/30 bg-warning/15 text-warning",
 } as const
 
+/** The last step: someone records the payment. Shown with the officers who can. */
+function paymentStep(req: Requisition, stages: RequisitionStage[]) {
+  if (!stages.length || req.status === "rejected") return null
+  const officers = (req.payment_officers || []).map((p) => p.full_name).filter(Boolean)
+  const names = officers.length ? officers.join(", ") : "No payment officer set"
+  if (req.status === "paid") {
+    return { node: "done" as Node, badge: { text: "Paid", tone: "success" as const }, who: names }
+  }
+  if (req.status === "awaiting_payment" || req.status === "partly_paid") {
+    return {
+      node: "current" as Node,
+      badge: { text: req.status === "partly_paid" ? "Partly paid" : "Awaiting payment", tone: "warning" as const },
+      who: names,
+    }
+  }
+  return { node: "idle" as Node, badge: { text: "After approval", tone: "muted" as const }, who: names }
+}
+
 export function RequisitionStageList({
   requisition,
   heading = true,
@@ -179,6 +197,7 @@ export function RequisitionStageList({
   const stages = orderedStages(requisition)
   const current = currentStage(requisition)
   const recorded = stages.filter((s) => s.state !== "pending").length
+  const payment = paymentStep(requisition, stages)
 
   return (
     <section className={cn("space-y-3", className)}>
@@ -253,6 +272,37 @@ export function RequisitionStageList({
               </li>
             )
           })}
+          {payment ? (
+            <li className="relative flex gap-3">
+              <div
+                className={cn(
+                  "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
+                  NODE_CLASS[payment.node]
+                )}
+              >
+                {payment.node === "done" ? <Check className="h-3 w-3 stroke-[3]" /> : <Wallet className="h-3 w-3" />}
+              </div>
+              <div className="min-w-0 flex-1 text-xs">
+                <div className="flex min-h-5 flex-wrap items-center justify-between gap-1.5">
+                  <span
+                    className={cn("font-medium", payment.node === "idle" ? "text-muted-foreground" : "text-foreground")}
+                  >
+                    Payment
+                  </span>
+                  {payment.badge.tone === "muted" ? (
+                    <span className="text-muted-foreground text-xs">{payment.badge.text}</span>
+                  ) : (
+                    <Badge variant="outline" className={cn("text-xs font-medium", BADGE_CLASS[payment.badge.tone])}>
+                      {payment.badge.text}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  <span className="text-foreground/90">{payment.who}</span>
+                </p>
+              </div>
+            </li>
+          ) : null}
         </ol>
       )}
     </section>

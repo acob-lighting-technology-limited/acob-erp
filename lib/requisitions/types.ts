@@ -104,6 +104,10 @@ export interface RequisitionPayment {
 export interface Requisition {
   /** Set on list rows: the pending stage the signed-in user can sign now, else null. */
   sign_stage_id?: string | null
+  /** Set on list rows: the viewer may record a payment on this one now. */
+  can_pay?: boolean
+  /** Payment officers for this form, so the route can show who pays next. */
+  payment_officers?: RequisitionPerson[]
   id: string
   /** e.g. PR/HR/26/001: form (PR or PC), department code, year, serial. */
   requisition_number: string
