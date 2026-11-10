@@ -156,6 +156,7 @@ test("line item totals round to kobo", () => {
 test("payment request takes a listed project or a typed one, and no site location", () => {
   const base = {
     form_type: "payment_request" as const,
+    pin: "123456",
     project_name: "Solar Expansion",
     purpose: "Procurement of cables",
     amount: 75_000,
@@ -166,4 +167,9 @@ test("payment request takes a listed project or a typed one, and no site locatio
   const listed = PaymentRequestSchema.safeParse({ ...base, project_id: "6f1c1d2e-3b4a-4c5d-8e9f-0a1b2c3d4e5f" })
   assert.equal(listed.success, true)
   assert.equal(PaymentRequestSchema.safeParse({ ...base, project_name: "  " }).success, false)
+
+  // Submitting signs the form, so it needs the approval PIN.
+  const { pin: _pin, ...withoutPin } = base
+  assert.equal(PaymentRequestSchema.safeParse(withoutPin).success, false)
+  assert.equal(PaymentRequestSchema.safeParse({ ...base, pin: "12" }).success, false)
 })

@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
+import { verifyActionPin } from "@/lib/approval-signing/server"
 import { confirmBeneficiaries } from "@/lib/requisitions/paystack"
 import { resolveRequisitionStages } from "@/lib/requisitions/routing"
 import { parseCreateRequisition } from "@/lib/requisitions/schemas"
@@ -140,6 +141,9 @@ export async function POST(request: NextRequest) {
       return apiError("Attach only files you uploaded", ApiErrorCode.VALIDATION_ERROR, 400)
     }
 
+    // Submitting signs "Requested by": the PIN is checked and that signature is stamped on the form.
+    const requesterSignaturePath = await verifyActionPin(admin, user.id, input.pin)
+
     // A listed project supplies its own name; the browser's copy is not trusted. Its location is
     // kept on the requisition for the record, though forms no longer show a site location.
     let project: { project_name: string; location: string | null } | null = null
@@ -175,6 +179,7 @@ export async function POST(request: NextRequest) {
         amount_in_words: numberToNairaWords(amount),
         line_items: input.form_type === "petty_cash" ? input.line_items : [],
         beneficiary_details: confirmed.beneficiaries,
+        requester_signature_path: requesterSignaturePath,
         attachments: input.attachments || [],
       },
       p_stages: stages,

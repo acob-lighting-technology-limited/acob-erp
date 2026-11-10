@@ -271,7 +271,8 @@ function ProcessedSlot({ req }: { req: Requisition }) {
 }
 
 function SignatureGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-4 @xl:grid-cols-2">{children}</div>
+  // mt-auto: the signatures sit at the foot of the A4 sheet however little is written above them.
+  return <div className="mt-auto grid grid-cols-1 gap-x-8 gap-y-5 pt-10 @xl:grid-cols-2">{children}</div>
 }
 
 function PaymentRequestSheet({ req }: { req: Requisition }) {
@@ -284,7 +285,7 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
         ]}
       />
       <FormTitle>Payment Request Form</FormTitle>
-      <div className="space-y-4">
+      <div className="flex flex-1 flex-col gap-4">
         <FieldLine label="Requested by" value={req.requester?.full_name} />
         <FieldLine label="Amount in words" value={req.amount_in_words} />
         <FieldLine label="Purpose" value={req.purpose} />
@@ -352,7 +353,7 @@ function PettyCashSheet({ req }: { req: Requisition }) {
           </tr>
         </tbody>
       </table>
-      <div className="space-y-4">
+      <div className="flex flex-1 flex-col gap-4">
         <FieldLine label="Total amount in words" value={req.amount_in_words} />
         <BeneficiaryTable req={req} />
         <SignatureGrid>
@@ -379,7 +380,8 @@ export function RequisitionDocument({
     <article
       ref={ref}
       className={cn(
-        "requisition-document @container mx-auto w-full max-w-[210mm] rounded-lg border border-slate-300 bg-white p-5 text-slate-900 shadow-sm sm:p-10",
+        // A4 proportions whatever is written; a longer form grows the sheet instead of squashing.
+        "requisition-document @container mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col rounded-lg border border-slate-300 bg-white p-5 text-slate-900 shadow-sm sm:p-10",
         className
       )}
     >
@@ -388,7 +390,7 @@ export function RequisitionDocument({
       ) : (
         <PaymentRequestSheet req={requisition} />
       )}
-      <p className="mt-8 text-center text-xs font-bold tracking-wide uppercase">Attach relevant supporting documents</p>
+      <p className="mt-6 text-center text-xs font-bold tracking-wide uppercase">Attach relevant supporting documents</p>
     </article>
   )
 }

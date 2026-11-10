@@ -109,6 +109,8 @@ export interface Requisition {
   requisition_number: string
   /** The REQ-/PCV- number it had before department numbering. Search only. */
   previous_number?: string | null
+  /** Signature file the requester stamped when submitting; null on requisitions raised before this existed. */
+  requester_signature_path?: string | null
   form_type: RequisitionFormType
   user_id: string
   department: string
