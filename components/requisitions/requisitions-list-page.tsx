@@ -108,7 +108,12 @@ export function RequisitionsListPage({
   const [viewer, setViewer] = useState<ViewerFlags>({ is_admin: false, is_payment_processor: false })
 
   const views: View[] = useMemo(() => {
-    if (surface === "dept") return ["department", "action"]
+    if (surface === "dept") {
+      // The Accounts lead pays from here, so a payment processor gets the payment queue too.
+      const list: View[] = ["department", "action"]
+      if (viewer.is_payment_processor) list.push("payment")
+      return list
+    }
     if (surface === "admin") return ["all", "action", "payment"]
     // Everything company-wide lives in the admin console; a person's page holds only what is theirs.
     const list: View[] = ["mine", "action", "signed"]

@@ -137,17 +137,13 @@ async function adminIds(admin: SupabaseClient): Promise<string[]> {
   return (data || []).map((p) => p.id as string)
 }
 
+/** The payment officers chosen for this requisition's form, except the person who raised it. */
 async function processorIds(admin: SupabaseClient, req: Requisition): Promise<string[]> {
-  const [{ data: listed }, { data: accountsLeads }] = await Promise.all([
-    admin.from("requisition_payment_processors").select("profile_id"),
-    admin.from("profiles").select("id, department, lead_departments").eq("is_department_lead", true),
-  ])
-  const ids = new Set<string>((listed || []).map((p) => p.profile_id as string))
-  for (const lead of accountsLeads || []) {
-    if (lead.department === "Accounts" || (lead.lead_departments || []).includes("Accounts")) ids.add(lead.id)
-  }
-  ids.delete(req.user_id)
-  return Array.from(ids)
+  const { data: listed } = await admin
+    .from("requisition_payment_processors")
+    .select("profile_id")
+    .eq("form_type", req.form_type)
+  return (listed || []).map((p) => p.profile_id as string).filter((id) => id !== req.user_id)
 }
 
 /** Tell the next signer (or admins, when the next stage has nobody). */

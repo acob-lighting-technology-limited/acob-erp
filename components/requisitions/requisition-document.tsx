@@ -3,6 +3,7 @@ import type { Ref } from "react"
 import { Globe, Mail, MapPin, Phone } from "lucide-react"
 import type { Requisition, RequisitionStage, RequisitionStageCode } from "@/lib/requisitions/types"
 import { formatNaira } from "@/lib/requisitions/format"
+import { MAX_BENEFICIARIES } from "@/lib/requisitions/limits"
 import { accountNamesMatch } from "@/lib/requisitions/nuban"
 import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
@@ -117,6 +118,13 @@ function FieldLine({ label, value }: { label: string; value: string | null | und
   )
 }
 
+/** Petty-cash vouchers print with at least this many item rows, like the paper pad, so the page reads as a form. */
+const MIN_VOUCHER_ROWS = 12
+
+function blankRows(filled: number, upTo: number) {
+  return Array.from({ length: Math.max(0, upTo - filled) }, (_, i) => i)
+}
+
 function BeneficiaryTable({ req }: { req: Requisition }) {
   const showAmounts = req.beneficiary_details.length > 1 && req.beneficiary_details.some((b) => b.amount != null)
   const showPurpose = req.beneficiary_details.some((b) => b.purpose)
@@ -155,6 +163,14 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
                     {b.amount != null ? formatNaira(b.amount) : ""}
                   </td>
                 )}
+              </tr>
+            ))}
+            {/* Empty ruled rows up to what the form allows, as on the printed sheet. */}
+            {blankRows(req.beneficiary_details.length, MAX_BENEFICIARIES[req.form_type]).map((i) => (
+              <tr key={`blank-${i}`} aria-hidden>
+                {Array.from({ length: 3 + Number(showPurpose) + Number(showAmounts) }, (_, c) => (
+                  <td key={c} className="h-8 border border-slate-500" />
+                ))}
               </tr>
             ))}
           </tbody>
@@ -271,8 +287,8 @@ function ProcessedSlot({ req }: { req: Requisition }) {
 }
 
 function SignatureGrid({ children }: { children: React.ReactNode }) {
-  // mt-auto: the signatures sit at the foot of the A4 sheet however little is written above them.
-  return <div className="mt-auto grid grid-cols-1 gap-x-8 gap-y-5 pt-10 @xl:grid-cols-2">{children}</div>
+  // Signatures follow the content. The sheet stays A4, so any spare room is blank paper at the foot.
+  return <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-10 @xl:grid-cols-2">{children}</div>
 }
 
 function PaymentRequestSheet({ req }: { req: Requisition }) {
@@ -343,6 +359,13 @@ function PettyCashSheet({ req }: { req: Requisition }) {
               <td className="border border-slate-500 p-1.5 text-center">{i + 1}</td>
               <td className="border border-slate-500 p-1.5">{item.description}</td>
               <td className="border border-slate-500 p-1.5 text-right">{formatNaira(item.amount).slice(1)}</td>
+            </tr>
+          ))}
+          {blankRows(req.line_items.length, MIN_VOUCHER_ROWS).map((i) => (
+            <tr key={`blank-${i}`} aria-hidden>
+              <td className="h-7 border border-slate-500" />
+              <td className="border border-slate-500" />
+              <td className="border border-slate-500" />
             </tr>
           ))}
           <tr>

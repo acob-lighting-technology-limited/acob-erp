@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const [req, viewer] = await Promise.all([loadRequisition(admin, id), getViewerContext(admin, user.id)])
     if (!req) return apiError("Requisition not found", ApiErrorCode.NOT_FOUND, 404)
-    if (!viewer.isPaymentProcessor) {
+    if (!viewer.paymentFormTypes.includes(req.form_type)) {
       return apiError("You are not set up to record payments.", ApiErrorCode.FORBIDDEN, 403)
     }
     if (req.user_id === user.id) {
