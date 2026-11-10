@@ -1,13 +1,17 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Ban, Crown, Layers, Lock, ShieldAlert, UserCheck, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn } from "@/components/ui/data-table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { apiFetch } from "@/lib/api-client"
+import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { cn } from "@/lib/utils"
+import type { UserRole } from "@/types/database"
 
 type Group = "hr" | "it" | "cs" | "md"
 
@@ -33,8 +37,21 @@ interface AccessPerson {
 const UMBRELLA: Record<Group, string> = { hr: "hr.main", it: "it.main", cs: "scorecard.main", md: "mddesk.main" }
 const GROUP_LABEL: Record<Group, string> = { hr: "HR", it: "IT", cs: "Corporate Services", md: "MD's Desk" }
 
-function roleLabel(role: string) {
-  return role.replace("_", " ").replace(/^\w/, (char) => char.toUpperCase())
+/** Where an Edit comes from, as a small coloured tag under the choice. */
+const SOURCE_TAG: Record<NonNullable<AccessCell["via"]>, { label: string; icon: LucideIcon; className: string }> = {
+  owner: { label: "Owner", icon: Crown, className: "border-info/30 bg-info/10 text-info" },
+  override: { label: "Override", icon: ShieldAlert, className: "border-warning/30 bg-warning/10 text-warning" },
+  delegation: { label: "Delegate", icon: UserCheck, className: "border-purple/30 bg-purple/10 text-purple" },
+  some: { label: "Some areas", icon: Layers, className: "border-border bg-muted/50 text-muted-foreground" },
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
 }
 
 async function readError(res: Response, fallback: string) {
@@ -92,26 +109,45 @@ export function AccessRoster() {
     const cell = person[group]
     if (cell.level === "none") {
       return (
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-sm">No access</span>
-          <span className="text-muted-foreground text-xs">Give view in Settings → Users first</span>
-        </div>
+        <span
+          className="text-muted-foreground/70 inline-flex items-center gap-1.5 text-xs"
+          title="Give view in Settings → Users first"
+        >
+          <Ban className="h-3.5 w-3.5" /> No access
+        </span>
       )
     }
 
     const notOwner = !canChange[group]
     const locked = notOwner || person.is_self || cell.via === "owner" || cell.via === "delegation"
     const value = cell.level === "edit" && cell.via !== "some" ? "edit" : "view"
+    const tag = cell.via ? SOURCE_TAG[cell.via] : null
+    const lockReason = person.is_self
+      ? "You cannot change your own access"
+      : cell.via === "owner" || cell.via === "delegation"
+        ? `${cell.note ?? "Comes from their role"}: change it where it is set, not here`
+        : notOwner
+          ? `Only an owner of ${GROUP_LABEL[group]} can change this`
+          : null
 
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col items-start gap-1.5" title={lockReason ?? cell.note ?? undefined}>
         <Select
           value={value}
           disabled={locked || setLevel.isPending}
           onValueChange={(next) => setLevel.mutate({ person, group, level: next as "view" | "edit" })}
         >
-          <SelectTrigger className="h-8 w-28">
-            <SelectValue />
+          <SelectTrigger
+            className={cn(
+              "h-8 w-28 font-medium",
+              value === "edit" && "border-success/40 bg-success/10 text-success",
+              locked && "disabled:opacity-80"
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              {locked ? <Lock className="h-3 w-3 shrink-0 opacity-70" /> : null}
+              <SelectValue />
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="view">View</SelectItem>
@@ -119,11 +155,12 @@ export function AccessRoster() {
           </SelectContent>
         </Select>
         {person.is_self ? (
-          <span className="text-muted-foreground text-xs">You cannot change your own access</span>
-        ) : cell.note ? (
-          <span className="text-muted-foreground text-xs">{cell.note}</span>
-        ) : notOwner ? (
-          <span className="text-muted-foreground text-xs">Only an owner of {GROUP_LABEL[group]} can change this</span>
+          <span className="text-muted-foreground text-xs">Your own access</span>
+        ) : tag ? (
+          <Badge variant="outline" className={cn("gap-1 px-1.5 py-0 text-xs font-medium", tag.className)}>
+            <tag.icon className="h-3 w-3" />
+            {tag.label}
+          </Badge>
         ) : null}
       </div>
     )
@@ -135,20 +172,39 @@ export function AccessRoster() {
       label: "Person",
       sortable: true,
       accessor: (row) => row.name,
-      render: (row) => <span className="font-medium">{row.name}</span>,
+      render: (row) => (
+        <div className="flex items-center gap-2.5">
+          <span className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+            {initials(row.name)}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{row.name}</p>
+            {row.department ? (
+              <p className="text-muted-foreground truncate text-xs md:hidden">{row.department}</p>
+            ) : null}
+          </div>
+        </div>
+      ),
     },
     {
       key: "role",
       label: "Role",
       sortable: true,
       accessor: (row) => row.role,
-      render: (row) => <Badge variant="outline">{roleLabel(row.role)}</Badge>,
+      render: (row) => (
+        <Badge
+          className={cn("border-transparent text-xs font-medium shadow-none", getRoleBadgeColor(row.role as UserRole))}
+        >
+          {getRoleDisplayName(row.role as UserRole)}
+        </Badge>
+      ),
     },
     {
       key: "department",
       label: "Department",
       sortable: true,
       accessor: (row) => row.department ?? "",
+      render: (row) => <span className="text-muted-foreground text-sm">{row.department ?? "—"}</span>,
       hideOnMobile: true,
     },
     {
