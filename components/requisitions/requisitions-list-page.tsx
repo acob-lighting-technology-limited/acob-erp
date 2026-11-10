@@ -1,5 +1,6 @@
 "use client"
 
+import { cn } from "@/lib/utils"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -53,7 +54,7 @@ import type {
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
-import { statusBadgeVariant } from "./requisition-detail"
+import { statusBadgeClass } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
 import { RequisitionRowPanel } from "./requisition-row-panel"
 import { ADMIN_REQUISITIONS_PATH, STAFF_REQUISITIONS_PATH } from "./requisition-paths"
@@ -97,11 +98,14 @@ export function RequisitionsListPage({
   surface,
   deptName,
   extraTabs = [],
+  headerActions,
   detailBasePath,
 }: {
   surface: RequisitionsSurface
   deptName?: string
   extraTabs?: ExtraTab[]
+  /** Extra buttons in the page header, before Refresh. */
+  headerActions?: ReactNode
   /** Where a requisition's full page lives. A department console passes its own. */
   detailBasePath?: string
 }) {
@@ -248,7 +252,7 @@ export function RequisitionsListPage({
       accessor: (r) => r.status,
       render: (r) => (
         <div className="flex min-w-0 flex-col gap-1">
-          <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-xs">
+          <Badge variant="outline" className={cn(statusBadgeClass(r.status), "w-fit text-xs")}>
             {STATUS_LABELS[r.status]}
           </Badge>
           {r.status === "pending" || r.status === "partly_paid" ? (
@@ -376,6 +380,7 @@ export function RequisitionsListPage({
           extra.actions
         ) : (
           <div className="flex items-center gap-2">
+            {headerActions}
             <Button variant="outline" size="sm" onClick={fetchRows} aria-label="Refresh">
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>
@@ -451,12 +456,14 @@ export function RequisitionsListPage({
             },
             {
               label: "Record payment",
+              primary: true,
               icon: Wallet,
               onClick: (r) => void openPay(r),
               hidden: (r) => !r.can_pay,
             },
             { label: "View", icon: Eye, onClick: (r) => setPreviewId(r.id) },
           ]}
+          inlineRowActions={tab === "payment"}
           isLoading={isLoading}
           error={error}
           onRetry={fetchRows}
@@ -470,7 +477,7 @@ export function RequisitionsListPage({
             subtitle: (r) =>
               `${r.requisition_number} · ${r.requester?.full_name || r.department} · ${formatNaira(r.amount)}`,
             trailing: (r) => (
-              <Badge variant={statusBadgeVariant(r.status)} className="text-xs">
+              <Badge variant="outline" className={cn(statusBadgeClass(r.status), "text-xs")}>
                 {STATUS_LABELS[r.status]}
               </Badge>
             ),
@@ -520,7 +527,7 @@ export function RequisitionsListPage({
                 {FORM_LABELS[r.form_type]} · {r.requester?.full_name || r.department}
               </p>
               <div className="flex items-center justify-between gap-2 border-t pt-2">
-                <Badge variant={statusBadgeVariant(r.status)} className="text-xs">
+                <Badge variant="outline" className={cn(statusBadgeClass(r.status), "text-xs")}>
                   {STATUS_LABELS[r.status]}
                 </Badge>
                 <span className="text-muted-foreground truncate text-xs">{progressLabel(r)}</span>

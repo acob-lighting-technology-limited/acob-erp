@@ -272,39 +272,21 @@ export function RequisitionStageList({
               </li>
             )
           })}
-          {payment ? (
-            <li className="relative flex gap-3">
-              <div
-                className={cn(
-                  "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
-                  NODE_CLASS[payment.node]
-                )}
-              >
-                {payment.node === "done" ? <Check className="h-3 w-3 stroke-[3]" /> : <Wallet className="h-3 w-3" />}
-              </div>
-              <div className="min-w-0 flex-1 text-xs">
-                <div className="flex min-h-5 flex-wrap items-center justify-between gap-1.5">
-                  <span
-                    className={cn("font-medium", payment.node === "idle" ? "text-muted-foreground" : "text-foreground")}
-                  >
-                    Payment
-                  </span>
-                  {payment.badge.tone === "muted" ? (
-                    <span className="text-muted-foreground text-xs">{payment.badge.text}</span>
-                  ) : (
-                    <Badge variant="outline" className={cn("text-xs font-medium", BADGE_CLASS[payment.badge.tone])}>
-                      {payment.badge.text}
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  <span className="text-foreground/90">{payment.who}</span>
-                </p>
-              </div>
-            </li>
-          ) : null}
         </ol>
       )}
+      {payment ? (
+        <div className="border-info/30 bg-info/10 rounded-md border border-dashed px-3 py-2.5 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <span className="text-info flex items-center gap-1.5 font-medium">
+              {payment.node === "done" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}
+              Payment officer
+            </span>
+            <span className="text-info text-xs font-medium">{payment.badge.text}</span>
+          </div>
+          <p className="text-foreground/90 mt-1">{payment.who}</p>
+          <p className="text-muted-foreground mt-0.5">Not an approval. Records the payment to close this out.</p>
+        </div>
+      ) : null}
     </section>
   )
 }

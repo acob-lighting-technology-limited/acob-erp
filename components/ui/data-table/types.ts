@@ -165,6 +165,8 @@ export interface RowAction<TData> {
   icon?: LucideIcon
   onClick: (row: TData) => void
   variant?: "default" | "destructive"
+  /** Draw as the filled primary button when shown inline. */
+  primary?: boolean
   /** Return true to hide the action for a given row */
   hidden?: (row: TData) => boolean
 }
