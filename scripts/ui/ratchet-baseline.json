@@ -176,7 +176,6 @@
       "app/api/admin/reports/weekly-report-schedules/route.ts": 1,
       "app/api/admin/settings/roles/route.ts": 1,
       "app/api/admin/tasks/management/route.ts": 1,
-      "app/api/correspondence/department-codes/route.ts": 2,
       "app/api/correspondence/records/[id]/approvals/route.ts": 10,
       "app/api/correspondence/records/[id]/dispatch/route.ts": 1,
       "app/api/correspondence/records/[id]/documents/route.ts": 5,
