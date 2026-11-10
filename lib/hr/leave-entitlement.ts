@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
-import { evaluateLeaveEligibility, getLeaveConfirmationState, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("hr-leave-entitlement")

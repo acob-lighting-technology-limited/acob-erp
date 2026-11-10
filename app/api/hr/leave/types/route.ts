@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { evaluateLeaveEligibility, getLeaveConfirmationState, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 

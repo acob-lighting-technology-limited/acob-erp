@@ -7,6 +7,7 @@ import type { Json } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
 import { countLeaveDays, isWorkingDay, NO_HOLIDAYS, type HolidaySet } from "@/lib/hr/leave-days"
 import { isBlockedByProbation, type LeaveConfirmationState } from "@/lib/hr/leave-probation"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 
 const log = logger("leave-workflow")
 
@@ -402,22 +403,6 @@ export async function getLeavePolicy(supabase: LeaveWorkflowClient, leaveTypeId:
     frequency_rules: {},
     override_allowed: true,
   }
-}
-
-/**
- * Probation state for the rule in leave-probation.ts. Read with the service client so the
- * answer does not depend on which client the caller holds (callers mix user and service).
- */
-export async function getLeaveConfirmationState(userId: string): Promise<LeaveConfirmationState> {
-  const service = getServiceClient()
-  if (!service) throw new Error("Service client unavailable for confirmation check")
-  const { data, error } = await service
-    .from("profiles")
-    .select("confirmation_date")
-    .eq("id", userId)
-    .maybeSingle<{ confirmation_date: string | null }>()
-  if (error) throw new Error("Failed to load confirmation status")
-  return { confirmationDate: data?.confirmation_date ?? null }
 }
 
 export async function evaluateLeaveEligibility(params: {

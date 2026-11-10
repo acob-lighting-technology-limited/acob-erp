@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { evaluateLeaveEligibility, getLeaveConfirmationState, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { LeaveContent } from "./leave-content"

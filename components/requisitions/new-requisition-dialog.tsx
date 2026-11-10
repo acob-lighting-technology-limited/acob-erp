@@ -350,7 +350,11 @@ export function NewRequisitionDialog({
         const next = { ...b, ...patch }
         const accountChanged =
           next.account_number !== b.account_number || next.bank_code !== b.bank_code || next.other_bank !== b.other_bank
-        return accountChanged && b.name_from_bank ? { ...next, account_name: "", name_from_bank: false } : next
+        if (!accountChanged) return next
+        // A number already looked up needs no new request: take the bank's name straight away.
+        const known = next.other_bank ? undefined : lookups[lookupKey(next.bank_code, next.account_number)]
+        if (known?.status === "found") return { ...next, account_name: known.accountName, name_from_bank: true }
+        return b.name_from_bank ? { ...next, account_name: "", name_from_bank: false } : next
       })
     )
   const bankOptions = useMemo(
@@ -391,6 +395,16 @@ export function NewRequisitionDialog({
           .then((json) => {
             const result: AccountLookup = json?.data?.status ? json.data : { status: "unavailable" }
             setLookups((prev) => ({ ...prev, [key]: result }))
+            // The account name is the bank's, not whatever was typed.
+            if (result.status === "found") {
+              setBeneficiaries((prev) =>
+                prev.map((b) =>
+                  !b.other_bank && lookupKey(b.bank_code, b.account_number) === key
+                    ? { ...b, account_name: result.accountName, name_from_bank: true }
+                    : b
+                )
+              )
+            }
           })
           .catch(() => setLookups((prev) => ({ ...prev, [key]: { status: "unavailable" } })))
       }
@@ -398,29 +412,6 @@ export function NewRequisitionDialog({
     return () => clearTimeout(timer)
   }, [pendingLookups])
 
-  // The account name is the bank's, not whatever was typed. Also covers going
-  // back to a number already looked up, which needs no new request.
-  const foundNames = lookupKeys
-    .map((k) =>
-      k && lookups[k]?.status === "found" ? `${k}=${(lookups[k] as { accountName: string }).accountName}` : ""
-    )
-    .join("|")
-  useEffect(() => {
-    if (!foundNames) return
-    setBeneficiaries((prev) => {
-      let changed = false
-      const next = prev.map((b) => {
-        if (b.other_bank) return b
-        const found = lookups[lookupKey(b.bank_code, b.account_number)]
-        if (found?.status !== "found" || (b.name_from_bank && b.account_name === found.accountName)) return b
-        changed = true
-        return { ...b, account_name: found.accountName, name_from_bank: true }
-      })
-      return changed ? next : prev
-    })
-    // foundNames captures every lookup this reads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [foundNames])
   const updateLine = (index: number, field: keyof LineDraft, value: string) =>
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: value } : l)))
 
