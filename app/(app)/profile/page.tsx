@@ -7,6 +7,8 @@ import { buildPersonalActivity } from "@/components/profile/personal-activity"
 import type { PersonalRecentActivityItem } from "@/components/profile/personal-recent-activity-feed"
 import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-workflow"
+import { isConfirmedOn } from "@/lib/hr/leave-probation"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import type { Task, TaskUserProfile } from "@/types/task"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
@@ -273,8 +275,11 @@ async function getProfileData() {
     }
   }
 
-  const loadAnnualLeaveRemaining = async () => {
+  /** Days left, or null while annual leave is closed to an unconfirmed employee. */
+  const loadAnnualLeaveRemaining = async (): Promise<number | null> => {
     try {
+      const confirmation = await getLeaveConfirmationState(userId)
+      if (!isConfirmedOn(confirmation, toLocalISODate())) return null
       const entitlements = await getLeaveEntitlements(dataClient, userId)
       const annual = entitlements.find(
         (e) => e.code?.toLowerCase() === "annual" || e.name.toLowerCase().includes("annual")

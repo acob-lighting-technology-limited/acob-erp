@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { evaluateLeaveEligibility, getLeaveConfirmationState, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 
@@ -55,6 +55,7 @@ export async function GET(_: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch leave types" }, { status: 500 })
     }
 
+    const confirmation = await getLeaveConfirmationState(user.id)
     const enriched = await Promise.all(
       ((leaveTypes || []) as LeaveTypeSummary[]).map(async (leaveType) => {
         const policy = await getLeavePolicy(supabase, leaveType.id)
@@ -65,6 +66,7 @@ export async function GET(_: NextRequest) {
           leaveType,
           startDate: toLocalISODate(),
           daysCount: 1,
+          confirmation,
         })
 
         const effectiveMaxDays =

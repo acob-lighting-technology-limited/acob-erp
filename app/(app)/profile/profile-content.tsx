@@ -42,7 +42,7 @@ interface ProfileContentProps {
   helpDesk: HelpDeskItem[]
   payments: PaymentItem[]
   leave: LeaveItem[]
-  annualLeaveRemaining?: number
+  annualLeaveRemaining?: number | null
   attendance: AttendanceItem[]
   recentWorkDaysAttendance?: WorkDayAttendanceItem[]
   todayStatus?: TodayAttendanceStatus | null

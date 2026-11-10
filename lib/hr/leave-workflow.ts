@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Json } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
 import { countLeaveDays, isWorkingDay, NO_HOLIDAYS, type HolidaySet } from "@/lib/hr/leave-days"
+import { isBlockedByProbation, type LeaveConfirmationState } from "@/lib/hr/leave-probation"
 
 const log = logger("leave-workflow")
 
@@ -403,6 +404,22 @@ export async function getLeavePolicy(supabase: LeaveWorkflowClient, leaveTypeId:
   }
 }
 
+/**
+ * Probation state for the rule in leave-probation.ts. Read with the service client so the
+ * answer does not depend on which client the caller holds (callers mix user and service).
+ */
+export async function getLeaveConfirmationState(userId: string): Promise<LeaveConfirmationState> {
+  const service = getServiceClient()
+  if (!service) throw new Error("Service client unavailable for confirmation check")
+  const { data, error } = await service
+    .from("profiles")
+    .select("confirmation_date")
+    .eq("id", userId)
+    .maybeSingle<{ confirmation_date: string | null }>()
+  if (error) throw new Error("Failed to load confirmation status")
+  return { confirmationDate: data?.confirmation_date ?? null }
+}
+
 export async function evaluateLeaveEligibility(params: {
   supabase: LeaveWorkflowClient
   policy: LeavePolicyRecord
@@ -418,10 +435,22 @@ export async function evaluateLeaveEligibility(params: {
   leaveType: { code?: string | null; name?: string | null }
   startDate: string
   daysCount: number
+  /** Pre-loaded probation state; loaded here when omitted. Pass it when evaluating many types. */
+  confirmation?: LeaveConfirmationState
 }): Promise<LeaveEligibilityResult> {
   const { supabase, policy, requesterProfile, leaveType, startDate, daysCount } = params
   const missingDocuments = new Set<string>()
   const requiredDocuments = new Set<string>(toStringArray(policy.required_documents))
+
+  const confirmation = params.confirmation ?? (await getLeaveConfirmationState(requesterProfile.id))
+  if (isBlockedByProbation(confirmation, leaveType.code, startDate)) {
+    return {
+      status: "not_eligible",
+      reason: "Until your appointment is confirmed, only Sick Leave and Leave Without Pay are available.",
+      requiredDocuments: Array.from(requiredDocuments),
+      missingDocuments: [],
+    }
+  }
 
   const normalizedGender = (requesterProfile.gender || "unspecified").toLowerCase()
 

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
-import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { evaluateLeaveEligibility, getLeaveConfirmationState, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("hr-leave-entitlement")
@@ -47,7 +47,13 @@ export type LeaveEntitlement = {
   needsEvidence: boolean
 }
 
-type LeaveTypeRow = { id: string; name: string; code: string | null; max_days: number | null; lead_max_days: number | null }
+type LeaveTypeRow = {
+  id: string
+  name: string
+  code: string | null
+  max_days: number | null
+  lead_max_days: number | null
+}
 type RequestRow = { leave_type_id: string; days_count: number | null; status: string }
 
 /** Leads get a higher entitlement on types with a lead_max_days override (e.g. Annual Leave). */
@@ -127,18 +133,20 @@ export async function getLeaveEntitlements(
 ): Promise<LeaveEntitlement[]> {
   const year = options?.year ?? new Date().getUTCFullYear()
 
-  const [{ data: profile }, { data: leaveTypes }, { data: activePolicies }, committed] = await Promise.all([
-    client
-      .from("profiles")
-      .select(
-        "id, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, is_department_lead, lead_departments"
-      )
-      .eq("id", userId)
-      .maybeSingle(),
-    client.from("leave_types").select("id, name, code, max_days, lead_max_days").eq("is_active", true).order("name"),
-    client.from("leave_policies").select("leave_type_id").eq("is_active", true),
-    getCommittedDays(client, userId, year, { excludeRequestId: options?.excludeRequestId }),
-  ])
+  const [{ data: profile }, { data: leaveTypes }, { data: activePolicies }, committed, confirmation] =
+    await Promise.all([
+      client
+        .from("profiles")
+        .select(
+          "id, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, is_department_lead, lead_departments"
+        )
+        .eq("id", userId)
+        .maybeSingle(),
+      client.from("leave_types").select("id, name, code, max_days, lead_max_days").eq("is_active", true).order("name"),
+      client.from("leave_policies").select("leave_type_id").eq("is_active", true),
+      getCommittedDays(client, userId, year, { excludeRequestId: options?.excludeRequestId }),
+      getLeaveConfirmationState(userId),
+    ])
 
   const requesterProfile = profile ?? {
     id: userId,
@@ -168,6 +176,7 @@ export async function getLeaveEntitlements(
         leaveType: lt,
         startDate: today,
         daysCount: 1,
+        confirmation,
       })
       if (evaluation.status === "not_eligible") continue
       needsEvidence = evaluation.status === "missing_evidence"
