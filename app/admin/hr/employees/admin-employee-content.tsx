@@ -736,6 +736,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     {getRoleBadgeLabel(r.role)}
                   </Badge>
                 )}
+                {r.delegate_until && (
+                  <Badge
+                    variant="outline"
+                    title={`Acting for a lead until ${formatWATDate(r.delegate_until)}`}
+                    className="text-info border-info/40 bg-info/10 shrink-0 px-1.5 py-0 text-xs font-medium whitespace-nowrap shadow-none"
+                  >
+                    Delegate
+                  </Badge>
+                )}
               </div>
               {r.designation && (
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">{r.designation}</p>

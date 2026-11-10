@@ -5,6 +5,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "./admin-employee-content"
 import { resolveAdminScope, expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { getAvatarSignedUrls } from "@/lib/profile-photos"
+import { loadActiveDelegates } from "@/lib/dept/active-delegates"
 import { logger } from "@/lib/logger"
 import type { Database, UserRole } from "@/types/database"
 
@@ -67,8 +68,10 @@ async function getAdminEmployeeData() {
     rawEmployees.map((r) => r.avatar_path).filter((path): path is string => Boolean(path))
   )
 
+  const delegates = await loadActiveDelegates(dataClient)
   const employees: Employee[] = rawEmployees.map((r) => ({
     ...(r as unknown as Employee),
+    delegate_until: delegates.get(String(r.id)) ?? null,
     avatar_url: r.avatar_path ? (signedUrlsByPath.get(r.avatar_path) ?? null) : null,
   }))
 
