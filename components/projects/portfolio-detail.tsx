@@ -15,7 +15,6 @@ import {
   MapPin,
   Pencil,
   Plus,
-  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -181,10 +180,6 @@ export function PortfolioDetail({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <PortfolioStatusBadge status={portfolio.status} />
-          <Button variant="outline" size="sm" onClick={refresh} aria-label="Refresh">
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} aria-label="Edit portfolio">
               <Pencil className="h-4 w-4 sm:mr-2" />

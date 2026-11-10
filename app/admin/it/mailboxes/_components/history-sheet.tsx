@@ -67,7 +67,6 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
   const {
     data: history = [],
     isLoading,
-    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -130,17 +129,6 @@ export function MailboxHistorySheet({ open, onOpenChange }: MailboxHistorySheetP
                 aria-label="Filter mailbox history"
               />
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => void refetch()}
-              disabled={isFetching}
-              title="Refresh history"
-              aria-label="Refresh history"
-              className="shrink-0"
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            </Button>
           </div>
           <Tabs value={typeFilter} onValueChange={setTypeFilter} className="w-full">
             <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

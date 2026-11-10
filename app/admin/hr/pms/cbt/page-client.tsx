@@ -4,7 +4,7 @@ import { useCanEdit } from "@/components/admin/edit-access-context"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Brain, Eye, RefreshCw, RotateCcw, Settings } from "lucide-react"
+import { Brain, Eye, RotateCcw, Settings } from "lucide-react"
 import { CbtAttemptDetail } from "@/components/pms/cbt-attempt-detail"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -247,7 +247,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     return counts
   }, [questionsQuery.data])
   const isInitialLoading = snapshotQuery.isPending
-  const isRefreshing = !snapshotQuery.isPending && (snapshotQuery.isFetching || questionsQuery.isFetching)
   const error = snapshotQuery.error?.message ?? null
   const loadCbtSnapshot = async () => {
     await Promise.all([snapshotQuery.refetch(), questionsQuery.refetch()])
@@ -694,10 +693,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       onTabChange={(value) => setTab(value as TabKey)}
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void loadCbtSnapshot()} disabled={isRefreshing}>
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {basePath.startsWith("/admin") ? (
             <Link href="/admin/hr/pms/cbt/settings">
               <Button variant="outline" size="sm">

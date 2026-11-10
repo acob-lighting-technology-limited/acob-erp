@@ -23,7 +23,6 @@ import {
   Clock,
   Star,
   ChevronRight,
-  RefreshCw,
   Mail,
   Megaphone,
   Trash2,
@@ -123,7 +122,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   const router = useRouter()
   const [supabase] = useState(() => createClient())
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
-  const [isLoading, setIsLoading] = useState(false)
   // Default to the work waiting on the viewer (audit 2.1).
   const [activeTab, setActiveTab] = useState("action")
 
@@ -380,15 +378,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     [deleteNotification, markAsRead, markAsUnread, openNotification]
   )
 
-  const refreshNotifications = useCallback(() => {
-    setIsLoading(true)
-    router.refresh()
-    setTimeout(() => {
-      setIsLoading(false)
-      toast.success("Notifications refreshed")
-    }, 900)
-  }, [router])
-
   return (
     <DataTablePage
       title="Notifications"
@@ -407,10 +396,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
               <span className="hidden sm:inline">Settings</span>
             </Button>
           </Link>
-          <Button variant="outline" size="sm" onClick={refreshNotifications} disabled={isLoading}>
-            <RefreshCw className={cn("h-4 w-4 sm:mr-2", isLoading && "animate-spin")} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           <Button size="sm" variant="secondary" onClick={() => void markAllAsRead()} disabled={counts.unread === 0}>
             <CheckCheck className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Mark all read</span>
@@ -425,7 +410,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         searchPlaceholder="Search title, message, actor..."
         searchFn={(n, q) => `${n.title} ${n.message} ${n.actor_name || ""} ${n.category}`.toLowerCase().includes(q)}
         filters={filters}
-        isLoading={isLoading}
         rowActions={rowActions}
         pagination={{ pageSize: 50 }}
         stickyToolbar

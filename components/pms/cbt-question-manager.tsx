@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Brain, Pencil, Plus, RefreshCw, Trash2, Upload } from "lucide-react"
+import { Brain, Pencil, Plus, Trash2, Upload } from "lucide-react"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { CbtUploadDialog } from "./cbt-upload-dialog"
@@ -454,10 +454,6 @@ export function CbtQuestionManager({
       backLink={{ href: basePath, label: "Back to PMS CBT" }}
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void loadPage()} disabled={isLoading}>
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
           {!lockDepartment && (
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/hr/pms/cycles">Manage Cycles</Link>
