@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
+  FastForward,
   AlertCircle,
   ArrowUpRight,
   Building2,
@@ -20,16 +21,16 @@ import {
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { CopyButton } from "@/components/ui/copy-button"
-import { cn } from "@/lib/utils"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
-import { formatNaira, progressLabel, STATUS_LABELS, stageTitle } from "@/lib/requisitions/format"
+import { formatNaira, progressLabel, STATUS_LABELS } from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
-import { StageIcon, stageLine, statusBadgeVariant } from "./requisition-detail"
+import { statusBadgeVariant } from "./requisition-detail"
+import { RequisitionBeneficiaryTable } from "./requisition-beneficiary-table"
+import { RequisitionStageList } from "./requisition-stage-list"
+import { STAFF_REQUISITIONS_PATH } from "./requisition-paths"
 import type { SignMode } from "./sign-dialog"
 
 import { LinesSkeleton } from "@/components/skeletons"
@@ -38,6 +39,8 @@ export interface RequisitionPreviewSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSign?: (requisition: Requisition, viewer: RequisitionViewerActions, mode: SignMode) => void
+  /** Where the full page lives on this surface (staff, admin or a department console). */
+  detailBasePath?: string
 }
 
 interface RequisitionResponse {
@@ -45,7 +48,13 @@ interface RequisitionResponse {
   viewer: RequisitionViewerActions & { is_admin: boolean }
 }
 
-export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onSign }: RequisitionPreviewSheetProps) {
+export function RequisitionPreviewSheet({
+  requisitionId,
+  open,
+  onOpenChange,
+  onSign,
+  detailBasePath = STAFF_REQUISITIONS_PATH,
+}: RequisitionPreviewSheetProps) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.requisition(requisitionId ?? ""),
     queryFn: () => apiJson<RequisitionResponse>(`/api/requisitions/${requisitionId}`),
@@ -55,8 +64,7 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
 
   const requisition = data?.data
   const viewer = data?.viewer
-  const stages = requisition?.stages || []
-  const fullPageHref = requisition ? `/accounts/requisitions/${requisition.id}` : "#"
+  const fullPageHref = requisition ? `${detailBasePath}/${requisition.id}` : "#"
 
   return (
     <DetailSheet
@@ -103,8 +111,17 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                   Reject
                 </Button>
                 <Button size="sm" className="h-8 text-xs" onClick={() => onSign(requisition, viewer, "sign")}>
-                  <PenLine className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                  Sign
+                  {viewer.would_bypass_stage_ids.length ? (
+                    <>
+                      <FastForward className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      Override
+                    </>
+                  ) : (
+                    <>
+                      <PenLine className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      Sign
+                    </>
+                  )}
                 </Button>
               </>
             ) : null}
@@ -229,73 +246,18 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                 <CreditCard className="h-3.5 w-3.5" aria-hidden />
                 Beneficiary details
               </h3>
-              <div className="overflow-hidden rounded-md border">
-                <table className="w-full border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-muted/50 text-muted-foreground border-b font-medium">
-                      <th className="p-2 text-left">Account name</th>
-                      <th className="p-2 text-left">Account no</th>
-                      <th className="p-2 text-left">Bank</th>
-                      {requisition.beneficiary_details.some((b) => b.amount != null) ? (
-                        <th className="p-2 text-right">Amount</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requisition.beneficiary_details.map((b, idx) => (
-                      <tr key={`row-${idx}`} className="border-b last:border-b-0">
-                        <td className="p-2 font-medium">
-                          <CopyableCell value={b.account_name} label="account name" />
-                        </td>
-                        <td className="p-2 font-mono">
-                          <CopyableCell value={b.account_number} label="account number" />
-                        </td>
-                        <td className="p-2">
-                          <CopyableCell value={b.bank_name} label="bank name" />
-                        </td>
-                        {requisition.beneficiary_details.some((item) => item.amount != null) ? (
-                          <td className="p-2 text-right font-mono">
-                            {b.amount != null ? (
-                              // Copies the bare figure, which pastes cleanly into a bank's transfer form.
-                              <CopyableCell
-                                value={String(Number(b.amount))}
-                                display={formatNaira(b.amount)}
-                                label="amount"
-                                className="justify-end"
-                              />
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <RequisitionBeneficiaryTable beneficiaries={requisition.beneficiary_details} />
             </div>
           ) : null}
 
           {/* Approval Route */}
           <div className="space-y-3">
             <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Approval route</h3>
-            <ol className="bg-card space-y-3 rounded-lg border p-3.5">
-              {stages.map((stage) => (
-                <li key={stage.id} className="flex gap-2.5">
-                  <StageIcon stage={stage} />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="text-xs font-semibold">{stageTitle(stage)}</p>
-                    <p className="text-muted-foreground text-xs">{stageLine(stage)}</p>
-                    {stage.state_note ? (
-                      <p className="text-muted-foreground text-xs italic">{stage.state_note}</p>
-                    ) : null}
-                    {stage.comments ? (
-                      <p className="bg-muted/40 border-border/40 mt-1 rounded border p-2 text-xs">“{stage.comments}”</p>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <RequisitionStageList
+              requisition={requisition}
+              heading={false}
+              className="bg-card rounded-lg border p-3.5"
+            />
           </div>
 
           {/* Attachments / Supporting Documents */}
@@ -379,26 +341,5 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
         </div>
       )}
     </DetailSheet>
-  )
-}
-
-/** A beneficiary value with a copy button beside it. Empty values show a dash and nothing to copy. */
-function CopyableCell({
-  value,
-  display,
-  label,
-  className,
-}: {
-  value: string | null | undefined
-  display?: string
-  label: string
-  className?: string
-}) {
-  if (!value) return <>—</>
-  return (
-    <span className={cn("flex items-center gap-1", className)}>
-      <span className="min-w-0 break-words">{display ?? value}</span>
-      <CopyButton value={value} label={label} />
-    </span>
   )
 }

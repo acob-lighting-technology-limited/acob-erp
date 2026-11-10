@@ -208,11 +208,6 @@ export const RecordPaymentSchema = z.object({
   pin: PIN,
 })
 
-/** PATCH /api/requisitions/[id]/stages/[stageId] */
-export const ReassignStageSchema = z.object({
-  assignee_id: z.string().uuid("Pick someone"),
-})
-
 /** POST /api/requisitions/payment-processors */
 export const PaymentProcessorSchema = z.object({
   profile_id: z.string().uuid("Pick someone"),

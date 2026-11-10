@@ -49,6 +49,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return apiError(reason, ApiErrorCode.FORBIDDEN, 403)
     }
 
+    // Signing ahead of earlier signers overrides them, so the reason goes on record.
+    if (body.action === "sign" && signable.bypassed.length && (body.comments?.trim().length ?? 0) < 3) {
+      return apiError("Say why you are overriding the earlier stages.", ApiErrorCode.VALIDATION_ERROR, 400)
+    }
+
     let amountChange: Record<string, unknown> | null = null
     if (body.action === "sign" && body.amount_change) {
       const change = body.amount_change

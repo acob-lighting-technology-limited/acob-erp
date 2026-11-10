@@ -134,6 +134,8 @@ export interface Requisition {
   updated_at: string
 
   requester?: (RequisitionPerson & { company_email?: string | null }) | null
+  /** Signed URL of the requester's stored signature, added by the detail API. */
+  requester_signature_url?: string | null
   stages?: RequisitionStage[]
   amount_changes?: RequisitionAmountChange[]
   payments?: RequisitionPayment[]

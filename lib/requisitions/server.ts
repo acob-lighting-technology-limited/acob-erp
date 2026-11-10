@@ -1,7 +1,7 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
-import { getMissingSetup, signedStorageUrl, SIGNATURE_BUCKET } from "@/lib/approval-signing/server"
+import { getMissingSetup, getSigningStatus, signedStorageUrl, SIGNATURE_BUCKET } from "@/lib/approval-signing/server"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getOneDriveService } from "@/lib/onedrive"
@@ -197,7 +197,16 @@ export async function withSignedUrls(admin: SupabaseClient, req: Requisition): P
     })
   )
 
-  return { ...req, attachments, stages, payments }
+  // The requester signs the form too: "Requested by" on a voucher, and any
+  // stage they hold themselves (an HR Lead's or the MD's own request).
+  let requesterSignatureUrl: string | null = null
+  try {
+    requesterSignatureUrl = (await getSigningStatus(admin, req.user_id)).signature_url
+  } catch (err) {
+    log.warn("Failed to load the requester's signature", { requisitionId: req.id, err })
+  }
+
+  return { ...req, attachments, stages, payments, requester_signature_url: requesterSignatureUrl }
 }
 
 /** The stage a person would sign now, and what signing it would bypass. Mirrors requisition_sign. */

@@ -66,7 +66,7 @@ export function isOwnUploadPath(path: string, userId: string): boolean {
   return path.startsWith(`${userId}/`) && !path.includes("..")
 }
 
-/** Finance admins curate requisition settings: funding categories, payment processors, stage reassignment. */
+/** Finance admins curate requisition settings: funding categories and payment processors. */
 export async function canManageRequisitionSettings(): Promise<boolean> {
   const scope = await getRequestScope()
   if (!scope) return false
