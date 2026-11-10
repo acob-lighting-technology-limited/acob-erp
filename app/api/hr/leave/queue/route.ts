@@ -326,8 +326,10 @@ export async function GET(request: NextRequest) {
         "id, leave_request_id, approver_id, approval_level, status, comments, approved_at, stage_code, stage_order, reliever_revision, superseded"
       )
       .eq("approver_id", actorProfileId)
+      // Decisions only, for the "Reviewed by me" tab: what is still open sits in Pending Reviews.
+      .neq("status", "pending")
       .order("approved_at", { ascending: false })
-      .limit(20)
+      .limit(200)
 
     if (historyError) {
       return NextResponse.json(
