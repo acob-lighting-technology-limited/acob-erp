@@ -68,15 +68,12 @@ export async function ViewOnlyNotice({ route }: ViewOnlyNoticeProps) {
   const holders = await loadEditHolders(getServiceRoleClientOrFallback(supabase), route)
 
   if (mode === "override") {
-    const owners = holders.filter((holder) => holder.via === "owner").map((holder) => holder.name)
     return (
       <div className="border-warning/40 bg-warning/10 text-foreground mx-4 mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm md:mx-6">
         <ShieldAlert className="text-warning mt-0.5 h-4 w-4 shrink-0" />
         <p>
           <span className="font-medium">You are using override access on {areaName(route)}.</span> You can change things
-          here, but every change is recorded as an override and shown to the owner
-          {owners.length === 1 ? "" : "s"}
-          {owners.length > 0 ? ` (${owners.join(", ")})` : ""}.
+          here, but every change is recorded as an override and shown to the owners of {areaName(route)}.
         </p>
       </div>
     )
