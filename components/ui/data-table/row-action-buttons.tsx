@@ -11,7 +11,7 @@ export function RowActionButtons<TData>({ actions, row }: { actions: RowAction<T
         <Button
           key={action.label}
           size="sm"
-          variant={action.variant === "destructive" ? "destructive" : "outline"}
+          variant={action.variant === "destructive" ? "destructive" : action.primary ? "default" : "outline"}
           onClick={() => action.onClick(row)}
           className="h-7 gap-1 px-2 text-xs"
         >

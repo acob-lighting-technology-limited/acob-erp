@@ -23,10 +23,20 @@ import { SignDialog, type SignMode } from "./sign-dialog"
 import { LinesSkeleton } from "@/components/skeletons"
 export type Viewer = RequisitionViewerActions & { is_admin: boolean }
 
-export function statusBadgeVariant(status: Requisition["status"]) {
-  if (status === "rejected") return "destructive" as const
-  if (status === "paid") return "default" as const
-  return "secondary" as const
+/** One colour per status, so "in approval" and "awaiting payment" never look alike. */
+export function statusBadgeClass(status: Requisition["status"]) {
+  switch (status) {
+    case "rejected":
+      return "border-red-500/30 bg-red-500/15 text-red-600 dark:text-red-400"
+    case "paid":
+      return "border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+    case "awaiting_payment":
+      return "border-sky-500/30 bg-sky-500/15 text-sky-600 dark:text-sky-400"
+    case "partly_paid":
+      return "border-violet-500/30 bg-violet-500/15 text-violet-600 dark:text-violet-400"
+    default:
+      return "border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-400"
+  }
 }
 
 /** One requisition: the paper form, its history, and what the viewer can do now. */
@@ -116,7 +126,9 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
           }
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={statusBadgeVariant(requisition.status)}>{STATUS_LABELS[requisition.status]}</Badge>
+          <Badge variant="outline" className={statusBadgeClass(requisition.status)}>
+            {STATUS_LABELS[requisition.status]}
+          </Badge>
           {progressLabel(requisition) !== STATUS_LABELS[requisition.status] ? (
             <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
           ) : null}

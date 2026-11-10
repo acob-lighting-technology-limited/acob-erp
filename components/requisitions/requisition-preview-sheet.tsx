@@ -21,12 +21,13 @@ import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiJson } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
 import { formatNaira, progressLabel, STATUS_LABELS } from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
-import { statusBadgeVariant } from "./requisition-detail"
+import { statusBadgeClass } from "./requisition-detail"
 import { RequisitionBeneficiaryTable } from "./requisition-beneficiary-table"
 import { RequisitionStageList } from "./requisition-stage-list"
 import { STAFF_REQUISITIONS_PATH } from "./requisition-paths"
@@ -83,7 +84,7 @@ export function RequisitionPreviewSheet({
             <Badge variant="outline" className="text-xs font-semibold">
               {FORM_LABELS[requisition.form_type]}
             </Badge>
-            <Badge variant={statusBadgeVariant(requisition.status)} className="text-xs">
+            <Badge variant="outline" className={cn(statusBadgeClass(requisition.status), "text-xs")}>
               {STATUS_LABELS[requisition.status]}
             </Badge>
             <span className="text-muted-foreground text-xs">{progressLabel(requisition)}</span>
