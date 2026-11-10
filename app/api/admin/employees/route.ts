@@ -6,6 +6,7 @@ import { buildAccessContextV2 } from "@/lib/admin/policy-v2"
 import { enforceRouteAccessV2 } from "@/lib/admin/api-guard-v2"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { getAvatarSignedUrls } from "@/lib/profile-photos"
+import { loadActiveDelegates } from "@/lib/dept/active-delegates"
 import { logger } from "@/lib/logger"
 
 const log = logger("admin-employees-list")
@@ -62,8 +63,10 @@ export async function GET() {
     rows.map((r) => r.avatar_path).filter((path): path is string => Boolean(path))
   )
 
+  const delegates = await loadActiveDelegates(dataClient)
   const employees = rows.map((r) => ({
     ...r,
+    delegate_until: delegates.get(String(r.id)) ?? null,
     avatar_url: r.avatar_path ? (signedUrlsByPath.get(r.avatar_path) ?? null) : null,
   }))
 

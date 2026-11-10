@@ -114,7 +114,16 @@ export function DeptDelegationButton({ deptId }: { deptId: string }) {
       })
     }
     for (const page of data?.adminPages ?? []) add(page.group, { key: page.key, label: page.label, alsoAdmin: false })
-    return Array.from(map.entries())
+    // Admin-side groups are added last; bring each one up beside its console group so it is not buried.
+    const entries = Array.from(map.entries())
+    const adminSide = entries.filter(([group]) => group.endsWith(", admin side only"))
+    const rest = entries.filter(([group]) => !group.endsWith(", admin side only"))
+    for (const item of adminSide) {
+      const owner = item[0].split(",")[0]
+      const at = rest.findIndex(([group]) => group === owner)
+      rest.splice(at >= 0 ? at + 1 : rest.length, 0, item)
+    }
+    return rest
   }, [data])
 
   const person = data?.candidates.find((candidate) => candidate.id === personId)

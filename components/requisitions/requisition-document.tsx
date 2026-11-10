@@ -1,14 +1,31 @@
-/* eslint-disable @next/next/no-img-element -- signatures are short-lived signed URLs; print needs plain <img> */
+/* eslint-disable @next/next/no-img-element -- signatures are short-lived signed URLs, and the PDF capture needs plain <img> */
+import type { Ref } from "react"
+import { Globe, Mail, MapPin, Phone } from "lucide-react"
 import type { Requisition, RequisitionStage, RequisitionStageCode } from "@/lib/requisitions/types"
 import { formatNaira } from "@/lib/requisitions/format"
-import { STAGE_LABELS } from "@/lib/requisitions/routing"
+import { accountNamesMatch } from "@/lib/requisitions/nuban"
+import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
 
 /**
  * The requisition as the paper form: Payment Request Form or Petty-Cash
- * Voucher. Always light (it is a sheet of paper) and printable with the
- * browser's Save as PDF.
+ * Voucher. Always light (it is a sheet of paper). Layout switches on the
+ * sheet's own width (container queries), so the PDF captured at A4 width looks
+ * the same whatever screen it was downloaded from.
  */
+
+/** The ACOB Lighting wordmark. The acob-logo-* files carry the Matrix brand. */
+const LETTERHEAD_LOGO = "/images/acob-lighting-letterhead.png"
+
+const CONTACT_LINES = [
+  {
+    icon: MapPin,
+    text: "Plot 2, Block 14 Extension, Federal Ministry of Works and Housing Sites and Services Scheme, Gwarinpa Phase 2, Abuja FCT.",
+  },
+  { icon: Mail, text: "info@acoblighting.com, infoacob@gmail.com" },
+  { icon: Phone, text: "+234 704 920 2634, +234 803 290 2825" },
+  { icon: Globe, text: "www.acoblighting.com" },
+] as const
 
 function formatDate(value: string | null | undefined) {
   if (!value) return ""
@@ -20,38 +37,81 @@ function formatDate(value: string | null | undefined) {
   })
 }
 
-function Letterhead({ boxLabel, boxValue }: { boxLabel: string; boxValue: string }) {
+interface RefCell {
+  label: string
+  value: string
+}
+
+function Letterhead({ cells }: { cells: RefCell[] }) {
   return (
-    <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-1">
-        <p className="text-right font-mono text-xs text-slate-500 sm:text-left">RC: 1324192</p>
-        <img src="/images/acob-logo-light.png" alt="ACOB Lighting Technology Limited" className="h-12 w-auto" />
-        <p className="text-xs text-slate-500">...Lighting up Nigeria</p>
-      </div>
-      <div className="space-y-2 sm:max-w-xs">
-        <div className="space-y-0.5 text-xs leading-snug text-slate-600">
-          <p>
-            Plot 2, Block 14 Extension, Federal Ministry of Works and Housing Sites and Services Scheme, Gwarinpa Phase
-            2, Abuja FCT.
+    <header className="mb-5">
+      <div className="flex flex-col gap-3 border-b-2 border-slate-800 pb-3 @xl:flex-row @xl:items-start @xl:justify-between">
+        <div className="space-y-1.5">
+          <img src={LETTERHEAD_LOGO} alt="ACOB Lighting Technology Limited" className="h-11 w-auto" />
+          <p className="text-xs text-slate-500">
+            <span className="font-mono">RC: 1324192</span> · ...Lighting up Nigeria
           </p>
-          <p>info@acoblighting.com, infoacob@gmail.com</p>
-          <p>+234 704 920 2634, +234 803 290 2825</p>
-          <p>www.acoblighting.com</p>
         </div>
-        <div className="border border-slate-400 px-3 py-1.5 text-xs">
-          <span className="font-bold uppercase">{boxLabel}:</span> <span className="font-semibold">{boxValue}</span>
-        </div>
+        <address className="space-y-1 text-xs leading-snug text-slate-600 not-italic @xl:max-w-[19rem]">
+          {CONTACT_LINES.map(({ icon: Icon, text }) => (
+            <p key={text} className="flex items-start gap-1.5">
+              <Icon className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
+              <span>{text}</span>
+            </p>
+          ))}
+        </address>
       </div>
+      {cells.length === 2 ? (
+        // Two references, each in its own box, at either end of the line.
+        <div className="mt-3 flex flex-col gap-2 text-xs @xl:flex-row @xl:justify-between">
+          {cells.map((cell) => (
+            <div key={`cell-${cell.label}`} className="border border-slate-500 px-2.5 py-1.5">
+              <span className="font-bold uppercase">{cell.label}:</span>{" "}
+              <span className="font-semibold">{cell.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-1 border border-slate-500 text-xs @xl:grid-cols-3">
+          {cells.map((cell, i) => (
+            <div
+              key={`cell-${cell.label}`}
+              className={cn("px-2.5 py-1.5", i > 0 && "border-t border-slate-500 @xl:border-t-0 @xl:border-l")}
+            >
+              <span className="font-bold uppercase">{cell.label}:</span>{" "}
+              <span className="font-semibold">{cell.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </header>
+  )
+}
+
+function FormTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-5 border border-slate-500 py-2 text-center text-sm font-bold tracking-wide uppercase">
+      {children}
     </div>
   )
 }
 
+/** One ruled line per line of text, so a long field fills as many lines as it needs. */
+const RULED_LINES = {
+  backgroundImage: "linear-gradient(to bottom, transparent calc(1.5rem - 1px), #64748b calc(1.5rem - 1px))",
+  backgroundSize: "100% 1.5rem",
+} as const
+
+/** A filled-in form field: the label on the first line, the value written on ruled lines. */
 function FieldLine({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-end sm:gap-2">
-      <span className="shrink-0 text-xs font-bold uppercase">{label}:</span>
-      <span className="min-h-[1.25rem] flex-1 border-b border-slate-500 pb-0.5 text-[12px] font-medium whitespace-pre-wrap">
-        {value || ""}
+    <div className="flex flex-col @xl:flex-row @xl:items-start @xl:gap-2">
+      <span className="shrink-0 text-xs leading-6 font-bold uppercase">{label}:</span>
+      <span
+        className="min-h-6 flex-1 text-xs leading-6 font-medium break-words whitespace-pre-wrap"
+        style={RULED_LINES}
+      >
+        {value?.trim() || ""}
       </span>
     </div>
   )
@@ -59,25 +119,37 @@ function FieldLine({ label, value }: { label: string; value: string | null | und
 
 function BeneficiaryTable({ req }: { req: Requisition }) {
   const showAmounts = req.beneficiary_details.length > 1 && req.beneficiary_details.some((b) => b.amount != null)
+  const showPurpose = req.beneficiary_details.some((b) => b.purpose)
   return (
-    <div className="flex flex-col gap-2 sm:flex-row">
-      <p className="w-28 shrink-0 text-xs font-bold uppercase">Beneficiary details:</p>
-      <div className="flex-1 overflow-x-auto">
-        <table className="w-full border-collapse border border-slate-500 text-xs">
+    <div className="space-y-1.5">
+      <p className="text-xs font-bold uppercase">Beneficiary details:</p>
+      <div className="min-w-0">
+        <table className="w-full border-collapse border border-slate-500 text-xs break-words">
           <thead>
             <tr className="font-bold uppercase">
               <th className="border border-slate-500 p-1.5">Account name</th>
               <th className="border border-slate-500 p-1.5">Account no</th>
               <th className="border border-slate-500 p-1.5">Bank name</th>
+              {showPurpose && <th className="border border-slate-500 p-1.5">Purpose</th>}
               {showAmounts && <th className="border border-slate-500 p-1.5">Amount</th>}
             </tr>
           </thead>
           <tbody>
             {req.beneficiary_details.map((b, i) => (
               <tr key={`row-${i}`}>
-                <td className="border border-slate-500 p-1.5">{b.account_name}</td>
+                <td className="border border-slate-500 p-1.5">
+                  {b.account_name}
+                  {b.verified_account_name ? (
+                    <span className="block text-slate-500">
+                      {accountNamesMatch(b.account_name, b.verified_account_name)
+                        ? "✓ Confirmed by the bank"
+                        : `Bank has: ${b.verified_account_name}`}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
                 <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
+                {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}
                 {showAmounts && (
                   <td className="border border-slate-500 p-1.5 text-right">
                     {b.amount != null ? formatNaira(b.amount) : ""}
@@ -92,93 +164,132 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
   )
 }
 
-function SignatureSlot({ label, stage }: { label: string; stage?: RequisitionStage }) {
-  let body: React.ReactNode = null
-  if (stage?.state === "signed") {
-    body = (
-      <>
-        {stage.signature_url ? (
-          <img
-            src={stage.signature_url}
-            alt={`Signature of ${stage.actor?.full_name || "signer"}`}
-            className="h-10 w-auto"
-          />
-        ) : null}
-        <span className="font-semibold">{stage.actor?.full_name}</span>
-        <span className="text-xs text-slate-500">{formatDate(stage.acted_at)}</span>
-      </>
-    )
-  } else if (stage?.state === "bypassed") {
-    body = (
-      <span className="text-xs font-semibold text-slate-500 uppercase">
-        Bypassed by {stage.actor?.full_name || "a later signer"} · {formatDate(stage.acted_at)}
-      </span>
-    )
-  } else if (stage?.state === "not_required") {
-    body = <span className="text-xs font-semibold text-slate-500 uppercase">Not required</span>
-  } else if (stage?.state === "rejected") {
-    body = (
-      <span className="text-xs font-semibold text-red-700 uppercase">
-        Rejected by {stage.actor?.full_name} · {formatDate(stage.acted_at)}
-      </span>
-    )
-  }
+interface SlotContent {
+  /** Signature image, or a short status line when the slot was not signed. */
+  signatureUrl?: string | null
+  status?: { text: string; tone?: "muted" | "danger" }
+  name?: string | null
+  date?: string | null
+  /** Extra line under the name row (payment totals and reference). */
+  detail?: string | null
+}
 
+/**
+ * One signature box: label beside the line; above the line, the signature with
+ * the signer's name and date in one row under it.
+ */
+function Slot({ label, content }: { label: string; content: SlotContent }) {
+  const { signatureUrl, status, name, date, detail } = content
   return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-2">
-      <span className="shrink-0 text-xs font-bold uppercase">{label}:</span>
-      <span className="flex min-h-[2.75rem] flex-1 flex-col justify-end border-b border-slate-500 pb-0.5 text-xs">
-        {body}
-      </span>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
+      <span className="self-end pb-0.5 text-xs font-bold uppercase">{label}:</span>
+      <div className="border-b border-slate-500 pb-0.5">
+        <div className="flex h-11 items-end">
+          {signatureUrl ? (
+            <img src={signatureUrl} alt={`Signature of ${name || "signer"}`} className="max-h-11 w-auto" />
+          ) : status ? (
+            <span
+              className={cn(
+                "text-xs font-semibold uppercase",
+                status.tone === "danger" ? "text-red-700" : "text-slate-500"
+              )}
+            >
+              {status.text}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex min-h-4 items-baseline gap-3 text-xs">
+          {name ? <span className="truncate font-semibold">{name}</span> : null}
+          {date ? <span className="shrink-0 text-slate-500">{date}</span> : null}
+        </div>
+      </div>
+      {detail ? (
+        <>
+          <span aria-hidden />
+          <p className="pt-1 text-xs text-slate-500">{detail}</p>
+        </>
+      ) : null}
     </div>
   )
+}
+
+function requesterContent(req: Requisition): SlotContent {
+  return {
+    signatureUrl: req.requester_signature_url,
+    name: req.requester?.full_name,
+    date: formatDate(req.created_at),
+  }
+}
+
+function stageContent(req: Requisition, stage?: RequisitionStage): SlotContent {
+  if (!stage) return {}
+  const who = stage.actor?.full_name
+  switch (stage.state) {
+    case "signed":
+      return { signatureUrl: stage.signature_url, name: who, date: formatDate(stage.acted_at) }
+    case "bypassed":
+      return {
+        status: { text: `Bypassed by ${who || "a later signer"}` },
+        date: formatDate(stage.acted_at),
+      }
+    case "rejected":
+      return { status: { text: "Rejected", tone: "danger" }, name: who, date: formatDate(stage.acted_at) }
+    case "not_required":
+      // The requester holds this role, so their own signature stands here.
+      return isRaisedByHolder(stage) ? requesterContent(req) : { status: { text: "Not required" } }
+    default:
+      return {}
+  }
 }
 
 function stageFor(req: Requisition, code: RequisitionStageCode) {
   return req.stages?.find((s) => s.stage_code === code)
 }
 
+function StageSlot({ req, code }: { req: Requisition; code: RequisitionStageCode }) {
+  return <Slot label={`${STAGE_LABELS[code]} by`} content={stageContent(req, stageFor(req, code))} />
+}
+
 function ProcessedSlot({ req }: { req: Requisition }) {
   const payments = req.payments || []
   const last = payments[payments.length - 1]
-  return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-2">
-      <span className="shrink-0 text-xs font-bold uppercase">Processed by:</span>
-      <span className="flex min-h-[2.75rem] flex-1 flex-col justify-end border-b border-slate-500 pb-0.5 text-xs">
-        {last ? (
-          <>
-            {last.signature_url ? (
-              <img
-                src={last.signature_url}
-                alt={`Signature of ${last.recorder?.full_name || "processor"}`}
-                className="h-10 w-auto"
-              />
-            ) : null}
-            <span className="font-semibold">{last.recorder?.full_name}</span>
-            <span className="text-xs text-slate-500">
-              {payments.length > 1 ? `${payments.length} payments, ` : ""}
-              {formatNaira(req.amount_paid)} paid · last {formatDate(last.paid_on)}
-              {last.reference ? ` · ref ${last.reference}` : ""}
-            </span>
-          </>
-        ) : null}
-      </span>
-    </div>
-  )
+  const content: SlotContent = last
+    ? {
+        signatureUrl: last.signature_url,
+        name: last.recorder?.full_name,
+        date: formatDate(last.paid_on),
+        detail: [
+          payments.length > 1 ? `${payments.length} payments` : null,
+          `${formatNaira(req.amount_paid)} paid`,
+          last.reference ? `ref ${last.reference}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      }
+    : {}
+  return <Slot label="Processed by" content={content} />
+}
+
+function SignatureGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-4 @xl:grid-cols-2">{children}</div>
 }
 
 function PaymentRequestSheet({ req }: { req: Requisition }) {
   return (
     <>
-      <Letterhead boxLabel="Site location" boxValue={req.site_location || ""} />
-      <div className="mb-5 border border-slate-500 py-2 text-center text-sm font-bold tracking-wide uppercase">
-        Payment Request Form
-      </div>
+      <Letterhead
+        cells={[
+          { label: "No", value: req.requisition_number },
+          { label: "Department", value: req.department },
+        ]}
+      />
+      <FormTitle>Payment Request Form</FormTitle>
       <div className="space-y-4">
         <FieldLine label="Requested by" value={req.requester?.full_name} />
         <FieldLine label="Amount in words" value={req.amount_in_words} />
         <FieldLine label="Purpose" value={req.purpose} />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr_1fr]">
+        {/* The project is the site; there is no separate site location. */}
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-[2fr_1fr_1fr]">
           <div className="border border-slate-500 px-2 py-1.5 text-xs">
             <span className="font-bold uppercase">Project:</span> {req.project_name}
           </div>
@@ -189,19 +300,14 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
             <span className="font-bold uppercase">Amount (₦):</span> {formatNaira(req.amount).slice(1)}
           </div>
         </div>
-        {req.funding_category_name ? (
-          <p className="text-xs">
-            <span className="font-bold uppercase">Funding:</span> {req.funding_category_name}
-          </p>
-        ) : null}
         <BeneficiaryTable req={req} />
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-4 sm:grid-cols-2">
-          <SignatureSlot label={STAGE_LABELS.reviewed + " by"} stage={stageFor(req, "reviewed")} />
-          <SignatureSlot label={STAGE_LABELS.authorized + " by"} stage={stageFor(req, "authorized")} />
-          <SignatureSlot label={STAGE_LABELS.verified + " by"} stage={stageFor(req, "verified")} />
-          <SignatureSlot label={STAGE_LABELS.approved + " by"} stage={stageFor(req, "approved")} />
+        <SignatureGrid>
+          <StageSlot req={req} code="reviewed" />
+          <StageSlot req={req} code="authorized" />
+          <StageSlot req={req} code="verified" />
+          <StageSlot req={req} code="approved" />
           <ProcessedSlot req={req} />
-        </div>
+        </SignatureGrid>
       </div>
     </>
   )
@@ -210,7 +316,13 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
 function PettyCashSheet({ req }: { req: Requisition }) {
   return (
     <>
-      <Letterhead boxLabel="Date" boxValue={formatDate(req.created_at)} />
+      <Letterhead
+        cells={[
+          { label: "No", value: req.requisition_number },
+          { label: "Department", value: req.department },
+          { label: "Date", value: formatDate(req.created_at) },
+        ]}
+      />
       <table className="mb-4 w-full border-collapse border border-slate-500 text-xs">
         <thead>
           <tr>
@@ -243,35 +355,34 @@ function PettyCashSheet({ req }: { req: Requisition }) {
       <div className="space-y-4">
         <FieldLine label="Total amount in words" value={req.amount_in_words} />
         <BeneficiaryTable req={req} />
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-2">
-            <span className="shrink-0 text-xs font-bold uppercase">Requested by:</span>
-            <span className="flex min-h-[2.75rem] flex-1 flex-col justify-end border-b border-slate-500 pb-0.5 text-xs">
-              <span className="font-semibold">{req.requester?.full_name}</span>
-              <span className="text-xs text-slate-500">Submitted {formatDate(req.created_at)}</span>
-            </span>
-          </div>
-          <SignatureSlot label={STAGE_LABELS.authorized + " by"} stage={stageFor(req, "authorized")} />
-          <SignatureSlot label={STAGE_LABELS.approved + " by"} stage={stageFor(req, "approved")} />
+        <SignatureGrid>
+          <Slot label="Requested by" content={requesterContent(req)} />
+          <StageSlot req={req} code="authorized" />
+          <StageSlot req={req} code="approved" />
           {req.payments?.length ? <ProcessedSlot req={req} /> : null}
-        </div>
+        </SignatureGrid>
       </div>
     </>
   )
 }
 
-export function RequisitionDocument({ requisition, className }: { requisition: Requisition; className?: string }) {
+export function RequisitionDocument({
+  requisition,
+  className,
+  ref,
+}: {
+  requisition: Requisition
+  className?: string
+  ref?: Ref<HTMLElement>
+}) {
   return (
     <article
+      ref={ref}
       className={cn(
-        "requisition-document mx-auto w-full max-w-[210mm] rounded-lg border border-slate-300 bg-white p-5 text-slate-900 shadow-sm sm:p-10 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none",
+        "requisition-document @container mx-auto w-full max-w-[210mm] rounded-lg border border-slate-300 bg-white p-5 text-slate-900 shadow-sm sm:p-10",
         className
       )}
     >
-      <div className="mb-3 flex items-center justify-between font-mono text-xs text-slate-500">
-        <span>{requisition.requisition_number}</span>
-        <span>{requisition.department}</span>
-      </div>
       {requisition.form_type === "petty_cash" ? (
         <PettyCashSheet req={requisition} />
       ) : (

@@ -23,6 +23,10 @@ export async function requireRequisitionUser() {
 /** The workflow RPCs raise these codes; each maps to what the person can do about it. */
 const RPC_ERRORS: Record<string, [number, string]> = {
   requisition_not_found: [404, "Requisition not found."],
+  requisition_department_code_missing: [
+    400,
+    "Your department has no code yet, so the requisition cannot be numbered. Ask HR to set it under Departments.",
+  ],
   requisition_not_pending: [409, "This requisition has already moved on. Refresh to see where it is."],
   cannot_sign_own_requisition: [403, "You cannot sign your own requisition."],
   not_a_pending_signer: [403, "This requisition is not waiting on you."],
@@ -66,7 +70,7 @@ export function isOwnUploadPath(path: string, userId: string): boolean {
   return path.startsWith(`${userId}/`) && !path.includes("..")
 }
 
-/** Finance admins curate requisition settings: funding categories, payment processors, stage reassignment. */
+/** Finance admins curate requisition settings: the payment processors. */
 export async function canManageRequisitionSettings(): Promise<boolean> {
   const scope = await getRequestScope()
   if (!scope) return false

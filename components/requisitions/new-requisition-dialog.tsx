@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, FileText, Loader2, Plus, Receipt, Trash2, Upload, Wallet } from "lucide-react"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Plus,
+  Receipt,
+  Trash2,
+  TriangleAlert,
+  Upload,
+  Wallet,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,6 +25,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
@@ -28,16 +40,10 @@ import {
   amountOutOfRangeMessage,
   lineItemsTotal,
 } from "@/lib/requisitions/limits"
+import { NIGERIAN_BANKS, checkNuban, type NigerianBank, type NubanResult } from "@/lib/requisitions/nuban"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
-import type {
-  Requisition,
-  RequisitionAttachment,
-  RequisitionFormType,
-  RequisitionFundingCategory,
-} from "@/lib/requisitions/types"
+import type { Requisition, RequisitionAttachment, RequisitionFormType } from "@/lib/requisitions/types"
 import { uploadRequisitionFiles } from "@/lib/requisitions/upload"
-
-const NO_FUNDING = "none"
 
 type CostCategory = "admin" | "operational"
 
@@ -51,6 +57,14 @@ interface BeneficiaryDraft {
   account_name: string
   account_number: string
   bank_name: string
+  /** Paystack code of the picked bank; empty when typed by hand. */
+  bank_code: string
+  /** Typing a bank that is not in the list: no format or name check. */
+  other_bank: boolean
+  /** The account name was filled in by the bank, not typed. */
+  name_from_bank: boolean
+  /** What this account is paid for; optional, on top of the main purpose. */
+  purpose: string
   amount: string
 }
 
@@ -59,7 +73,111 @@ interface LineDraft {
   amount: string
 }
 
-const emptyBeneficiary = (): BeneficiaryDraft => ({ account_name: "", account_number: "", bank_name: "", amount: "" })
+const emptyBeneficiary = (): BeneficiaryDraft => ({
+  account_name: "",
+  account_number: "",
+  bank_name: "",
+  bank_code: "",
+  other_bank: false,
+  name_from_bank: false,
+  purpose: "",
+  amount: "",
+})
+
+const OTHER_BANK = "__other__"
+
+/** What the bank said about one account number at one bank. */
+type AccountLookup =
+  | { status: "loading" }
+  | { status: "found"; accountName: string }
+  | { status: "not_found" }
+  | { status: "unavailable" }
+
+const lookupKey = (bankCode: string, accountNumber: string) => `${bankCode}:${accountNumber}`
+
+/**
+ * One line under a beneficiary: first the check digit (instant, catches
+ * typos), then whether the bank confirmed the account and gave its name.
+ */
+function AccountCheck({
+  nuban,
+  lookup,
+  otherBank,
+  onPickBank,
+}: {
+  nuban: NubanResult | null
+  lookup: AccountLookup | undefined
+  otherBank: boolean
+  onPickBank: (code: string) => void
+}) {
+  if (otherBank) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        This bank cannot be checked. Type the account name exactly as the bank has it.
+      </p>
+    )
+  }
+  if (nuban?.status === "invalid") {
+    return (
+      <div className="text-danger space-y-1 text-xs" role="alert">
+        <p className="flex items-start gap-1.5">
+          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+          This is not a valid {nuban.bank.name} account number. Check the digits, or the bank.
+        </p>
+        {nuban.fits.length ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-1 pl-5">
+            It fits:
+            {nuban.fits.slice(0, 4).map((bank) => (
+              <button
+                key={bank.code}
+                type="button"
+                onClick={() => onPickBank(bank.code)}
+                className="text-foreground hover:bg-muted rounded border px-1.5 py-0.5"
+              >
+                {bank.name}
+              </button>
+            ))}
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+  if (!lookup) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        Enter the account number and pick the bank; the account name comes from the bank.
+      </p>
+    )
+  }
+  if (lookup.status === "loading") {
+    return (
+      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> Checking the account with the bank…
+      </p>
+    )
+  }
+  if (lookup.status === "not_found") {
+    return (
+      <p className="text-danger flex items-start gap-1.5 text-xs" role="alert">
+        <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+        The bank has no account with this number. Check the number and the bank.
+      </p>
+    )
+  }
+  if (lookup.status === "unavailable") {
+    return (
+      <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+        <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+        Could not reach the bank. Type the account name; signers will see it was not confirmed.
+      </p>
+    )
+  }
+  return (
+    <p className="text-success flex items-center gap-1.5 text-xs">
+      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Account name confirmed by the bank.
+    </p>
+  )
+}
 
 function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void }) {
   const choices: { type: RequisitionFormType; icon: typeof Wallet; title: string; text: string }[] = [
@@ -118,15 +236,14 @@ export function NewRequisitionDialog({
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [projectName, setProjectName] = useState("")
   const [purpose, setPurpose] = useState("")
-  const [siteLocation, setSiteLocation] = useState("")
   const [amount, setAmount] = useState("")
   const [lines, setLines] = useState<LineDraft[]>([{ description: "", amount: "" }])
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDraft[]>([emptyBeneficiary()])
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
-  const [fundingCategories, setFundingCategories] = useState<RequisitionFundingCategory[]>([])
-  const [fundingId, setFundingId] = useState(NO_FUNDING)
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [banks, setBanks] = useState<NigerianBank[]>([...NIGERIAN_BANKS])
+  const [lookups, setLookups] = useState<Record<string, AccountLookup>>({})
 
   useEffect(() => {
     if (!open) return
@@ -136,19 +253,21 @@ export function NewRequisitionDialog({
     setCustomProjectName("")
     setProjectName("")
     setPurpose("")
-    setSiteLocation("")
     setAmount("")
     setLines([{ description: "", amount: "" }])
     setBeneficiaries([emptyBeneficiary()])
     setAttachments([])
-    setFundingId(NO_FUNDING)
+    setLookups({})
     setLoadingProjects(true)
 
+    apiFetch("/api/requisitions/banks")
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json.data) && json.data.length) setBanks(json.data)
+      })
+      .catch(() => undefined)
+
     Promise.all([
-      apiFetch("/api/requisitions/funding-categories")
-        .then((res) => res.json())
-        .then((json) => setFundingCategories(json.data || []))
-        .catch(() => setFundingCategories([])),
       apiFetch("/api/projects")
         .then((res) => res.json())
         .then((json) => {
@@ -160,7 +279,7 @@ export function NewRequisitionDialog({
                 project_name: p.project_name.trim(),
                 location: p.location || null,
               }))
-            setProjects(list)
+            setProjects(list.sort((a, b) => a.project_name.localeCompare(b.project_name)))
           } else {
             setProjects([])
           }
@@ -198,9 +317,6 @@ export function NewRequisitionDialog({
       const found = projects.find((p) => p.id === val)
       if (found) {
         setProjectName(found.project_name)
-        if (!siteLocation.trim() && found.location) {
-          setSiteLocation(found.location)
-        }
       } else {
         setProjectName("")
       }
@@ -223,11 +339,79 @@ export function NewRequisitionDialog({
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
   const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
   const showSplit = beneficiaries.length > 1
-  const isPaymentRequestIncomplete =
-    formType === "payment_request" && (!resolvedProjectName || !purpose.trim() || !siteLocation.trim())
+  // The project is the site: there is no separate site location to ask for.
+  const listedProject = costCategory === "operational" ? projects.find((p) => p.id === selectedProjectId) || null : null
+  const isPaymentRequestIncomplete = formType === "payment_request" && (!resolvedProjectName || !purpose.trim())
 
-  const updateBeneficiary = (index: number, field: keyof BeneficiaryDraft, value: string) =>
-    setBeneficiaries((prev) => prev.map((b, i) => (i === index ? { ...b, [field]: value } : b)))
+  const updateBeneficiary = (index: number, patch: Partial<BeneficiaryDraft>) =>
+    setBeneficiaries((prev) =>
+      prev.map((b, i) => {
+        if (i !== index) return b
+        const next = { ...b, ...patch }
+        const accountChanged =
+          next.account_number !== b.account_number || next.bank_code !== b.bank_code || next.other_bank !== b.other_bank
+        if (!accountChanged) return next
+        // A number already looked up needs no new request: take the bank's name straight away.
+        const known = next.other_bank ? undefined : lookups[lookupKey(next.bank_code, next.account_number)]
+        if (known?.status === "found") return { ...next, account_name: known.accountName, name_from_bank: true }
+        return b.name_from_bank ? { ...next, account_name: "", name_from_bank: false } : next
+      })
+    )
+  const bankOptions = useMemo(
+    () => [
+      ...banks.map((b) => ({ value: b.code, label: b.name })),
+      { value: OTHER_BANK, label: "Other bank (type the name)" },
+    ],
+    [banks]
+  )
+  const bankByCode = useMemo(() => new Map(banks.map((b) => [b.code, b])), [banks])
+  const pickBank = (index: number, code: string) => {
+    if (code === OTHER_BANK) return updateBeneficiary(index, { other_bank: true, bank_name: "", bank_code: "" })
+    const bank = bankByCode.get(code) ?? NIGERIAN_BANKS.find((b) => b.code === code)
+    if (bank) updateBeneficiary(index, { other_bank: false, bank_name: bank.name, bank_code: bank.code })
+  }
+  const nubanResults = beneficiaries.map((b) =>
+    b.other_bank ? null : checkNuban(b.account_number, bankByCode.get(b.bank_code))
+  )
+  // Ask the bank for the name once the number is complete and passes the check digit.
+  const lookupKeys = beneficiaries.map((b, i) =>
+    !b.other_bank && b.bank_code && b.account_number.length === 10 && nubanResults[i]?.status !== "invalid"
+      ? lookupKey(b.bank_code, b.account_number)
+      : null
+  )
+  const pendingLookups = Array.from(new Set(lookupKeys.filter((k): k is string => !!k && !lookups[k]))).join(",")
+  useEffect(() => {
+    if (!pendingLookups) return
+    const timer = setTimeout(() => {
+      for (const key of pendingLookups.split(",")) {
+        const [bankCode, accountNumber] = key.split(":")
+        setLookups((prev) => ({ ...prev, [key]: { status: "loading" } }))
+        apiFetch("/api/requisitions/resolve-account", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account_number: accountNumber, bank_code: bankCode }),
+        })
+          .then((res) => res.json())
+          .then((json) => {
+            const result: AccountLookup = json?.data?.status ? json.data : { status: "unavailable" }
+            setLookups((prev) => ({ ...prev, [key]: result }))
+            // The account name is the bank's, not whatever was typed.
+            if (result.status === "found") {
+              setBeneficiaries((prev) =>
+                prev.map((b) =>
+                  !b.other_bank && lookupKey(b.bank_code, b.account_number) === key
+                    ? { ...b, account_name: result.accountName, name_from_bank: true }
+                    : b
+                )
+              )
+            }
+          })
+          .catch(() => setLookups((prev) => ({ ...prev, [key]: { status: "unavailable" } })))
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [pendingLookups])
+
   const updateLine = (index: number, field: keyof LineDraft, value: string) =>
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: value } : l)))
 
@@ -270,22 +454,34 @@ export function NewRequisitionDialog({
         toast.error("Purpose is required")
         return
       }
-      if (!siteLocation.trim()) {
-        toast.error("Site location is required")
-        return
-      }
+    }
+
+    const badAccount = beneficiaries.findIndex((_, i) => {
+      const key = lookupKeys[i]
+      return nubanResults[i]?.status === "invalid" || (key ? lookups[key]?.status === "not_found" : false)
+    })
+    if (badAccount >= 0) {
+      toast.error(
+        `Beneficiary ${badAccount + 1}: the account number is not valid for ${beneficiaries[badAccount].bank_name}`
+      )
+      return
+    }
+    if (lookupKeys.some((k) => k && lookups[k]?.status === "loading")) {
+      toast.error("Still checking an account name with the bank. Try again in a moment.")
+      return
     }
 
     const beneficiaryPayload = beneficiaries.map((b) => ({
       account_name: b.account_name,
       account_number: b.account_number.replace(/\s/g, ""),
       bank_name: b.bank_name,
+      ...(b.bank_code && !b.other_bank ? { bank_code: b.bank_code } : {}),
+      ...(b.purpose.trim() ? { purpose: b.purpose.trim() } : {}),
       ...(showSplit && b.amount ? { amount: Number(b.amount) } : {}),
     }))
     const common = {
       beneficiary_details: beneficiaryPayload,
       attachments,
-      funding_category_id: fundingId === NO_FUNDING ? null : fundingId,
     }
     const body =
       formType === "petty_cash"
@@ -296,9 +492,9 @@ export function NewRequisitionDialog({
           }
         : {
             form_type: formType,
+            ...(listedProject ? { project_id: listedProject.id } : {}),
             project_name: resolvedProjectName,
             purpose: purpose.trim(),
-            site_location: siteLocation.trim(),
             amount: Number(amount) || 0,
             ...common,
           }
@@ -370,20 +566,17 @@ export function NewRequisitionDialog({
                 ) : (
                   <>
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label htmlFor="req-project-select">Project</Label>
-                      <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
-                        <SelectTrigger id="req-project-select" aria-label="Project">
-                          <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select a project"} />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.project_name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__other__">Others</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Project</Label>
+                      <SearchableSelect
+                        value={selectedProjectId}
+                        onValueChange={handleProjectSelect}
+                        placeholder={loadingProjects ? "Loading projects..." : "Select a project"}
+                        searchPlaceholder="Search projects..."
+                        options={[
+                          ...projects.map((p) => ({ value: p.id, label: p.project_name })),
+                          { value: "__other__", label: "Others (not in the list)" },
+                        ]}
+                      />
                     </div>
 
                     {selectedProjectId === "__other__" ? (
@@ -411,15 +604,6 @@ export function NewRequisitionDialog({
                     inputMode="decimal"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="req-site">Site location</Label>
-                  <Input
-                    id="req-site"
-                    placeholder="Enter site location"
-                    value={siteLocation}
-                    onChange={(e) => setSiteLocation(e.target.value)}
                   />
                 </div>
               </div>
@@ -485,52 +669,97 @@ export function NewRequisitionDialog({
 
             <div className="space-y-2">
               <Label>Beneficiary details</Label>
-              {beneficiaries.map((b, i) => (
-                <div key={`row-${i}`} className="space-y-2 rounded-md border p-3">
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <Input
-                      aria-label={`Beneficiary ${i + 1} account name`}
-                      placeholder="Account name"
-                      value={b.account_name}
-                      onChange={(e) => updateBeneficiary(i, "account_name", e.target.value)}
-                    />
-                    <Input
-                      aria-label={`Beneficiary ${i + 1} account number`}
-                      placeholder="Account no (10 digits)"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={b.account_number}
-                      onChange={(e) => updateBeneficiary(i, "account_number", e.target.value.replace(/\D/g, ""))}
-                    />
-                    <Input
-                      aria-label={`Beneficiary ${i + 1} bank`}
-                      placeholder="Bank name"
-                      value={b.bank_name}
-                      onChange={(e) => updateBeneficiary(i, "bank_name", e.target.value)}
-                    />
-                  </div>
-                  {showSplit ? (
-                    <div className="flex items-center gap-2">
+              {beneficiaries.map((b, i) => {
+                const lookup = lookupKeys[i] ? lookups[lookupKeys[i]!] : undefined
+                // Typed only when the bank cannot give it: a bank outside the list, or Paystack unreachable.
+                const nameEditable = b.other_bank || lookup?.status === "unavailable"
+                return (
+                  <div key={`row-${i}`} className="space-y-2 rounded-md border p-3">
+                    <div className="grid gap-2 sm:grid-cols-3">
                       <Input
-                        aria-label={`Beneficiary ${i + 1} amount`}
-                        placeholder="Amount for this beneficiary"
-                        inputMode="decimal"
-                        className="max-w-[14rem]"
-                        value={b.amount}
-                        onChange={(e) => updateBeneficiary(i, "amount", e.target.value)}
+                        aria-label={`Beneficiary ${i + 1} account number`}
+                        placeholder="Account no (10 digits)"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={b.account_number}
+                        onChange={(e) => updateBeneficiary(i, { account_number: e.target.value.replace(/\D/g, "") })}
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setBeneficiaries((prev) => prev.filter((_, j) => j !== i))}
-                      >
-                        <Trash2 className="mr-1.5 h-4 w-4" /> Remove
-                      </Button>
+                      {b.other_bank ? (
+                        <div className="flex gap-1">
+                          <Input
+                            aria-label={`Beneficiary ${i + 1} bank`}
+                            placeholder="Bank name"
+                            value={b.bank_name}
+                            onChange={(e) => updateBeneficiary(i, { bank_name: e.target.value })}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 px-2 text-xs"
+                            onClick={() => updateBeneficiary(i, { other_bank: false, bank_name: "", bank_code: "" })}
+                          >
+                            List
+                          </Button>
+                        </div>
+                      ) : (
+                        <SearchableSelect
+                          value={b.bank_code}
+                          onValueChange={(value) => pickBank(i, value)}
+                          placeholder="Select bank"
+                          searchPlaceholder="Search banks..."
+                          options={bankOptions}
+                        />
+                      )}
+                      <Input
+                        aria-label={`Beneficiary ${i + 1} account name`}
+                        placeholder={nameEditable ? "Account name" : "Filled in by the bank"}
+                        readOnly={!nameEditable}
+                        tabIndex={nameEditable ? undefined : -1}
+                        className={nameEditable ? undefined : "bg-muted/50 font-medium"}
+                        value={b.account_name}
+                        onChange={(e) => updateBeneficiary(i, { account_name: e.target.value, name_from_bank: false })}
+                      />
                     </div>
-                  ) : null}
-                </div>
-              ))}
+                    <AccountCheck
+                      nuban={nubanResults[i]}
+                      lookup={lookup}
+                      otherBank={b.other_bank}
+                      onPickBank={(code) => pickBank(i, code)}
+                    />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Input
+                        aria-label={`Beneficiary ${i + 1} purpose`}
+                        placeholder="Purpose for this account (optional)"
+                        maxLength={300}
+                        className="sm:flex-1"
+                        value={b.purpose}
+                        onChange={(e) => updateBeneficiary(i, { purpose: e.target.value })}
+                      />
+                      {showSplit ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            aria-label={`Beneficiary ${i + 1} amount`}
+                            placeholder="Amount"
+                            inputMode="decimal"
+                            className="sm:w-36"
+                            value={b.amount}
+                            onChange={(e) => updateBeneficiary(i, { amount: e.target.value })}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setBeneficiaries((prev) => prev.filter((_, j) => j !== i))}
+                          >
+                            <Trash2 className="mr-1.5 h-4 w-4" /> Remove
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
               {beneficiaries.length < maxBeneficiaries ? (
                 <Button
                   type="button"
@@ -548,23 +777,7 @@ export function NewRequisitionDialog({
               ) : null}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Funding category (optional)</Label>
-                <Select value={fundingId} onValueChange={setFundingId}>
-                  <SelectTrigger aria-label="Funding category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_FUNDING}>Not specified</SelectItem>
-                    {fundingCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="req-files">Supporting documents (optional)</Label>

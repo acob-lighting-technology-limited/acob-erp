@@ -21,6 +21,8 @@ import {
   Inbox,
   Wallet,
   AlertCircle,
+  Check,
+  X,
 } from "lucide-react"
 import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
@@ -41,15 +43,23 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { SectionHeading } from "@/components/ui/detail-list"
+import {
+  LeaveApprovalStages,
+  LeaveAttachments,
+  LeaveDetailsList,
+  LeaveOverlapNotice,
+  LeaveStatusStrip,
+} from "@/app/admin/hr/leave/_components/leave-detail-sections"
+import type { LeaveItem } from "@/app/admin/hr/leave/view"
 import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
-import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
+import { approvalStageLabel, getApprovalTimeline, resolvePersonName } from "./_components/approval-timeline"
 import { LeaveOverviewDialog } from "./_components/leave-overview-dialog"
-import { RecentReviewHistoryDialog } from "./_components/recent-review-history-dialog"
 import { CannotCreateNewRequestDialog } from "./_components/cannot-create-new-request-dialog"
 
 interface LeaveContentProps {
@@ -93,13 +103,6 @@ type LeaveRoutePreview = {
   }>
 }
 
-type PersonNameRef = {
-  first_name?: string | null
-  last_name?: string | null
-  full_name?: string | null
-  company_email?: string | null
-}
-
 const EMPTY_REQUEST_FORM: LeaveRequestFormData = {
   leave_type_id: "",
   segments: [],
@@ -113,6 +116,8 @@ const EMPTY_REQUEST_FORM: LeaveRequestFormData = {
 
 type CombinedLeaveItem = Omit<LeaveRequest, "user"> & {
   isIncomingReview?: boolean
+  /** Set on "Reviewed by me" rows: the decision this person made on someone else's leave. */
+  myReview?: { status: string; at: string | null; stage: string | null }
   user?: {
     id?: string
     first_name?: string | null
@@ -175,7 +180,6 @@ export function LeaveContent({
   const [deleteConfirmRequest, setDeleteConfirmRequest] = useState<LeaveRequest | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOverviewOpen, setIsOverviewOpen] = useState(false)
-  const [isReviewHistoryOpen, setIsReviewHistoryOpen] = useState(false)
   /**
    * "My requests" and "Pending reviews" are two different jobs, not two subsets
    * of one list: one is leave you asked for, the other is decisions you owe other
@@ -183,8 +187,11 @@ export function LeaveContent({
    * metrics above them. That is what a tab is for — folding them into one list
    * behind a filter option hid the queue from the reliever who had to act on it.
    */
-  const [activeTab, setActiveTab] = useState<"my-requests" | "reviews">("my-requests")
+  const [activeTab, setActiveTab] = useState<"my-requests" | "reviews" | "reviewed">("my-requests")
   const isReviewTab = activeTab === "reviews"
+  const isReviewedTab = activeTab === "reviewed"
+  /** Both review tabs list other people's leave. */
+  const showsEmployee = activeTab !== "my-requests"
   const [isCreateBlockedOpen, setIsCreateBlockedOpen] = useState(false)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
 
@@ -257,166 +264,34 @@ export function LeaveContent({
     }
   }, [myRequests, balances, approverQueue])
 
-  function approvalStageLabel(code?: string | null) {
-    const value = String(code || "").toLowerCase()
-    if (value.includes("reliever")) return "Reliever"
-    if (value.includes("department_lead")) return "Department Lead"
-    if (value.includes("admin_hr_lead")) return "Admin and HR Lead"
-    if (value.includes("hcs")) return "HCS"
-    if (value.includes("md")) return "MD"
-    return formatName(code || "Stage")
-  }
-
-  function approvalStageKey(code?: string | null) {
-    const value = String(code || "").toLowerCase()
-    if (value.includes("reliever")) return "reliever"
-    if (value.includes("department_lead")) return "department_lead"
-    if (value.includes("admin_hr_lead")) return "admin_hr_lead"
-    if (value.includes("hcs")) return "hcs"
-    if (value.includes("md")) return "md"
-    return value || "unknown"
-  }
-
-  function resolvePersonName(person?: PersonNameRef | null) {
-    if (!person) return ""
-    const full = String(person.full_name || "").trim()
-    if (full) return full
-    const composed = `${person.first_name || ""} ${person.last_name || ""}`.trim()
-    if (composed) return composed
-    const email = String(person.company_email || "").trim()
-    if (email) return email.split("@")[0] || email
-    return ""
-  }
-
-  function getApprovalTimeline(row: LeaveRequest) {
-    const timeline = [...(row.approvals || [])].sort((left, right) => {
-      const leftOrder = Number(left.stage_order || left.approval_level || 999)
-      const rightOrder = Number(right.stage_order || right.approval_level || 999)
-      if (leftOrder !== rightOrder) return leftOrder - rightOrder
-      return String(left.approved_at || "").localeCompare(String(right.approved_at || ""))
-    })
-
-    const stageAuditMap = new Map<string, LeaveApprovalAudit>()
-    for (const item of timeline) {
-      const key = approvalStageKey(item.stage_code)
-      const existing = stageAuditMap.get(key)
-      if (!existing) {
-        stageAuditMap.set(key, item)
-        continue
-      }
-
-      const existingTime = existing.approved_at ? new Date(existing.approved_at).getTime() : 0
-      const nextTime = item.approved_at ? new Date(item.approved_at).getTime() : 0
-      if (nextTime >= existingTime) {
-        stageAuditMap.set(key, item)
-      }
-    }
-
-    if (timeline.length === 0) {
-      if (row.reliever_decision_at) {
-        stageAuditMap.set("reliever", {
-          id: `${row.id}-reliever-fallback`,
-          status: row.status === "rejected" ? "rejected" : "approved",
-          stage_code: "pending_reliever",
-          approved_at: row.reliever_decision_at,
-          approver: row.reliever
-            ? {
-                id: row.reliever.id,
-                full_name: row.reliever.full_name,
-                company_email: row.reliever.company_email,
-              }
-            : null,
-        })
-      }
-
-      if (row.supervisor_decision_at) {
-        stageAuditMap.set("department_lead", {
-          id: `${row.id}-deptlead-fallback`,
-          status: row.status === "rejected" ? "rejected" : "approved",
-          stage_code: "pending_department_lead",
-          approved_at: row.supervisor_decision_at,
-          approver: row.supervisor
-            ? {
-                id: row.supervisor.id,
-                full_name: row.supervisor.full_name,
-                company_email: row.supervisor.company_email,
-              }
-            : null,
-        })
-      }
-
-      if (row.hr_decision_at) {
-        stageAuditMap.set("admin_hr_lead", {
-          id: `${row.id}-hr-fallback`,
-          status: row.status === "rejected" ? "rejected" : "approved",
-          stage_code: "pending_admin_hr_lead",
-          approved_at: row.hr_decision_at,
-          approver: row.approved_by_profile
-            ? {
-                id: row.approved_by_profile.id,
-                full_name: row.approved_by_profile.full_name,
-                company_email: row.approved_by_profile.company_email,
-              }
-            : null,
-        })
-      }
-    }
-
-    const stageOrder = resolveLeaveRouteStages(row)
-    const stageName: Record<string, string> = {
-      reliever: "Reliever",
-      department_lead: "Department Lead",
-      admin_hr_lead: "Admin & HR Lead",
-      hcs: "HCS",
-      md: "MD",
-    }
-    const currentStageKey = approvalStageKey(row.current_stage_code || row.approval_stage)
-    const hasRelieverAssignee = Boolean(row.reliever?.id)
-    const relieverHandledByLead =
-      Boolean(row.reliever?.id) &&
-      Boolean(row.supervisor?.id) &&
-      row.reliever?.id === row.supervisor?.id &&
-      Boolean(stageAuditMap.get("department_lead"))
-    const departmentLeadApproverName = resolvePersonName(stageAuditMap.get("department_lead")?.approver)
-    const advancedPastReliever = ["department_lead", "admin_hr_lead", "hcs", "md"].includes(currentStageKey)
-
-    const lines: string[] = []
-    for (const stageKey of stageOrder) {
-      const item = stageAuditMap.get(stageKey)
-      const stageActorName =
-        resolvePersonName(item?.approver) ||
-        (stageKey === "reliever"
-          ? resolvePersonName(row.reliever) || null
-          : stageKey === "department_lead"
-            ? resolvePersonName(row.supervisor) || null
-            : stageKey === "admin_hr_lead"
-              ? resolvePersonName(row.approved_by_profile) || null
-              : null)
-      if (item) {
-        lines.push(
-          `${stageName[stageKey]}: ${formatName(item.status)}${stageActorName ? ` by ${stageActorName}` : ""}${item.approved_at ? ` (${formatWATDateTime(item.approved_at)})` : ""}`
-        )
-      } else if (stageKey === "reliever" && !hasRelieverAssignee) {
-        lines.push(`${stageName[stageKey]}: Not required`)
-      } else if (stageKey === "reliever" && relieverHandledByLead) {
-        lines.push(`${stageName[stageKey]}: Handled by ${departmentLeadApproverName || "Department Lead"}`)
-      } else if (stageKey === "reliever" && advancedPastReliever && currentStageKey !== "reliever") {
-        lines.push(`${stageName[stageKey]}: Skipped by route rules`)
-      } else {
-        lines.push(`${stageName[stageKey]}: Pending`)
-      }
-    }
-    return lines.join("\n")
-  }
-
   // One row shape either way, so the list anatomy, the detail sheet and the row
   // actions stay shared — only the source and the labels change with the tab.
+  // Every leave this person decided on, in any role (reliever, lead, HR, MD): the
+  // latest decision per request. It replaces the old "Review History" dialog.
+  const reviewedRecords = useMemo<CombinedLeaveItem[]>(() => {
+    const seen = new Set<string>()
+    const rows: CombinedLeaveItem[] = []
+    for (const item of pendingReviewHistory) {
+      if (!item.request || seen.has(item.leave_request_id)) continue
+      if (!item.status || item.status === "pending") continue
+      seen.add(item.leave_request_id)
+      rows.push({
+        ...(item.request as CombinedLeaveItem),
+        isIncomingReview: false,
+        myReview: { status: item.status, at: item.approved_at || null, stage: item.stage_code || null },
+      })
+    }
+    return rows
+  }, [pendingReviewHistory])
+
   const visibleRecords = useMemo<CombinedLeaveItem[]>(
     () =>
       isReviewTab
         ? approverQueue.map((r) => ({ ...r, isIncomingReview: true }))
-        : myRequests.map((r) => ({ ...r, isIncomingReview: false })),
-    [isReviewTab, myRequests, approverQueue]
+        : isReviewedTab
+          ? reviewedRecords
+          : myRequests.map((r) => ({ ...r, isIncomingReview: false })),
+    [isReviewTab, isReviewedTab, myRequests, approverQueue, reviewedRecords]
   )
 
   const tabs = useMemo<DataTableTab[]>(
@@ -426,8 +301,9 @@ export function LeaveContent({
       // is one you discover too late — and its count already answers "is there
       // anything for me?" without being clicked.
       { key: "reviews", label: `Pending Reviews (${approverQueue.length})`, icon: Inbox },
+      { key: "reviewed", label: `Reviewed by me (${reviewedRecords.length})`, icon: History },
     ],
-    [approverQueue.length]
+    [approverQueue.length, reviewedRecords.length]
   )
 
   const columns: DataTableColumn<CombinedLeaveItem>[] = useMemo(
@@ -436,16 +312,16 @@ export function LeaveContent({
         key: "leave_type",
         // The column no longer has to mean two things at once: inside a tab every
         // row is the same kind of record.
-        label: isReviewTab ? "Employee" : "Leave Type",
+        label: showsEmployee ? "Employee" : "Leave Type",
         sortable: true,
         accessor: (r) =>
-          isReviewTab ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
+          showsEmployee ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
         render: (r) => (
           <div className="space-y-0.5">
             <span className="block font-medium">
-              {isReviewTab ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
+              {showsEmployee ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
             </span>
-            {isReviewTab && (
+            {showsEmployee && (
               <span className="text-muted-foreground block text-xs">
                 {r.user?.department || leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
               </span>
@@ -510,8 +386,32 @@ export function LeaveContent({
         ),
         hideOnMobile: true,
       },
+      ...(isReviewedTab
+        ? [
+            {
+              key: "my_review",
+              label: "Your decision",
+              accessor: (r: CombinedLeaveItem) => r.myReview?.at || "",
+              render: (r: CombinedLeaveItem) =>
+                r.myReview ? (
+                  <div className="space-y-0.5 text-xs">
+                    <StatusBadge
+                      status={r.myReview.status}
+                      label={`${formatName(r.myReview.status)} as ${approvalStageLabel(r.myReview.stage)}`}
+                      className="text-xs"
+                    />
+                    {r.myReview.at ? (
+                      <span className="text-muted-foreground block">{formatWATDateTime(r.myReview.at)}</span>
+                    ) : null}
+                  </div>
+                ) : (
+                  "-"
+                ),
+            } satisfies DataTableColumn<CombinedLeaveItem>,
+          ]
+        : []),
     ],
-    [leaveTypeMap, isReviewTab]
+    [leaveTypeMap, showsEmployee, isReviewedTab]
   )
 
   const filters: DataTableFilter<CombinedLeaveItem>[] = useMemo(
@@ -558,7 +458,7 @@ export function LeaveContent({
       icon: Pencil,
       onClick: (item) => openEditDialog(item),
       hidden: (r) => {
-        if (r.isIncomingReview) return true
+        if (r.isIncomingReview || r.myReview) return true
         const isEditAllowed =
           ["pending", "pending_evidence"].includes(r.status) &&
           ["pending_reliever", "reliever_pending"].includes(r.current_stage_code || r.approval_stage || "")
@@ -569,14 +469,14 @@ export function LeaveContent({
       label: "Upload Evidence",
       icon: Paperclip,
       onClick: (item) => setEvidencePrompt({ requestId: item.id, documentType: "Sick Note" }),
-      hidden: (r) => r.isIncomingReview || r.status !== "pending_evidence",
+      hidden: (r) => r.isIncomingReview || !!r.myReview || r.status !== "pending_evidence",
     },
     {
       label: "Cancel Request",
       icon: Trash2,
       variant: "destructive",
       onClick: (item) => setDeleteConfirmRequest(item),
-      hidden: (r) => r.isIncomingReview || !["pending", "pending_evidence"].includes(r.status),
+      hidden: (r) => r.isIncomingReview || !!r.myReview || !["pending", "pending_evidence"].includes(r.status),
     },
   ]
 
@@ -802,7 +702,7 @@ export function LeaveContent({
       icon={CalendarDays}
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={(tab) => setActiveTab(tab === "reviews" ? "reviews" : "my-requests")}
+      onTabChange={(tab) => setActiveTab(tab === "reviews" || tab === "reviewed" ? tab : "my-requests")}
       spacing="tight"
       actionsPlacement="inline-always"
       stats={
@@ -849,17 +749,7 @@ export function LeaveContent({
       }
       actions={
         <div className="flex items-center gap-2">
-          <HeaderMoreMenu
-            items={[
-              { label: "Overview", icon: CircleHelp, onSelect: () => setIsOverviewOpen(true) },
-              {
-                label: "Review History",
-                icon: History,
-                onSelect: () => setIsReviewHistoryOpen(true),
-                hidden: pendingReviewHistory.length === 0,
-              },
-            ]}
-          />
+          <HeaderMoreMenu items={[{ label: "Overview", icon: CircleHelp, onSelect: () => setIsOverviewOpen(true) }]} />
           <Button size="sm" onClick={() => (hasPendingRequest ? setIsCreateBlockedOpen(true) : openCreateDialog())}>
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">New Request</span>
@@ -870,7 +760,7 @@ export function LeaveContent({
       <DataTable<CombinedLeaveItem>
         data={visibleRecords}
         columns={columns}
-        getRowId={(r) => (r.isIncomingReview ? `review-${r.id}` : r.id)}
+        getRowId={(r) => (r.isIncomingReview ? `review-${r.id}` : r.myReview ? `reviewed-${r.id}` : r.id)}
         filters={filters}
         pagination={{ pageSize: 25 }}
         stickyToolbar
@@ -884,11 +774,47 @@ export function LeaveContent({
             .includes(q)
         }
         rowActions={staticRowActions}
+        // The same expanded row as the admin leave table: where the request stands and every stage.
+        expandable={{
+          render: (r) => {
+            const leave = r as unknown as LeaveItem
+            return (
+              <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+                <div className="space-y-3">
+                  <SectionHeading title="Leave overview" />
+                  <LeaveStatusStrip leave={leave} />
+                  <LeaveOverlapNotice leave={leave} />
+                  <LeaveDetailsList leave={leave} />
+                </div>
+                <div className="space-y-5">
+                  <LeaveApprovalStages leave={leave} />
+                  <LeaveAttachments leave={leave} />
+                </div>
+                {r.isIncomingReview ? (
+                  <div className="flex gap-2 border-t pt-3 md:col-span-2">
+                    <Button onClick={() => setApprovePrompt({ requestId: r.id })} className="gap-2">
+                      <Check className="h-4 w-4" /> Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setRejectPrompt({ requestId: r.id })}
+                      className="gap-2"
+                    >
+                      <X className="h-4 w-4" /> Reject
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            )
+          },
+        }}
         mobileRow={{
           title: (r) =>
-            r.isIncomingReview ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
+            r.isIncomingReview || r.myReview
+              ? r.user?.full_name || "Employee"
+              : leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
           subtitle: (r) =>
-            r.isIncomingReview
+            r.isIncomingReview || r.myReview
               ? `${leaveTypeMap.get(r.leave_type_id)?.name || "Leave"} · ${r.start_date} to ${r.end_date}`
               : `${r.start_date} to ${r.end_date} · ${r.days_count} day${Number(r.days_count) > 1 ? "s" : ""}`,
           trailing: (r) => (
@@ -896,7 +822,7 @@ export function LeaveContent({
           ),
           detail: {
             title: (r) =>
-              r.isIncomingReview
+              r.isIncomingReview || r.myReview
                 ? r.user?.full_name || "Employee Request"
                 : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
@@ -916,10 +842,10 @@ export function LeaveContent({
               <StatusBadge status={r.status} label={formatName(r.status)} className="text-xs capitalize" />
             ),
             fields: (r) => [
-              ...(r.isIncomingReview && r.user?.department
+              ...((r.isIncomingReview || r.myReview) && r.user?.department
                 ? [{ icon: Building2, label: "Department", value: r.user.department }]
                 : []),
-              ...(r.isIncomingReview && r.user?.company_email
+              ...((r.isIncomingReview || r.myReview) && r.user?.company_email
                 ? [{ icon: Mail, label: "Email", value: r.user.company_email }]
                 : []),
               { icon: FileText, label: "Reason", value: r.reason, copyable: true },
@@ -989,45 +915,49 @@ export function LeaveContent({
                       onClick: () => setRejectPrompt({ requestId: r.id }),
                     },
                   ]
-                : [
-                    ...(["pending", "pending_evidence"].includes(r.status) &&
-                    ["pending_reliever", "reliever_pending"].includes(r.current_stage_code || r.approval_stage || "")
-                      ? [
-                          {
-                            label: "Edit",
-                            icon: Pencil,
-                            variant: "outline" as const,
-                            onClick: () => openEditDialog(r),
-                          },
-                        ]
-                      : []),
-                    ...(r.status === "pending_evidence"
-                      ? [
-                          {
-                            label: "Upload Evidence",
-                            icon: Paperclip,
-                            variant: "outline" as const,
-                            onClick: () => setEvidencePrompt({ requestId: r.id, documentType: "Sick Note" }),
-                          },
-                        ]
-                      : []),
-                    ...(["pending", "pending_evidence"].includes(r.status)
-                      ? [
-                          {
-                            label: "Cancel Request",
-                            icon: Trash2,
-                            variant: "destructive" as const,
-                            onClick: () => setDeleteConfirmRequest(r),
-                          },
-                        ]
-                      : []),
-                  ]),
+                : r.myReview
+                  ? []
+                  : [
+                      ...(["pending", "pending_evidence"].includes(r.status) &&
+                      ["pending_reliever", "reliever_pending"].includes(r.current_stage_code || r.approval_stage || "")
+                        ? [
+                            {
+                              label: "Edit",
+                              icon: Pencil,
+                              variant: "outline" as const,
+                              onClick: () => openEditDialog(r),
+                            },
+                          ]
+                        : []),
+                      ...(r.status === "pending_evidence"
+                        ? [
+                            {
+                              label: "Upload Evidence",
+                              icon: Paperclip,
+                              variant: "outline" as const,
+                              onClick: () => setEvidencePrompt({ requestId: r.id, documentType: "Sick Note" }),
+                            },
+                          ]
+                        : []),
+                      ...(["pending", "pending_evidence"].includes(r.status)
+                        ? [
+                            {
+                              label: "Cancel Request",
+                              icon: Trash2,
+                              variant: "destructive" as const,
+                              onClick: () => setDeleteConfirmRequest(r),
+                            },
+                          ]
+                        : []),
+                    ]),
             ],
           },
         }}
-        emptyTitle={isReviewTab ? "Nothing waiting on you" : "No leave requests"}
+        emptyTitle={
+          isReviewTab ? "Nothing waiting on you" : isReviewedTab ? "Nothing reviewed yet" : "No leave requests"
+        }
         emptyAction={
-          isReviewTab ? undefined : (
+          isReviewTab || isReviewedTab ? undefined : (
             <Button size="sm" onClick={openCreateDialog}>
               Request leave
             </Button>
@@ -1036,7 +966,9 @@ export function LeaveContent({
         emptyDescription={
           isReviewTab
             ? "Requests reach you here when you are the reliever, the department lead, or the next approver in the route."
-            : "Submit a request and it will appear here with its approval trail."
+            : isReviewedTab
+              ? "Leave you approve or decline, as reliever or approver, stays listed here."
+              : "Submit a request and it will appear here with its approval trail."
         }
         emptyIcon={CalendarDays}
         skeletonRows={6}
@@ -1045,7 +977,7 @@ export function LeaveContent({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-foreground block text-sm font-semibold">
-                  {row.isIncomingReview
+                  {row.isIncomingReview || row.myReview
                     ? row.user?.full_name || "Employee"
                     : leaveTypeMap.get(row.leave_type_id)?.name || "Leave"}
                 </span>
@@ -1056,7 +988,7 @@ export function LeaveContent({
               <StatusBadge status={row.status} label={formatName(row.status)} className="text-xs capitalize" />
             </div>
             <div className="text-muted-foreground grid gap-1 text-xs">
-              {row.isIncomingReview && row.user?.department && (
+              {(row.isIncomingReview || row.myReview) && row.user?.department && (
                 <div className="flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 shrink-0" />
                   <span>{row.user.department}</span>
@@ -1168,16 +1100,6 @@ export function LeaveContent({
         setIsOverviewOpen={setIsOverviewOpen}
         leaveTypes={leaveTypes}
         balanceMap={balanceMap}
-      />
-
-      {/* An approver's own decision trail. It lives in a dialog rather than a panel
-          under the table so the record list stays the whole page — but it is not
-          optional: without it there is no way to see what you already decided. */}
-      <RecentReviewHistoryDialog
-        isReviewHistoryOpen={isReviewHistoryOpen}
-        setIsReviewHistoryOpen={setIsReviewHistoryOpen}
-        pendingReviewHistory={pendingReviewHistory}
-        approvalStageLabel={approvalStageLabel}
       />
 
       <CannotCreateNewRequestDialog

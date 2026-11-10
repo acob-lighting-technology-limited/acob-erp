@@ -28,7 +28,6 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   Building,
   MessageSquare,
   Calendar,
@@ -211,7 +210,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
   const [saving, setSaving] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   // Ticks each minute so an open page switches from arrivals to departures at closing.
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -222,7 +220,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const {
     data: roster,
     isLoading: loading,
-    isFetching,
     refetch,
   } = useQuery({
     queryKey: QUERY_KEYS.dailyRoster(rosterDate, lockedDepartment ?? null),
@@ -255,7 +252,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const policy = roster?.policy ?? DEFAULT_ATTENDANCE_POLICY
   const closeTime = roster?.closeTime ?? null
   const load = async () => {
-    setRefreshing(true)
     try {
       const result = await refetch()
       if (result.isError) {
@@ -265,8 +261,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       }
     } catch {
       toast.error("Failed to refresh roster")
-    } finally {
-      setRefreshing(false)
     }
   }
 
@@ -276,7 +270,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   // A live check should not need a Refresh button: reload quietly every two
   // minutes while today's roster is open. Past days do not change.
   const closingLabel = formatClock12((closeTime ?? policy.endTime).slice(0, 5))
-  const isLive = phase !== null
 
   function openEdit(record: AttendanceRecord) {
     const clockIn = record.clock_in ?? null
@@ -582,23 +575,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Next day</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="border-input h-full w-8 shrink-0 rounded-none border-l"
-                onClick={() => void load()}
-                disabled={refreshing || isFetching}
-                aria-label="Refresh now"
-              >
-                <RefreshCw className={cn("h-3.5 w-3.5", (refreshing || isFetching) && "animate-spin")} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {isLive ? "Refresh now (also refreshes every 2 min)" : "Refresh"}
-            </TooltipContent>
           </Tooltip>
         </div>
       ),

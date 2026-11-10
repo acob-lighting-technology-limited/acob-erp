@@ -103,6 +103,24 @@ function departmentLeadRole(department: string, assignee_id: string): Slot {
   }
 }
 
+/**
+ * Notes on a stage skipped because the requester holds that role. The form
+ * shows the requester's own signature in that slot; old rows carry these exact
+ * notes, so they are matched as text.
+ */
+export const RAISED_BY_HOLDER_NOTES = {
+  hrLead: "Not required: raised by the HR Lead",
+  md: "Not required: the MD's own request",
+} as const
+
+/** The requester holds this stage's role, so they stand in its signature slot. */
+export function isRaisedByHolder(stage: { state: string; state_note: string | null }) {
+  return (
+    stage.state === "not_required" &&
+    (Object.values(RAISED_BY_HOLDER_NOTES) as string[]).includes(stage.state_note || "")
+  )
+}
+
 function notRequired(role_key: RequisitionRoleKey, role_label: string, note: string): Slot {
   return { role_key, role_label, assignee_id: null, state: "not_required", state_note: note }
 }
@@ -115,7 +133,7 @@ function paymentRequestStages(requester: RoutingProfile, h: Holders): Slot[] {
   if (leadAuthorized) {
     reviewed = notRequired("hr_lead", ROLE_LABELS.hr_lead, `Not required for ${department}`)
   } else if (h.hrLead && h.hrLead === requester.id) {
-    reviewed = notRequired("hr_lead", ROLE_LABELS.hr_lead, "Not required: raised by the HR Lead")
+    reviewed = notRequired("hr_lead", ROLE_LABELS.hr_lead, RAISED_BY_HOLDER_NOTES.hrLead)
   } else {
     reviewed = role("hr_lead", h.hrLead)
   }
@@ -141,9 +159,7 @@ function paymentRequestStages(requester: RoutingProfile, h: Holders): Slot[] {
       : role("accounts_lead", h.accountsLead)
 
   const approved =
-    h.md && h.md === requester.id
-      ? notRequired("md", ROLE_LABELS.md, "Not required: the MD's own request")
-      : role("md", h.md)
+    h.md && h.md === requester.id ? notRequired("md", ROLE_LABELS.md, RAISED_BY_HOLDER_NOTES.md) : role("md", h.md)
 
   return [reviewed, authorized, verified, approved]
 }

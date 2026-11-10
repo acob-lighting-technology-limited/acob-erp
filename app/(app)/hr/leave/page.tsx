@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateLeaveEligibility, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { LeaveContent } from "./leave-content"
@@ -207,6 +208,7 @@ async function getLeaveData() {
     pregnancy_status: "unspecified",
   }
 
+  const confirmation = await getLeaveConfirmationState(user.id)
   const enrichedLeaveTypes = await Promise.all(
     (leaveTypes || []).map(async (leaveType: { id: string; name: string; code: string; max_days: number }) => {
       const policy = await getLeavePolicy(supabase, leaveType.id)
@@ -217,6 +219,7 @@ async function getLeaveData() {
         leaveType,
         startDate: toLocalISODate(),
         daysCount: 1,
+        confirmation,
       })
 
       return {

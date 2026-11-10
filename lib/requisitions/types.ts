@@ -15,6 +15,14 @@ export interface BeneficiaryDetail {
   account_name: string
   account_number: string
   bank_name: string
+  bank_code?: string
+  /**
+   * The account holder's name as the bank returned it when the requisition was
+   * raised. Set by the server only; null when the bank could not be asked.
+   */
+  verified_account_name?: string | null
+  /** What this account is paid for, on top of the requisition's main purpose. Optional. */
+  purpose?: string
   amount?: number | string
 }
 
@@ -35,15 +43,6 @@ export interface RequisitionAttachment {
   web_url?: string | null
   /** Timestamp when the attachment was archived to SharePoint. */
   archived_at?: string | null
-}
-
-export interface RequisitionFundingCategory {
-  id: string
-  code: string
-  name: string
-  description?: string | null
-  is_active: boolean
-  sort_order: number
 }
 
 export interface RequisitionPerson {
@@ -106,7 +105,10 @@ export interface Requisition {
   /** Set on list rows: the pending stage the signed-in user can sign now, else null. */
   sign_stage_id?: string | null
   id: string
+  /** e.g. PR/HR/26/001: form (PR or PC), department code, year, serial. */
   requisition_number: string
+  /** The REQ-/PCV- number it had before department numbering. Search only. */
+  previous_number?: string | null
   form_type: RequisitionFormType
   user_id: string
   department: string
@@ -122,6 +124,7 @@ export interface Requisition {
   attachments: RequisitionAttachment[]
   status: RequisitionStatus
 
+  /** Deprecated: funding categories are no longer collected; older requisitions keep theirs. */
   funding_category_id?: string | null
   funding_category_name?: string | null
   help_desk_ticket_id?: string | null
@@ -134,6 +137,8 @@ export interface Requisition {
   updated_at: string
 
   requester?: (RequisitionPerson & { company_email?: string | null }) | null
+  /** Signed URL of the requester's stored signature, added by the detail API. */
+  requester_signature_url?: string | null
   stages?: RequisitionStage[]
   amount_changes?: RequisitionAmountChange[]
   payments?: RequisitionPayment[]

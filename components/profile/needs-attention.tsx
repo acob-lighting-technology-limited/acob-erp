@@ -14,7 +14,8 @@ interface NeedsAttentionProps {
   helpDesk: HelpDeskItem[]
   correspondence: CorrespondenceItem[]
   payments: PaymentItem[]
-  annualLeaveRemaining?: number
+  /** null = annual leave not open yet (awaiting confirmation), not "used up". */
+  annualLeaveRemaining?: number | null
 }
 
 const TONES = {
@@ -74,15 +75,25 @@ export function NeedsAttention({
       tone: overdueTasks > 0 ? "red" : "muted",
       description: overdueTasks > 0 ? "Needs immediate action" : "All caught up",
     },
-    {
-      href: "/hr/leave",
-      hint: "Your annual leave days remaining for this year",
-      title: "Leave Left",
-      value: `${annualLeaveRemaining}d`,
-      icon: CalendarClock,
-      tone: annualLeaveRemaining > 0 ? "blue" : "muted",
-      description: annualLeaveRemaining > 0 ? `${annualLeaveRemaining} days remaining` : "None left",
-    },
+    annualLeaveRemaining === null
+      ? {
+          href: "/hr/leave",
+          hint: "Annual leave opens once HR records your confirmation. Until then you can take Sick Leave or Leave Without Pay.",
+          title: "Annual Leave",
+          value: "Not yet",
+          icon: CalendarClock,
+          tone: "muted",
+          description: "Opens after confirmation",
+        }
+      : {
+          href: "/hr/leave",
+          hint: "Your annual leave days remaining for this year",
+          title: "Leave Left",
+          value: `${annualLeaveRemaining}d`,
+          icon: CalendarClock,
+          tone: annualLeaveRemaining > 0 ? "blue" : "muted",
+          description: annualLeaveRemaining > 0 ? `${annualLeaveRemaining} days remaining` : "All used for this year",
+        },
     {
       href: "/help-desk",
       hint: "Help desk tickets not yet resolved, closed, or cancelled",

@@ -2,9 +2,9 @@
 
 import type { Employee, EmployeeGender, UserProfile } from "./_components/employee-types"
 import { DeptDelegationAction } from "@/components/dept/dept-delegation-dialog"
+import { EmployeeNameBadges } from "./_components/employee-name-badges"
 import {
   deriveLeadDepartments,
-  getRoleBadgeLabel,
   isContractStaff,
   roleList,
   genderFilterOptions,
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
-import { formatWATDate, formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
+import { formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
 import {
   Users,
   UserCheck,
@@ -726,16 +726,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
                 </span>
-                {ELEVATED_ROLES.includes(r.role) && (
-                  <Badge
-                    className={cn(
-                      "shrink-0 px-1.5 py-0 text-xs font-medium whitespace-nowrap shadow-none",
-                      getRoleBadgeColor(r.role)
-                    )}
-                  >
-                    {getRoleBadgeLabel(r.role)}
-                  </Badge>
-                )}
+                <EmployeeNameBadges employee={r} />
               </div>
               {r.designation && (
                 <p className="text-muted-foreground truncate text-xs whitespace-nowrap">{r.designation}</p>

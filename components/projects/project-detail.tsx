@@ -19,7 +19,6 @@ import {
   Layers,
   MapPin,
   Pencil,
-  RefreshCw,
   Star,
   Wrench,
   Zap,
@@ -200,18 +199,6 @@ export function ProjectDetail({
       onTabChange={(tab) => router.replace(tab === "plans" ? pathname : `${pathname}?tab=${tab}`, { scroll: false })}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
-              void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectPlans(project.id) })
-              void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectTasks(project.id) })
-            }}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {isAdmin && (
             <Button size="sm" onClick={() => setIsEditOpen(true)}>
               <Pencil className="h-4 w-4 sm:mr-2" />

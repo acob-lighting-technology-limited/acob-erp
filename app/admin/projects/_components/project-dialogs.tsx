@@ -253,7 +253,7 @@ function ProjectForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit((values) => save.mutate(values))} className="space-y-4 py-2">
         {textField("project_name", <>Project Title {required}</>, {
-          placeholder: isEdit ? "Project name" : "e.g. 1155KWp INTERCONNECTED MINI-GRID",
+          placeholder: isEdit ? "Project name" : "e.g. Adebayo — 100kWp Hybrid Solar Mini-Grid",
         })}
 
         <div className="grid grid-cols-2 gap-4">

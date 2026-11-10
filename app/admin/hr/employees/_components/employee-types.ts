@@ -28,6 +28,8 @@ export interface Employee {
   separation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
+  /** End date of a live delegation from a department lead, when the person holds one. */
+  delegate_until?: string | null
   lead_departments: string[]
   employment_status: EmploymentStatus
   employment_type?: "full_time" | "part_time" | "contract"

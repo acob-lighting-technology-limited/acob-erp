@@ -87,10 +87,13 @@ export function SignDialog({
 
   if (!stage) return null
   const verb = STAGE_VERBS[stage.stage_code]
+  // A later signer going ahead of earlier ones: an override, never a plain signature.
+  const isOverride = mode === "sign" && bypassed.length > 0
 
   const submit = async () => {
     if (pin.length !== 6) return toast.error("Enter your 6-digit PIN")
     if (mode === "reject" && comments.trim().length < 3) return toast.error("Say why it is being rejected")
+    if (isOverride && comments.trim().length < 3) return toast.error("Say why you are overriding")
     if (changeAmount && amountProblem) return toast.error(amountProblem)
     if (changeAmount && reason.trim().length < 3) return toast.error("Say why the amount is changing")
 
@@ -150,12 +153,16 @@ export function SignDialog({
           <DialogTitle>
             {mode === "reject"
               ? "Reject requisition"
-              : `${verb[0].toUpperCase()}${verb.slice(1)} ${requisition.requisition_number}`}
+              : isOverride
+                ? `Override and ${verb} ${requisition.requisition_number}`
+                : `${verb[0].toUpperCase()}${verb.slice(1)} ${requisition.requisition_number}`}
           </DialogTitle>
           <DialogDescription>
             {mode === "reject"
               ? "The requester will see your reason. This ends the requisition."
-              : `You are signing as ${stage.role_label}.`}
+              : isOverride
+                ? `It is not your turn yet. Overriding signs as ${stage.role_label} and skips the stages still waiting before you.`
+                : `You are signing as ${stage.role_label}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -169,10 +176,19 @@ export function SignDialog({
               </Button>
             </div>
           ) : null}
-          {mode === "sign" && bypassed.length ? (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-              Signing now bypasses {bypassed.map((s) => stageTitle(s)).join(", ")}.
-            </p>
+          {isOverride ? (
+            <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p className="font-medium">This overrides:</p>
+              <ul className="list-disc pl-5">
+                {bypassed.map((s) => (
+                  <li key={s.id}>
+                    {stageTitle(s)}
+                    {s.assignee?.full_name ? ` (${s.assignee.full_name})` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground text-xs">They will be marked bypassed and told.</p>
+            </div>
           ) : null}
 
           {mode === "sign" ? (
@@ -236,7 +252,13 @@ export function SignDialog({
           ) : null}
 
           <div className="space-y-1.5">
-            <Label htmlFor="sign-comments">{mode === "reject" ? "Reason (required)" : "Comment (optional)"}</Label>
+            <Label htmlFor="sign-comments">
+              {mode === "reject"
+                ? "Reason (required)"
+                : isOverride
+                  ? "Why you are overriding (required)"
+                  : "Comment (optional)"}
+            </Label>
             <Textarea id="sign-comments" rows={2} value={comments} onChange={(e) => setComments(e.target.value)} />
           </div>
 
@@ -258,7 +280,7 @@ export function SignDialog({
             disabled={busy || setupMissing.length > 0}
           >
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {mode === "reject" ? "Reject" : `Sign and ${verb}`}
+            {mode === "reject" ? "Reject" : isOverride ? `Override and ${verb}` : `Sign and ${verb}`}
           </Button>
         </DialogFooter>
       </DialogContent>

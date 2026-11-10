@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Brain, FileClock, RefreshCw } from "lucide-react"
+import { Brain, FileClock } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -50,7 +50,6 @@ export default function CbtDetailsLogPage() {
   const {
     data: data = [],
     isLoading,
-    isFetching: isRefreshing,
     error: queryError,
     refetch,
   } = useQuery({
@@ -196,12 +195,6 @@ export default function CbtDetailsLogPage() {
       description="Audit logins and detail records entered by candidates for standalone CBT tests."
       icon={FileClock}
       backLink={{ href: "/admin/hr/pms/cbt", label: "Back to CBT Overview" }}
-      actions={
-        <Button variant="outline" size="sm" onClick={() => void loadAttempts(true)} disabled={isRefreshing}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-      }
     >
       <DataTable<AttemptRow>
         data={data}

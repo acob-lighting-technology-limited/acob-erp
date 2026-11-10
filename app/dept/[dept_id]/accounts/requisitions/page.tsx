@@ -13,5 +13,11 @@ export default async function DeptFinanceRequisitionsPage({ params }: Props) {
   const scope = await requireDeptScope(dept_id)
 
   // Locked to this console's department; the API enforces it too.
-  return <RequisitionsListPage surface="dept" deptName={scope.deptName} />
+  return (
+    <RequisitionsListPage
+      surface="dept"
+      deptName={scope.deptName}
+      detailBasePath={`/dept/${dept_id}/accounts/requisitions`}
+    />
+  )
 }

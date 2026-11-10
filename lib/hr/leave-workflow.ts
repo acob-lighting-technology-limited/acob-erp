@@ -6,6 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Json } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
 import { countLeaveDays, isWorkingDay, NO_HOLIDAYS, type HolidaySet } from "@/lib/hr/leave-days"
+import { isBlockedByProbation, type LeaveConfirmationState } from "@/lib/hr/leave-probation"
+import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 
 const log = logger("leave-workflow")
 
@@ -418,10 +420,22 @@ export async function evaluateLeaveEligibility(params: {
   leaveType: { code?: string | null; name?: string | null }
   startDate: string
   daysCount: number
+  /** Pre-loaded probation state; loaded here when omitted. Pass it when evaluating many types. */
+  confirmation?: LeaveConfirmationState
 }): Promise<LeaveEligibilityResult> {
   const { supabase, policy, requesterProfile, leaveType, startDate, daysCount } = params
   const missingDocuments = new Set<string>()
   const requiredDocuments = new Set<string>(toStringArray(policy.required_documents))
+
+  const confirmation = params.confirmation ?? (await getLeaveConfirmationState(requesterProfile.id))
+  if (isBlockedByProbation(confirmation, leaveType.code, startDate)) {
+    return {
+      status: "not_eligible",
+      reason: "Until your appointment is confirmed, only Sick Leave and Leave Without Pay are available.",
+      requiredDocuments: Array.from(requiredDocuments),
+      missingDocuments: [],
+    }
+  }
 
   const normalizedGender = (requesterProfile.gender || "unspecified").toLowerCase()
 

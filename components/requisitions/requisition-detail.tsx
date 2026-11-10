@@ -1,149 +1,30 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Circle,
-  CircleSlash,
-  FileText,
-  Loader2,
-  Printer,
-  SkipForward,
-  Wallet,
-  XCircle,
-} from "lucide-react"
+import { AlertCircle, ArrowLeft, Download, FastForward, FileText, Loader2, Wallet, XCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
-import { formatNaira, progressLabel, STATUS_LABELS, stageTitle } from "@/lib/requisitions/format"
+import { formatNaira, progressLabel, STATUS_LABELS } from "@/lib/requisitions/format"
+import { downloadRequisitionPdf } from "@/lib/requisitions/document-pdf"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
-import type { Requisition, RequisitionStage, RequisitionViewerActions } from "@/lib/requisitions/types"
+import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
 import { RequisitionDocument } from "./requisition-document"
+import { RequisitionStageList, when } from "./requisition-stage-list"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
-import { useStaffOptions } from "./use-staff-options"
 
 import { LinesSkeleton } from "@/components/skeletons"
 export type Viewer = RequisitionViewerActions & { is_admin: boolean }
-
-export function when(value: string | null) {
-  if (!value) return ""
-  return new Date(value).toLocaleString("en-NG", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Africa/Lagos",
-  })
-}
 
 export function statusBadgeVariant(status: Requisition["status"]) {
   if (status === "rejected") return "destructive" as const
   if (status === "paid") return "default" as const
   return "secondary" as const
-}
-
-export function StageIcon({ stage }: { stage: RequisitionStage }) {
-  const cls = "mt-0.5 h-4 w-4 shrink-0"
-  if (stage.state === "signed") return <CheckCircle2 className={`${cls} text-emerald-600`} aria-hidden />
-  if (stage.state === "bypassed") return <SkipForward className={`${cls} text-muted-foreground`} aria-hidden />
-  if (stage.state === "not_required") return <CircleSlash className={`${cls} text-muted-foreground`} aria-hidden />
-  if (stage.state === "rejected") return <XCircle className={`${cls} text-destructive`} aria-hidden />
-  return <Circle className={`${cls} text-amber-500`} aria-hidden />
-}
-
-export function stageLine(stage: RequisitionStage) {
-  switch (stage.state) {
-    case "signed":
-      return `Signed by ${stage.actor?.full_name || "—"} · ${when(stage.acted_at)}`
-    case "bypassed":
-      return `Bypassed by ${stage.actor?.full_name || "a later signer"} · ${when(stage.acted_at)}`
-    case "rejected":
-      return `Rejected by ${stage.actor?.full_name || "—"} · ${when(stage.acted_at)}`
-    case "not_required":
-      return "Not required"
-    default:
-      return stage.assignee ? `Waiting on ${stage.assignee.full_name}` : "Nobody assigned"
-  }
-}
-
-function ReassignDialog({
-  stage,
-  onClose,
-  requisitionId,
-  onDone,
-}: {
-  stage: RequisitionStage | null
-  onClose: () => void
-  requisitionId: string
-  onDone: () => void
-}) {
-  const options = useStaffOptions(Boolean(stage))
-  const [assignee, setAssignee] = useState("")
-  const [busy, setBusy] = useState(false)
-
-  const save = async () => {
-    if (!stage || !assignee) return
-    setBusy(true)
-    try {
-      const res = await apiFetch(`/api/requisitions/${requisitionId}/stages/${stage.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignee_id: assignee }),
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || "Could not reassign")
-      toast.success("Stage reassigned")
-      onClose()
-      onDone()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not reassign")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog open={Boolean(stage)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Reassign stage</DialogTitle>
-          <DialogDescription>{stage ? stageTitle(stage) : ""}</DialogDescription>
-        </DialogHeader>
-        <SearchableSelect
-          value={assignee}
-          onValueChange={setAssignee}
-          options={options}
-          placeholder="Pick who signs this stage"
-          searchPlaceholder="Search staff"
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button onClick={save} disabled={busy || !assignee}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Reassign
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
 }
 
 /** One requisition: the paper form, its history, and what the viewer can do now. */
@@ -153,7 +34,21 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   const [error, setError] = useState<string | null>(null)
   const [signMode, setSignMode] = useState<SignMode | null>(null)
   const [paying, setPaying] = useState(false)
-  const [reassigning, setReassigning] = useState<RequisitionStage | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const sheetRef = useRef<HTMLElement>(null)
+
+  const downloadPdf = async () => {
+    if (!sheetRef.current || !requisition) return
+    setDownloading(true)
+    try {
+      // Slashes are not allowed in file names: PR/HR/26/001 saves as PR-HR-26-001.pdf.
+      await downloadRequisitionPdf(sheetRef.current, `${requisition.requisition_number.replace(/\//g, "-")}.pdf`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create the PDF")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -196,17 +91,17 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   }
 
   const canSign = Boolean(viewer.sign_stage_id)
-  const stages = requisition.stages || []
 
   return (
-    <PageWrapper maxWidth="full" className="print:p-0">
-      <div className="space-y-3 print:hidden">
+    <PageWrapper maxWidth="full">
+      <div className="space-y-3">
         <PageHeader
           title={`${FORM_LABELS[requisition.form_type]} ${requisition.requisition_number}`}
           backLink={{ href: backHref, label: "Back to requisitions" }}
           actions={
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer className="mr-2 h-4 w-4" /> Print / Save PDF
+            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={downloading}>
+              {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Download PDF
             </Button>
           }
         />
@@ -217,9 +112,9 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <RequisitionDocument requisition={requisition} />
+        <RequisitionDocument ref={sheetRef} requisition={requisition} />
 
-        <aside className="space-y-4 print:hidden">
+        <aside className="space-y-4">
           {canSign || viewer.can_record_payment ? (
             <Card className="border-primary/40">
               <CardHeader className="pb-3">
@@ -228,7 +123,18 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
               <CardContent className="flex flex-wrap gap-2">
                 {canSign ? (
                   <>
-                    <Button onClick={() => setSignMode("sign")}>Sign</Button>
+                    {viewer.would_bypass_stage_ids.length ? (
+                      <>
+                        <p className="text-muted-foreground w-full text-xs">
+                          Earlier signers have not signed yet. You can override them.
+                        </p>
+                        <Button onClick={() => setSignMode("sign")}>
+                          <FastForward className="mr-2 h-4 w-4" /> Override
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => setSignMode("sign")}>Sign</Button>
+                    )}
                     <Button variant="outline" onClick={() => setSignMode("reject")}>
                       Reject
                     </Button>
@@ -248,31 +154,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
               <CardTitle className="text-base">Approval route</CardTitle>
             </CardHeader>
             <CardContent>
-              <ol className="space-y-3">
-                {stages.map((stage) => (
-                  <li key={stage.id} className="flex gap-2">
-                    <StageIcon stage={stage} />
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <p className="text-sm font-medium">{stageTitle(stage)}</p>
-                      <p className="text-muted-foreground text-xs">{stageLine(stage)}</p>
-                      {stage.state_note ? (
-                        <p className="text-muted-foreground text-xs italic">{stage.state_note}</p>
-                      ) : null}
-                      {stage.comments ? <p className="text-xs">“{stage.comments}”</p> : null}
-                      {viewer.is_admin && stage.state === "pending" && requisition.status === "pending" ? (
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0 text-xs"
-                          onClick={() => setReassigning(stage)}
-                        >
-                          Reassign
-                        </Button>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ol>
+              <RequisitionStageList requisition={requisition} heading={false} />
             </CardContent>
           </Card>
 
@@ -395,12 +277,6 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
         />
       ) : null}
       <PaymentDialog open={paying} onOpenChange={setPaying} requisition={requisition} viewer={viewer} onDone={load} />
-      <ReassignDialog
-        stage={reassigning}
-        onClose={() => setReassigning(null)}
-        requisitionId={requisition.id}
-        onDone={load}
-      />
     </PageWrapper>
   )
 }

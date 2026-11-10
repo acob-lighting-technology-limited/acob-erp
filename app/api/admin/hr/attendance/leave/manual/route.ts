@@ -7,7 +7,8 @@ import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
-import { formatLeaveReference, getHolidaySet, notifyUsers } from "@/lib/hr/leave-workflow"
+import { assertNoOverlap, formatLeaveReference, getHolidaySet, notifyUsers } from "@/lib/hr/leave-workflow"
+import { getRemainingDays } from "@/lib/hr/leave-entitlement"
 import { addIsoDays, countLeaveDays, nextWorkingDayAfter, trimRangeToWorkingDays } from "@/lib/hr/leave-days"
 import {
   departmentHasLead,
@@ -105,6 +106,31 @@ export async function POST(request: NextRequest) {
     const effectiveEndDate = workingRange.end_date
     const days_count = countLeaveDays(effectiveStartDate, effectiveEndDate, holidays)
     const resume_date = nextWorkingDayAfter(effectiveEndDate, holidays)
+
+    // The employee's own request may already cover these days. Recording it again here
+    // doubled the days charged against their balance (eleven duplicate rows in prod, Nov 2026).
+    try {
+      await assertNoOverlap(dataClient, user_id, effectiveStartDate, effectiveEndDate)
+    } catch {
+      return NextResponse.json(
+        { error: "This employee already has leave pending or approved on some of these days." },
+        { status: 409 }
+      )
+    }
+
+    // Same yearly allowance check as an employee-submitted request. Without it this route let
+    // one employee reach 18 sick days against a 12-day allowance (Nov 2026).
+    const remaining = await getRemainingDays(dataClient, user_id, leave_type_id, {
+      year: Number(effectiveStartDate.slice(0, 4)),
+    })
+    if (days_count > remaining) {
+      return NextResponse.json(
+        {
+          error: `This employee has ${remaining} day(s) of ${ltRow?.name || "this leave"} left this year; this range needs ${days_count}.`,
+        },
+        { status: 400 }
+      )
+    }
 
     // One leave = one appeal, dated on its first working day. Refuse if that day
     // already has a pending appeal, so the appeal maps back to exactly this leave.

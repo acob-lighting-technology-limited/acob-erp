@@ -44,3 +44,20 @@ export function requisitionSummary(req: Pick<Requisition, "form_type" | "purpose
   }
   return req.purpose || ""
 }
+
+/**
+ * The earlier stages still waiting when the viewer signs `signStageId`. Signing
+ * then overrides them (they are marked bypassed), which mirrors
+ * findSignableStage on the server. Empty when it is simply the viewer's turn.
+ */
+export function stagesOverriddenBy(
+  req: Pick<Requisition, "stages">,
+  signStageId: string | null | undefined
+): RequisitionStage[] {
+  const stages = req.stages || []
+  const own = stages.find((s) => s.id === signStageId)
+  if (!own) return []
+  return stages
+    .filter((s) => s.state === "pending" && s.position < own.position)
+    .sort((a, b) => a.position - b.position)
+}

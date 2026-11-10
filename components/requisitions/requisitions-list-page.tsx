@@ -8,7 +8,9 @@ import {
   Clock,
   Download,
   Eye,
+  FastForward,
   FileCheck2,
+  History,
   Inbox,
   PenLine,
   Plus,
@@ -33,7 +35,13 @@ import { apiJson } from "@/lib/api-client"
 import { toast } from "sonner"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportRequisitionsToExcel, exportRequisitionsToPDF } from "@/lib/requisitions/export"
-import { STATUS_LABELS, formatNaira, progressLabel, requisitionSummary } from "@/lib/requisitions/format"
+import {
+  STATUS_LABELS,
+  formatNaira,
+  progressLabel,
+  requisitionSummary,
+  stagesOverriddenBy,
+} from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import { NairaAmount } from "@/components/requisitions/naira-amount"
 import type {
@@ -46,12 +54,14 @@ import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
+import { RequisitionRowPanel } from "./requisition-row-panel"
+import { ADMIN_REQUISITIONS_PATH, STAFF_REQUISITIONS_PATH } from "./requisition-paths"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
-type View = "mine" | "action" | "payment" | "all" | "department"
+type View = "mine" | "action" | "signed" | "payment" | "all" | "department"
 
 interface ViewerFlags {
   is_admin: boolean
@@ -67,6 +77,7 @@ export interface ExtraTab {
 const VIEW_TABS: Record<View, DataTableTab> = {
   mine: { key: "mine", label: "My requisitions", icon: FileCheck2 },
   action: { key: "action", label: "Needs my signature", icon: PenLine },
+  signed: { key: "signed", label: "Signed by me", icon: History },
   payment: { key: "payment", label: "Awaiting payment", icon: Wallet },
   all: { key: "all", label: "All requisitions", icon: Inbox },
   department: { key: "department", label: "Department", icon: FileCheck2 },
@@ -85,10 +96,13 @@ export function RequisitionsListPage({
   surface,
   deptName,
   extraTabs = [],
+  detailBasePath,
 }: {
   surface: RequisitionsSurface
   deptName?: string
   extraTabs?: ExtraTab[]
+  /** Where a requisition's full page lives. A department console passes its own. */
+  detailBasePath?: string
 }) {
   const router = useRouter()
   const [viewer, setViewer] = useState<ViewerFlags>({ is_admin: false, is_payment_processor: false })
@@ -96,9 +110,9 @@ export function RequisitionsListPage({
   const views: View[] = useMemo(() => {
     if (surface === "dept") return ["department", "action"]
     if (surface === "admin") return ["all", "action", "payment"]
-    const list: View[] = ["mine", "action"]
+    // Everything company-wide lives in the admin console; a person's page holds only what is theirs.
+    const list: View[] = ["mine", "action", "signed"]
     if (viewer.is_payment_processor) list.push("payment")
-    if (viewer.is_admin || viewer.is_payment_processor) list.push("all")
     return list
   }, [surface, viewer])
 
@@ -152,7 +166,8 @@ export function RequisitionsListPage({
     fetchRows()
   }, [fetchRows])
 
-  const detailHref = (r: Requisition) => `/accounts/requisitions/${r.id}`
+  const basePath = detailBasePath || (surface === "admin" ? ADMIN_REQUISITIONS_PATH : STAFF_REQUISITIONS_PATH)
+  const detailHref = (r: Requisition) => `${basePath}/${r.id}`
   const count = (status: RequisitionStatus) => rows.filter((r) => r.status === status).length
   const totalAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 
@@ -171,20 +186,13 @@ export function RequisitionsListPage({
               setPreviewId(r.id)
             }
           }}
-          className="text-primary font-mono text-xs font-semibold whitespace-nowrap hover:underline"
+          className="flex flex-col hover:underline"
         >
-          {r.requisition_number}
+          <span className="text-primary font-mono text-xs font-semibold whitespace-nowrap">{r.requisition_number}</span>
+          <span className="text-muted-foreground text-xs whitespace-nowrap">{FORM_LABELS[r.form_type]}</span>
         </Link>
       ),
-      initialWidth: 130,
-    },
-    {
-      key: "form_type",
-      label: "Form",
-      sortable: true,
-      accessor: (r) => FORM_LABELS[r.form_type],
-      render: (r) => <span className="text-xs whitespace-nowrap">{FORM_LABELS[r.form_type]}</span>,
-      initialWidth: 130,
+      initialWidth: 140,
     },
     {
       key: "requester",
@@ -192,9 +200,9 @@ export function RequisitionsListPage({
       sortable: true,
       accessor: (r) => r.requester?.full_name || "",
       render: (r) => (
-        <div className="flex flex-col">
-          <span className="text-xs font-medium">{r.requester?.full_name || "—"}</span>
-          <span className="text-muted-foreground text-xs">{r.department}</span>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-xs font-medium">{r.requester?.full_name || "—"}</span>
+          <span className="text-muted-foreground truncate text-xs">{r.department}</span>
         </div>
       ),
       initialWidth: 170,
@@ -205,7 +213,7 @@ export function RequisitionsListPage({
       label: "For",
       accessor: (r) => requisitionSummary(r),
       render: (r) => <span className="line-clamp-2 text-xs">{requisitionSummary(r)}</span>,
-      initialWidth: 220,
+      initialWidth: 260,
     },
     {
       key: "amount",
@@ -222,16 +230,18 @@ export function RequisitionsListPage({
       sortable: true,
       accessor: (r) => r.status,
       render: (r) => (
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-xs">
             {STATUS_LABELS[r.status]}
           </Badge>
           {r.status === "pending" || r.status === "partly_paid" ? (
-            <span className="text-muted-foreground text-xs">{progressLabel(r)}</span>
+            <span className="text-muted-foreground truncate text-xs" title={progressLabel(r)}>
+              {progressLabel(r)}
+            </span>
           ) : null}
         </div>
       ),
-      initialWidth: 220,
+      initialWidth: 200,
     },
     {
       key: "created_at",
@@ -380,13 +390,40 @@ export function RequisitionsListPage({
           getRowId={(r) => r.id}
           searchPlaceholder="Search reference, person, project, purpose..."
           searchFn={(r, q) =>
-            [r.requisition_number, r.requester?.full_name, r.department, r.project_name, requisitionSummary(r)]
+            [
+              r.requisition_number,
+              r.previous_number,
+              r.requester?.full_name,
+              r.department,
+              r.project_name,
+              requisitionSummary(r),
+            ]
               .filter(Boolean)
               .some((v) => String(v).toLowerCase().includes(q))
           }
           filters={filters}
+          expandable={{
+            render: (r) => (
+              <RequisitionRowPanel
+                requisition={r}
+                onOpen={() => setPreviewId(r.id)}
+                onSign={r.sign_stage_id ? (mode) => void openSign(r, mode) : undefined}
+              />
+            ),
+          }}
           rowActions={[
-            { label: "Sign", icon: PenLine, onClick: (r) => void openSign(r, "sign"), hidden: (r) => !r.sign_stage_id },
+            {
+              label: "Sign",
+              icon: PenLine,
+              onClick: (r) => void openSign(r, "sign"),
+              hidden: (r) => !r.sign_stage_id || stagesOverriddenBy(r, r.sign_stage_id).length > 0,
+            },
+            {
+              label: "Override",
+              icon: FastForward,
+              onClick: (r) => void openSign(r, "sign"),
+              hidden: (r) => !r.sign_stage_id || stagesOverriddenBy(r, r.sign_stage_id).length === 0,
+            },
             {
               label: "Reject",
               icon: XCircle,
@@ -417,14 +454,22 @@ export function RequisitionsListPage({
             onSelect: (r) => setPreviewId(r.id),
           }}
           emptyTitle={
-            tab === "action" ? "Nothing waiting on you" : tab === "payment" ? "Nothing to pay" : "No requisitions"
+            tab === "action"
+              ? "Nothing waiting on you"
+              : tab === "signed"
+                ? "Nothing signed yet"
+                : tab === "payment"
+                  ? "Nothing to pay"
+                  : "No requisitions"
           }
           emptyDescription={
             tab === "action"
               ? "Requisitions that need your signature will appear here."
-              : tab === "payment"
-                ? "Fully signed requisitions appear here until they are paid."
-                : "Raise a Payment Request or Petty Cash with New requisition."
+              : tab === "signed"
+                ? "Requisitions you sign, override, reject or pay appear here."
+                : tab === "payment"
+                  ? "Fully signed requisitions appear here until they are paid."
+                  : "Raise a Payment Request or Petty Cash with New requisition."
           }
           emptyIcon={FileCheck2}
           skeletonRows={6}
@@ -484,6 +529,7 @@ export function RequisitionsListPage({
         requisitionId={previewId}
         open={Boolean(previewId)}
         onOpenChange={(open) => !open && setPreviewId(null)}
+        detailBasePath={basePath}
         onSign={(req, viewerActions, mode) => {
           setSigning({ requisition: req, viewer: viewerActions, mode })
         }}

@@ -9,36 +9,6 @@ import {
   lineItemsTotal,
 } from "./limits"
 
-/** The editable fields of a requisition funding category — the form and both API methods use these. */
-export const FundingCategoryFieldsSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters"),
-  description: z.string().trim().optional(),
-  sort_order: z
-    .number({ invalid_type_error: "Enter a number" })
-    .int("Use a whole number")
-    .min(0, "Use 0 or more")
-    .max(9999, "Use 9999 or less"),
-})
-
-export type FundingCategoryFields = z.infer<typeof FundingCategoryFieldsSchema>
-
-/** POST /api/requisitions/funding-categories */
-export const CreateFundingCategorySchema = FundingCategoryFieldsSchema.extend({
-  code: z
-    .string()
-    .trim()
-    .min(2, "Code must be at least 2 characters")
-    .regex(/^[a-z0-9_-]+$/, "Code may only contain lowercase letters, numbers, hyphens and underscores")
-    .optional(),
-  sort_order: FundingCategoryFieldsSchema.shape.sort_order.optional(),
-})
-
-/** PATCH /api/requisitions/funding-categories */
-export const UpdateFundingCategorySchema = FundingCategoryFieldsSchema.partial().extend({
-  id: z.string().uuid("A valid category id is required"),
-  is_active: z.boolean().optional(),
-})
-
 const money = z
   .number({ invalid_type_error: "Enter an amount in naira" })
   .positive("Amount must be greater than zero")
@@ -52,6 +22,13 @@ export const BeneficiarySchema = z.object({
     .trim()
     .regex(/^\d{10}$/, "Account number must be 10 digits"),
   bank_name: z.string().trim().min(1, "Bank name is required").max(120),
+  /** Paystack bank code, when picked from the list. Lets the server confirm the account name. */
+  bank_code: z
+    .string()
+    .regex(/^\d{3,6}$/)
+    .optional(),
+  /** What this account is being paid for, on top of the requisition's main purpose. */
+  purpose: z.string().trim().max(300, "Keep each beneficiary's purpose under 300 characters").optional(),
   amount: money.optional(),
 })
 
@@ -115,15 +92,15 @@ const CommonFields = {
     )
     .optional()
     .default([]),
-  funding_category_id: z.string().uuid().nullish(),
 }
 
 export const PaymentRequestSchema = z
   .object({
     form_type: z.literal("payment_request"),
+    /** A project from the list: the server takes its name from the database. */
+    project_id: z.string().uuid().optional(),
     project_name: z.string().trim().min(1, "Project is required").max(200),
     purpose: z.string().trim().min(3, "Purpose must be at least 3 characters").max(2000),
-    site_location: z.string().trim().min(1, "Site location is required").max(200),
     amount: money,
     ...CommonFields,
   })
@@ -206,11 +183,6 @@ export const RecordPaymentSchema = z.object({
   receipt_path: z.string().trim().max(500).optional(),
   note: z.string().trim().max(1000).optional(),
   pin: PIN,
-})
-
-/** PATCH /api/requisitions/[id]/stages/[stageId] */
-export const ReassignStageSchema = z.object({
-  assignee_id: z.string().uuid("Pick someone"),
 })
 
 /** POST /api/requisitions/payment-processors */

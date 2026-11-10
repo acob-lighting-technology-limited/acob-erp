@@ -18,7 +18,6 @@ export function buildRequisitionExportRows(rows: Requisition[]): RequisitionExpo
     Department: r.department,
     Project: r.project_name || "",
     For: requisitionSummary(r),
-    "Site location": r.site_location || "",
     Funding: r.funding_category_name || "",
     "Amount requested (₦)": Number(r.original_amount),
     "Amount (₦)": Number(r.amount),
@@ -26,7 +25,7 @@ export function buildRequisitionExportRows(rows: Requisition[]): RequisitionExpo
     Status: STATUS_LABELS[r.status],
     "Where it is": progressLabel(r),
     Beneficiaries: r.beneficiary_details
-      .map((b) => `${b.account_name} (${b.bank_name} ${b.account_number})`)
+      .map((b) => `${b.account_name} (${b.bank_name} ${b.account_number})${b.purpose ? ` for ${b.purpose}` : ""}`)
       .join("; "),
   }))
 }

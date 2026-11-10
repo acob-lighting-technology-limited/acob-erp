@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { isSameDepartment } from "@/shared/departments"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveDeptScope, type DeptScope } from "@/lib/dept/scope"
 import {
@@ -93,6 +94,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
   if (peopleError) return serverError(log, peopleError)
 
   const names = new Map((people ?? []).map((person) => [person.id, nameOf(person)]))
+  // Only people in this department can be chosen; names above stay complete so existing rows resolve.
+  const members = (people ?? []).filter((person) => isSameDepartment(person.department, scope.deptName))
   const delegable = await loadDelegableRoutes(client, scope.userId)
 
   return NextResponse.json({
@@ -104,7 +107,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
         pages: row.pages,
         valid_until: row.valid_until,
       })),
-      candidates: (people ?? []).map((person) => ({
+      candidates: members.map((person) => ({
         id: person.id,
         name: nameOf(person),
         department: person.department,
@@ -150,11 +153,21 @@ export async function POST(request: NextRequest, { params }: Params) {
   const client = getServiceRoleClientOrFallback(supabase)
   const { data: delegate } = await client
     .from("profiles")
-    .select("id, full_name, first_name, last_name, employment_status, role, admin_routes")
+    .select("id, full_name, first_name, last_name, employment_status, role, admin_routes, department")
     .eq("id", body.delegateId)
-    .maybeSingle<NameRow & { employment_status: string | null; role: string | null; admin_routes: string[] | null }>()
+    .maybeSingle<
+      NameRow & {
+        employment_status: string | null
+        role: string | null
+        admin_routes: string[] | null
+        department: string | null
+      }
+    >()
   if (!delegate || delegate.employment_status === "exited") {
     return NextResponse.json({ error: "That person cannot be given access." }, { status: 400 })
+  }
+  if (!isSameDepartment(delegate.department, scope.deptName)) {
+    return NextResponse.json({ error: "You can only delegate to someone in your own department." }, { status: 400 })
   }
 
   // The admin-only pages the lead ticked must be ones this lead can actually pass on.

@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   yesterday.setDate(yesterday.getDate() - 1)
   const date = toLocalISODate(yesterday)
 
+  // on_leave must stay excluded: someone on leave never clocks out, so without it every
+  // approved leave day was flipped to incomplete overnight and later read as absent
+  // (34 days across 10 people found Nov 2026).
   const { data, error } = await supabase
     .from("attendance_records")
     .update({ status: "incomplete" })
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
     .not(
       "status",
       "in",
-      '("absent","absent_with_permission","out_of_station","lateness_with_permission","waiver","exempted")'
+      '("absent","absent_with_permission","out_of_station","lateness_with_permission","waiver","exempted","on_leave")'
     )
     .select("id, user_id, date")
 
