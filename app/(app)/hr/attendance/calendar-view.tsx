@@ -32,6 +32,8 @@ interface UnifiedDay {
   date: string
   record: AttendanceRecord | null
   status: DayStatus
+  /** Leave that has cleared everyone before the MD and awaits only the MD's decision. */
+  leave_pending_md?: boolean
 }
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -211,9 +213,11 @@ export function EmployeeCalendarView() {
                 ? (ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status)
                 : ""
 
+              const pendingMd = Boolean(day?.leave_pending_md)
               return (
                 <div
                   key={date}
+                  title={pendingMd ? "Leave recorded. Awaiting the MD's final approval." : undefined}
                   className={`min-h-14 border-b p-1 text-xs sm:min-h-16 sm:p-1.5 ${isLastInRow ? "" : "border-r"} ${bg}`}
                 >
                   <div
@@ -235,6 +239,9 @@ export function EmployeeCalendarView() {
                           <span className="sm:hidden">{shortStatusLabel(status, fullLabel)}</span>
                           <span className="hidden sm:inline">{fullLabel}</span>
                         </Badge>
+                        {pendingMd && (
+                          <div className="text-muted-foreground mt-0.5 text-[10px] leading-tight">Pending MD</div>
+                        )}
                         {timeLabel && (
                           <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">
                             {timeLabel}
