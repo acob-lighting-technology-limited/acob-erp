@@ -111,9 +111,11 @@ export function appealAuditSteps(a: AuditableAppeal): AuditStep[] {
     steps.push({ key: "lead", label: "Lead side", state: "done", text: "Completed" })
   }
 
-  // Second stage: the Admin & HR Lead, or whoever she has delegated to.
+  // Second stage: the Admin & HR Lead, or whoever she has delegated to. An admin's own
+  // change has no row here: the "Initiated by" row already says who made it, and a
+  // second "Made the change" line only repeated it.
   if (isAdminChange) {
-    steps.push({ key: "admin", label: "Admin & HR Lead", state: "done", text: "Made the change", by: maker })
+    // nothing to add
   } else if (a.admin_reviewed_at) {
     const rejected = a.status === "rejected" && !rejectedByLead
     steps.push({

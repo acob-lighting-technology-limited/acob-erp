@@ -134,17 +134,34 @@ test("stuck: five working days with no decision, or the approver on leave with n
   )
 })
 
-test("override: super admin or developer only, and only once the approval is stuck", () => {
-  const stuck = { stage: "pending_lead", created_at: "2026-11-02T08:00:00Z" }
-  const fresh = { stage: "pending_lead", created_at: "2026-11-09T07:00:00Z" }
+test("override: a staff or lead appeal is for super admin or developer, with no wait", () => {
+  const fresh = { stage: "pending_lead", initiated_by_role: "employee", created_at: "2026-11-11T07:00:00Z" }
   const superAdmin = { role: "super_admin", isAdminLike: true, scopeMode: "global" as const }
   const dev = { role: "developer", isAdminLike: true, scopeMode: "global" as const }
   const plainAdmin = { role: "admin", isAdminLike: true, scopeMode: "global" as const }
-  assert.equal(overrideBlock(superAdmin, stuck, "Project", routing, NOW), null)
-  assert.equal(overrideBlock(dev, stuck, "Project", routing, NOW), null)
-  assert.match(overrideBlock(plainAdmin, stuck, "Project", routing, NOW) ?? "", /super admin or developer/)
-  assert.match(overrideBlock(superAdmin, fresh, "Project", routing, NOW) ?? "", /stuck/)
-  assert.match(overrideBlock({ ...superAdmin, scopeMode: "lead" }, stuck, "Project", routing, NOW) ?? "", /super admin/)
+  assert.equal(overrideBlock(superAdmin, fresh), null)
+  assert.equal(overrideBlock(dev, fresh), null)
+  assert.match(overrideBlock(plainAdmin, fresh) ?? "", /super admin or developer/)
+  assert.match(overrideBlock({ ...superAdmin, scopeMode: "lead" }, fresh) ?? "", /admin side/)
+})
+
+test("override: an admin-side change waiting on the lead can be overridden at once, never on your own record", () => {
+  const change = {
+    stage: "pending_lead",
+    initiated_by_role: "admin_manual",
+    created_at: "2026-11-11T07:00:00Z", // today, not stuck
+    user_id: "staff-1",
+  }
+  const plainAdmin = { role: "admin", isAdminLike: true, scopeMode: "global" as const, userId: "admin-1" }
+  const superAdmin = { ...plainAdmin, role: "super_admin" }
+  assert.equal(overrideBlock(plainAdmin, change), null)
+  assert.equal(overrideBlock(superAdmin, change), null)
+  assert.match(overrideBlock({ ...plainAdmin, userId: "staff-1" }, change) ?? "", /own/)
+  assert.match(overrideBlock({ ...superAdmin, userId: "staff-1" }, change) ?? "", /own/)
+  assert.match(overrideBlock({ ...plainAdmin, scopeMode: "lead" }, change) ?? "", /admin side/)
+  // A staff appeal is not an admin-side change: a plain admin still cannot override it.
+  const staffAppeal = { ...change, initiated_by_role: "employee" }
+  assert.match(overrideBlock(plainAdmin, staffAppeal) ?? "", /super admin or developer/)
 })
 
 test("staging: an admin's manual change goes to the lead side, a lead's change to the second stage", () => {
@@ -180,7 +197,7 @@ test("with no routing context loaded nobody passes the second stage", () => {
   assert.match(appealReviewBlock(hrLead, appeal, "Project", EMPTY_APPEAL_ROUTING) ?? "", /Admin & HR Lead/)
 })
 
-test("audit: an admin's change shows as made, not approved, and the lead confirmation is the outcome", () => {
+test("audit: an admin's change is one 'Initiated by' row, then the lead, and the lead confirmation is the outcome", () => {
   const steps = appealAuditSteps({
     status: "approved",
     stage: "approved",
@@ -197,8 +214,11 @@ test("audit: an admin's change shows as made, not approved, and the lead confirm
     reviewer_name: "Project Lead",
     reviewed_at: "2026-10-29T20:39:00Z",
   })
-  const admin = steps.find((s) => s.key === "admin")!
-  assert.equal(admin.text, "Made the change")
+  assert.deepEqual(
+    steps.map((s) => s.key),
+    ["origin", "lead", "outcome"]
+  )
+  assert.equal(steps.find((s) => s.key === "origin")!.text, "Admin change")
   assert.equal(steps.find((s) => s.key === "lead")!.text, "Confirmed")
   assert.deepEqual({ text: steps.at(-1)!.text, by: steps.at(-1)!.by }, { text: "Approved", by: "Project Lead" })
 })

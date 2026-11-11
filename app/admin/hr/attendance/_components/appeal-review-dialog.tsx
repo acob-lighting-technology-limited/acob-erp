@@ -77,9 +77,17 @@ interface AppealReviewDialogProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Open with the override prompt already showing (the row's Override button). */
+  startWithOverride?: boolean
 }
 
-export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealReviewDialogProps) {
+export function AppealReviewDialog({
+  appeal,
+  open,
+  onClose,
+  onSuccess,
+  startWithOverride = false,
+}: AppealReviewDialogProps) {
   const [note, setNote] = useState("")
   const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | "override" | null>(null)
   const [overrideOpen, setOverrideOpen] = useState(false)
@@ -89,6 +97,8 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   if (notedAppeal !== appeal) {
     setNotedAppeal(appeal)
     setNote("")
+    // The row's Override button opens this with the override prompt already up.
+    setOverrideOpen(Boolean(appeal && startWithOverride))
   }
 
   const currentNote = appeal ? note : ""
@@ -298,7 +308,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
         open={overrideOpen}
         onOpenChange={setOverrideOpen}
         title="Override this approval?"
-        description={`Override is only for an approval that is stuck. This approves ${dayCount > 1 ? `all ${dayCount} days` : "it"} now, skips the remaining steps, and is recorded against your name. The employee, the skipped approver and the Admin & HR Lead are told.`}
+        description={`This overrides the Department Lead. It approves ${dayCount > 1 ? `all ${dayCount} days` : "it"} now, skips the remaining steps, and is recorded against your name. The employee, the skipped approver and the Admin & HR Lead are told.`}
         label="Reason for overriding"
         placeholder="e.g. Department Lead on leave, payroll closes today"
         inputType="textarea"

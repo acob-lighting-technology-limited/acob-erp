@@ -255,9 +255,9 @@ export async function GET(request: NextRequest) {
         overridden_by_name: resolveProfileName(r.overridden_by),
         reviewer_name: r.status === "pending" ? null : resolveProfileName(r.reviewed_by),
         review_block: r.status === "pending" ? appealReviewBlock(scope, r, department || null, routing) : null,
-        can_override: r.status === "pending" && overrideBlock(scope, r, department || null, routing, now) === null,
+        can_override: r.status === "pending" && overrideBlock(scope, r) === null,
         stuck_reason: r.status === "pending" ? appealStuckReason(r, department || null, routing, now) : null,
-        override_block: r.status === "pending" ? overrideBlock(scope, r, department || null, routing, now) : null,
+        override_block: r.status === "pending" ? overrideBlock(scope, r) : null,
         live_status: liveAppealDayStatus(
           recordByDay.get(`${r.user_id}::${r.appeal_date}`) ?? null,
           r.appeal_date,
@@ -734,7 +734,7 @@ export async function PATCH(request: NextRequest) {
       const appellantDepartment = appellants.get(appeal.user_id)?.department ?? null
       const blocked =
         action === "override"
-          ? overrideBlock(scope, appeal, appellantDepartment, routing, new Date())
+          ? overrideBlock(scope, appeal)
           : appealReviewBlock(scope, appeal, appellantDepartment, routing)
       if (blocked) return NextResponse.json({ error: blocked }, { status: 403 })
     }
