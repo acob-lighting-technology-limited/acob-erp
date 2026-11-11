@@ -10,14 +10,13 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira, progressLabel, STATUS_LABELS } from "@/lib/requisitions/format"
-import { downloadRequisitionPdf } from "@/lib/requisitions/document-pdf"
-import { attachmentHref, attachmentKind } from "@/lib/requisitions/attachment-types"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
 import { RequisitionAttachments } from "./requisition-attachments"
 import { RequisitionDocument } from "./requisition-document"
 import { RequisitionStageList, when } from "./requisition-stage-list"
 import { PaymentDialog } from "./payment-dialog"
+import { RequisitionDownloadDialog } from "./requisition-download-dialog"
 import { UnpaidNotice } from "./unpaid-tag"
 import { SignDialog, type SignMode } from "./sign-dialog"
 
@@ -51,29 +50,8 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   const [error, setError] = useState<string | null>(null)
   const [signMode, setSignMode] = useState<SignMode | null>(null)
   const [paying, setPaying] = useState(false)
-  const [downloading, setDownloading] = useState(false)
+  const [pickingDownload, setPickingDownload] = useState(false)
   const sheetRef = useRef<HTMLElement>(null)
-
-  const downloadPdf = async () => {
-    if (!sheetRef.current || !requisition) return
-    setDownloading(true)
-    try {
-      // Slashes are not allowed in file names: PR/HR/26/001 saves as PR-HR-26-001.pdf.
-      await downloadRequisitionPdf(
-        sheetRef.current,
-        `${requisition.requisition_number.replace(/\//g, "-")}.pdf`,
-        (requisition.attachments || []).map((file, i) => ({
-          name: file.file_name,
-          kind: attachmentKind(file.file_name, file.file_type),
-          href: attachmentHref(requisition.id, i),
-        }))
-      )
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the PDF")
-    } finally {
-      setDownloading(false)
-    }
-  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -124,9 +102,9 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
           title={`${FORM_LABELS[requisition.form_type]} ${requisition.requisition_number}`}
           backLink={{ href: backHref, label: "Back to requisitions" }}
           actions={
-            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={downloading}>
-              {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Download PDF
+            <Button variant="outline" size="sm" onClick={() => setPickingDownload(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              Download
             </Button>
           }
         />
@@ -307,6 +285,12 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
           onDone={load}
         />
       ) : null}
+      <RequisitionDownloadDialog
+        open={pickingDownload}
+        onOpenChange={setPickingDownload}
+        requisition={requisition}
+        getSheet={() => sheetRef.current}
+      />
       <PaymentDialog open={paying} onOpenChange={setPaying} requisition={requisition} viewer={viewer} onDone={load} />
     </PageWrapper>
   )
