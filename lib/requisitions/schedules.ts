@@ -1,9 +1,10 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { signedStorageUrl } from "@/lib/approval-signing/server"
-import { bankCodeForName, bankDate, bankFileRows, BANK_FILE_HEADERS } from "./bank-file"
+import { bankCodeForName } from "./bank-file"
+import { buildBankWorkbookFile } from "./bank-workbook"
 import { findMdId } from "./routing"
-import { loadRoutingLeads, REQUISITION_DOCUMENTS_BUCKET, type ViewerContext } from "./server"
+import { loadPaymentOfficers, loadRoutingLeads, REQUISITION_DOCUMENTS_BUCKET, type ViewerContext } from "./server"
 import type { PaymentSchedule, PaymentScheduleItem, Requisition, SchedulableLine } from "./types"
 
 const PERSON = "id, full_name, department, designation"
@@ -18,8 +19,19 @@ const ITEM_SELECT = `
   *,
   recorder:profiles!requisition_schedule_items_recorded_by_fkey(${PERSON}),
   requisition:requisitions(
-    id, requisition_number, department, purpose, status, amount, amount_paid, user_id,
-    requester:profiles!requisitions_user_id_fkey(${PERSON})
+    id, requisition_number, department, purpose, status, amount, amount_paid, user_id, form_type, created_at,
+    unpaid_at, unpaid_note, unpaid_count,
+    requester:profiles!requisitions_user_id_fkey(${PERSON}),
+    stages:requisition_stages(
+      id, requisition_id, position, stage_code, role_key, role_label, assignee_id, state, state_note,
+      acted_by, acted_at, comments, signature_path,
+      assignee:profiles!requisition_stages_assignee_id_fkey(${PERSON}),
+      actor:profiles!requisition_stages_acted_by_fkey(${PERSON})
+    ),
+    payments:requisition_payments(
+      id, amount, paid_on, recorded_by, created_at,
+      recorder:profiles!requisition_payments_recorded_by_fkey(${PERSON})
+    )
   )
 `
 
@@ -67,6 +79,11 @@ export async function loadSchedule(
   if (itemsError) throw new Error(`Failed to load schedule lines: ${itemsError.message}`)
   if (!schedule) return null
   const lines = items || []
+  // The route's payment block names who pays; the same officers for every line.
+  const officers = await loadPaymentOfficers(admin)
+  for (const item of lines) {
+    if (item.requisition) item.requisition.payment_officers = officers[item.requisition.form_type] ?? []
+  }
   if (withReceipts) {
     await Promise.all(
       lines.map(async (item) => {
@@ -84,7 +101,7 @@ export async function loadSchedulableLines(admin: SupabaseClient): Promise<Sched
   const { data: reqs, error } = await admin
     .from("requisitions")
     .select(
-      "id, requisition_number, department, purpose, amount, amount_paid, beneficiary_details, user_id, unpaid_at, status, requester:profiles!requisitions_user_id_fkey(full_name)"
+      "id, requisition_number, department, purpose, amount, amount_paid, beneficiary_details, user_id, unpaid_at, status, created_at, requester:profiles!requisitions_user_id_fkey(full_name)"
     )
     .eq("form_type", "payment_request")
     .in("status", ["awaiting_payment", "partly_paid", "scheduled"])
@@ -101,6 +118,7 @@ export async function loadSchedulableLines(admin: SupabaseClient): Promise<Sched
     | "beneficiary_details"
     | "user_id"
     | "unpaid_at"
+    | "created_at"
   > & { requester: { full_name: string | null } | null })[]
   if (!rows.length) return []
 
@@ -130,6 +148,8 @@ export async function loadSchedulableLines(admin: SupabaseClient): Promise<Sched
         department: req.department,
         purpose: req.purpose,
         requester_name: req.requester?.full_name ?? null,
+        requested_at: req.created_at,
+        requisition_amount: Number(req.amount),
         beneficiary_index: index,
         account_name: b.verified_account_name || b.account_name,
         account_number: b.account_number,
@@ -146,48 +166,7 @@ export async function loadSchedulableLines(admin: SupabaseClient): Promise<Sched
 
 /** The bank's bulk-upload workbook for a schedule. */
 export async function buildBankWorkbook(schedule: PaymentSchedule): Promise<Buffer> {
-  const XLSX = await import("@e965/xlsx")
-  const rows = bankFileRows(schedule.items || [], schedule.payment_date, schedule.debit_account)
-  const aoa: (string | number)[][] = [
-    [...BANK_FILE_HEADERS],
-    ...rows.map((r) => [
-      r.reference,
-      r.name,
-      r.amount,
-      bankDate(r.dueDate),
-      r.beneficiaryCode,
-      r.accountNumber,
-      r.sortCode,
-      Number(r.debitAccount),
-    ]),
-  ]
-  const sheet = XLSX.utils.aoa_to_sheet(aoa)
-  // Account numbers stay text so their leading zeros survive; amounts show two decimals.
-  rows.forEach((_, i) => {
-    const row = i + 2
-    const amount = sheet[`C${row}`]
-    if (amount) amount.z = "0.00"
-    for (const col of ["A", "B", "D", "E", "F"]) {
-      const cell = sheet[`${col}${row}`]
-      if (cell) {
-        cell.t = "s"
-        cell.v = String(cell.v)
-      }
-    }
-  })
-  sheet["!cols"] = [
-    { wch: 24 },
-    { wch: 32 },
-    { wch: 14 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 14 },
-    { wch: 10 },
-    { wch: 14 },
-  ]
-  const book = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(book, sheet, "BANK UPLOAD SCHEDULE")
-  return XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer
+  return buildBankWorkbookFile(schedule.items || [], schedule.payment_date, schedule.debit_account)
 }
 
 export async function readSetting(admin: SupabaseClient, key: string): Promise<string | null> {

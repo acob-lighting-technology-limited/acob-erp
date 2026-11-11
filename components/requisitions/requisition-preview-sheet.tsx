@@ -94,7 +94,7 @@ export function RequisitionPreviewSheet({
       footer={
         <>
           <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-            <Link href={fullPageHref} onClick={() => onOpenChange(false)}>
+            <Link href={fullPageHref}>
               <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               Full voucher page
             </Link>

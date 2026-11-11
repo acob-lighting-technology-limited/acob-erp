@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { CalendarClock, CheckCircle2, Contact, Eye, Plus, RefreshCw, Send, Wallet } from "lucide-react"
+import { CalendarClock, CheckCircle2, Contact, Eye, Plus, Receipt, RefreshCw, Send, Wallet } from "lucide-react"
 import { DataTable, DataTablePage, type DataTableColumn } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
@@ -15,7 +15,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNaira } from "@/lib/requisitions/format"
 import type { PaymentSchedule } from "@/lib/requisitions/types"
 import { formatWATDate } from "@/lib/utils/date"
-import { PAYEES_PATH, SCHEDULES_PATH, STAFF_REQUISITIONS_PATH } from "../requisition-paths"
+import { ADMIN_REQUISITIONS_PATH, PAYEES_PATH, SCHEDULES_PATH } from "../requisition-paths"
 import { NewScheduleDialog } from "./new-schedule-dialog"
 import { ScheduleStatusBadge, SCHEDULE_STATUS_LABELS } from "./schedule-status"
 
@@ -103,7 +103,7 @@ export function SchedulesListPage() {
       title="Payment schedules"
       description="Verified Payment Requests batched for the MD to pay at the bank."
       icon={CalendarClock}
-      backLink={{ href: STAFF_REQUISITIONS_PATH, label: "Back to requisitions" }}
+      backLink={{ href: ADMIN_REQUISITIONS_PATH, label: "Back to requisitions" }}
       spacing="tight"
       actionsPlacement="inline-always"
       actions={
@@ -140,7 +140,7 @@ export function SchedulesListPage() {
           />
           <StatCard
             variant="compact"
-            title="With the MD"
+            title="Finalized"
             value={rows.filter((s) => s.status === "sent").length}
             icon={Send}
             iconBgColor="bg-blue-500/10"
@@ -171,7 +171,17 @@ export function SchedulesListPage() {
         getRowId={(s) => s.id}
         searchPlaceholder="Search schedule number…"
         searchFn={(s, q) => s.schedule_number.toLowerCase().includes(q)}
-        rowActions={[{ label: "Open", icon: Eye, onClick: open }]}
+        rowActions={[
+          {
+            // The officer's way in once the MD has paid: opens the schedule with the recording form up.
+            label: "Record what was paid",
+            icon: Receipt,
+            primary: true,
+            onClick: (s) => router.push(`${SCHEDULES_PATH}/${s.id}?record=1`),
+            hidden: (s) => !isOfficer || s.status !== "sent",
+          },
+          { label: "Open", icon: Eye, onClick: open },
+        ]}
         isLoading={isLoading}
         error={error instanceof Error ? error.message : null}
         onRetry={() => void refetch()}
@@ -191,7 +201,7 @@ export function SchedulesListPage() {
       <NewScheduleDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onCreated={(id) => router.push(`${SCHEDULES_PATH}/${id}`)}
+        onCreated={(id) => router.push(`${SCHEDULES_PATH}/${id}?add=1`)}
       />
     </DataTablePage>
   )

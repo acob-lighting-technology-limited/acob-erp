@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { bankCodeForName, bankNameForCode } from "@/lib/requisitions/bank-file"
 import { AddScheduleItemsSchema } from "@/lib/requisitions/schemas"
 import { getViewerContext } from "@/lib/requisitions/server"
+import { loadSchedulableLines } from "@/lib/requisitions/schedules"
 import { requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
 import type { BeneficiaryDetail } from "@/lib/requisitions/types"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -47,8 +48,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) throw error
     const byId = new Map((reqs || []).map((r) => [r.id as string, r]))
 
+    // Amounts are fixed by the requisition and worked out here, never taken from the browser.
+    const pool = await loadSchedulableLines(admin)
+    const poolByKey = new Map(pool.map((l) => [`${l.requisition_id}:${l.beneficiary_index}`, l]))
+
     const added: string[] = []
     for (const line of parsed.data.lines) {
+      const available = poolByKey.get(`${line.requisition_id}:${line.beneficiary_index}`)
+      if (!available) {
+        return apiError(
+          "A line you picked is no longer waiting to be paid. Refresh and try again.",
+          ApiErrorCode.VALIDATION_ERROR,
+          409
+        )
+      }
+      if (available.amount == null) {
+        return apiError(
+          `The amount for ${available.account_name} on ${available.requisition_number} was never recorded.`,
+          ApiErrorCode.VALIDATION_ERROR,
+          400
+        )
+      }
       const req = byId.get(line.requisition_id)
       if (!req) return apiError("Requisition not found", ApiErrorCode.NOT_FOUND, 404)
       const beneficiary = (req.beneficiary_details as BeneficiaryDetail[])[line.beneficiary_index]
@@ -85,7 +105,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         p_actor_id: user.id,
         p_requisition_id: line.requisition_id,
         p_beneficiary_index: line.beneficiary_index,
-        p_amount: line.amount,
+        p_amount: available.amount,
         p_payee_id: (payee as { id: string }).id,
       })
       if (itemError) throw itemError

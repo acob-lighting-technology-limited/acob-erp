@@ -4,7 +4,6 @@ import { Globe, Mail, MapPin, Phone } from "lucide-react"
 import type { Requisition, RequisitionStage, RequisitionStageCode } from "@/lib/requisitions/types"
 import { formatNaira } from "@/lib/requisitions/format"
 import { MAX_BENEFICIARIES } from "@/lib/requisitions/limits"
-import { accountNamesMatch } from "@/lib/requisitions/nuban"
 import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
 import { SignatureMark } from "./signature-mark"
@@ -146,16 +145,7 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
           <tbody>
             {req.beneficiary_details.map((b, i) => (
               <tr key={`row-${i}`}>
-                <td className="border border-slate-500 p-1.5">
-                  {b.account_name}
-                  {b.verified_account_name ? (
-                    <span className="block text-slate-500">
-                      {accountNamesMatch(b.account_name, b.verified_account_name)
-                        ? "✓ Confirmed by the bank"
-                        : `Bank has: ${b.verified_account_name}`}
-                    </span>
-                  ) : null}
-                </td>
+                <td className="border border-slate-500 p-1.5">{b.account_name}</td>
                 <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
                 <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
                 {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 
 export const SCHEDULE_STATUS_LABELS: Record<PaymentScheduleStatus, string> = {
   draft: "Draft",
-  sent: "Sent to MD",
+  sent: "Finalized",
   closed: "Closed",
 }
 

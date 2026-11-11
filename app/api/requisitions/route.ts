@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const viewerFlags = {
       is_admin: viewer.isAdminLike,
       is_payment_processor: viewer.paymentFormTypes.length > 0,
-      can_view_schedules: access.canView,
+      can_manage_schedules: access.isOfficer,
     }
     const empty = () => NextResponse.json({ data: [], viewer: viewerFlags })
     let query = admin.from("requisitions").select(REQUISITION_LIST_SELECT).order("created_at", { ascending: false })

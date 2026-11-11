@@ -52,7 +52,7 @@ export function RequisitionRowPanel({
           aside={
             <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onOpen}>
               <Eye className="h-3.5 w-3.5" />
-              Open details
+              Open preview
             </Button>
           }
         />
@@ -85,7 +85,7 @@ export function RequisitionRowPanel({
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Paperclip className="h-3.5 w-3.5" />
           {r.attachments?.length
-            ? `${r.attachments.length} supporting document${r.attachments.length === 1 ? "" : "s"} · open details to view`
+            ? `${r.attachments.length} supporting document${r.attachments.length === 1 ? "" : "s"} · open the preview to view`
             : "No supporting documents attached."}
         </p>
       </div>
