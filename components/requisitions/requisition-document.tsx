@@ -7,6 +7,7 @@ import { MAX_BENEFICIARIES } from "@/lib/requisitions/limits"
 import { accountNamesMatch } from "@/lib/requisitions/nuban"
 import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
+import { SignatureMark } from "./signature-mark"
 
 /**
  * The requisition as the paper form: Payment Request Form or Petty-Cash
@@ -202,7 +203,7 @@ function Slot({ label, content }: { label: string; content: SlotContent }) {
       <div className="border-b border-slate-500 pb-0.5">
         <div className="flex h-11 items-end">
           {signatureUrl ? (
-            <img src={signatureUrl} alt={`Signature of ${name || "signer"}`} className="max-h-11 w-auto" />
+            <SignatureMark src={signatureUrl} name={name} className="max-h-11" />
           ) : status ? (
             <span
               className={cn(
@@ -302,7 +303,22 @@ function PaymentRequestSheet({ req }: { req: Requisition }) {
       />
       <FormTitle>Payment Request Form</FormTitle>
       <div className="flex flex-1 flex-col gap-4">
-        <FieldLine label="Requested by" value={req.requester?.full_name} />
+        {/* Requested by, with the requester's signature beside it (no date: that is for the signatories below). */}
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-[7fr_3fr] @xl:gap-4">
+          <FieldLine label="Requested by" value={req.requester?.full_name} />
+          <div className="flex items-end gap-2">
+            <span className="shrink-0 text-xs leading-6 font-bold uppercase">Sign:</span>
+            <span className="relative h-6 flex-1" style={RULED_LINES}>
+              {req.requester_signature_url ? (
+                <SignatureMark
+                  src={req.requester_signature_url}
+                  name={req.requester?.full_name}
+                  className="absolute bottom-0.5 left-1 max-h-10"
+                />
+              ) : null}
+            </span>
+          </div>
+        </div>
         <FieldLine label="Amount in words" value={req.amount_in_words} />
         <FieldLine label="Purpose" value={req.purpose} />
         {/* The project is the site; there is no separate site location. */}
