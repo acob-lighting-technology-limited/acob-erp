@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { CalendarClock, CheckCircle2, Contact, Eye, Plus, Receipt, RefreshCw, Send, Wallet } from "lucide-react"
+import { CalendarClock, CheckCircle2, Contact, Eye, Plus, Receipt, Send, Wallet } from "lucide-react"
 import { DataTable, DataTablePage, type DataTableColumn } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
@@ -116,10 +116,6 @@ export function SchedulesListPage() {
               </Link>
             </Button>
           ) : null}
-          <Button variant="outline" size="sm" onClick={() => void refetch()} aria-label="Refresh">
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {isOfficer ? (
             <Button size="sm" onClick={() => setIsCreateOpen(true)} aria-label="New schedule">
               <Plus className="h-4 w-4 sm:mr-2" />

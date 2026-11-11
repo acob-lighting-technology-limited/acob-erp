@@ -239,7 +239,9 @@ export function AddLinesDialog({
                         {group.requester ? ` · ${group.requester}` : ""} · {group.department}
                       </p>
                       {group.purpose ? (
-                        <p className="text-muted-foreground mt-0.5 truncate text-xs">{group.purpose}</p>
+                        <p className="text-muted-foreground mt-0.5 text-xs break-words whitespace-pre-line">
+                          {group.purpose}
+                        </p>
                       ) : null}
                     </button>
                   </div>
