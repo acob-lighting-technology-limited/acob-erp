@@ -30,7 +30,8 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { PinInput } from "@/components/approval-signing/pin-input"
+import { RequisitionPinDialog } from "./requisition-pin-dialog"
+import { SigningSetupNotice } from "./signing-setup-notice"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira } from "@/lib/requisitions/format"
 import {
@@ -41,7 +42,9 @@ import {
   REQUISITION_ATTACHMENT_MAX_COUNT,
   REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES,
   amountOutOfRangeMessage,
+  cleanAmountInput,
   lineItemsTotal,
+  parseNaira,
 } from "@/lib/requisitions/limits"
 import { NIGERIAN_BANKS, checkNuban, type NigerianBank, type NubanResult } from "@/lib/requisitions/nuban"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
@@ -246,8 +249,10 @@ export function NewRequisitionDialog({
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  // Submitting signs "Requested by": the requester confirms with their approval PIN.
-  const [pin, setPin] = useState("")
+  // Submitting signs "Requested by": a PIN dialog opens once the form is complete.
+  const [pinOpen, setPinOpen] = useState(false)
+  // After the first Submit press the list of what is missing stays on screen and shrinks as it is fixed.
+  const [attempted, setAttempted] = useState(false)
   const [signing, setSigning] = useState<{ has_signature: boolean; has_pin: boolean } | null>(null)
   const pathname = usePathname()
   const signingMissing = signing
@@ -269,7 +274,8 @@ export function NewRequisitionDialog({
     setBeneficiaries([emptyBeneficiary()])
     setAttachments([])
     setLookups({})
-    setPin("")
+    setPinOpen(false)
+    setAttempted(false)
     apiFetch("/api/profile/signing")
       .then((res) => res.json())
       .then((json) => setSigning(json?.data ?? null))
@@ -347,8 +353,8 @@ export function NewRequisitionDialog({
   const total = useMemo(
     () =>
       formType === "petty_cash"
-        ? lineItemsTotal(lines.map((l) => ({ amount: Number(l.amount) || 0 })))
-        : Number(amount) || 0,
+        ? lineItemsTotal(lines.map((l) => ({ amount: parseNaira(l.amount) })))
+        : parseNaira(amount),
     [formType, lines, amount]
   )
   const rangeProblem = formType && total > 0 ? amountOutOfRangeMessage(formType, total) : null
@@ -457,48 +463,60 @@ export function NewRequisitionDialog({
     }
   }
 
-  const submit = async () => {
-    if (!formType) return
-    if (rangeProblem) return toast.error(rangeProblem)
-
+  /** Everything still missing, in the order the form asks for it. Empty means ready to sign. */
+  const collectProblems = (): string[] => {
+    if (!formType) return []
+    const found: string[] = []
     if (formType === "payment_request") {
-      if (!resolvedProjectName) {
-        toast.error("Project is required")
-        return
-      }
-      if (!purpose.trim()) {
-        toast.error("Purpose is required")
-        return
-      }
+      if (!resolvedProjectName) found.push("Pick the project.")
+      if (!purpose.trim()) found.push("Say what the payment is for (purpose).")
+      if (total <= 0) found.push("Enter the amount.")
+    } else {
+      if (lines.some((l) => !l.description.trim())) found.push("Describe every item.")
+      if (total <= 0) found.push("Give each item an amount.")
     }
-
-    const badAccount = beneficiaries.findIndex((_, i) => {
-      const key = lookupKeys[i]
-      return nubanResults[i]?.status === "invalid" || (key ? lookups[key]?.status === "not_found" : false)
+    if (rangeProblem) found.push(rangeProblem)
+    beneficiaries.forEach((b, i) => {
+      const who = `Beneficiary ${i + 1}`
+      if (b.account_number.length !== 10) found.push(`${who}: enter the 10-digit account number.`)
+      else if (!b.bank_name.trim()) found.push(`${who}: pick the bank.`)
+      else if (
+        nubanResults[i]?.status === "invalid" ||
+        (lookupKeys[i] && lookups[lookupKeys[i]!]?.status === "not_found")
+      ) {
+        found.push(`${who}: the account number is not valid for ${b.bank_name}.`)
+      } else if (lookupKeys[i] && lookups[lookupKeys[i]!]?.status === "loading") {
+        found.push(`${who}: still checking the account name with the bank. Try again in a moment.`)
+      } else if (!b.account_name.trim()) found.push(`${who}: enter the account name.`)
     })
-    if (badAccount >= 0) {
-      toast.error(
-        `Beneficiary ${badAccount + 1}: the account number is not valid for ${beneficiaries[badAccount].bank_name}`
-      )
-      return
+    if (showSplit && total > 0) {
+      const split = lineItemsTotal(beneficiaries.map((b) => ({ amount: parseNaira(b.amount) })))
+      if (Math.abs(split - total) > 0.001) found.push("The beneficiaries' amounts must add up to the total.")
     }
-    if (lookupKeys.some((k) => k && lookups[k]?.status === "loading")) {
-      toast.error("Still checking an account name with the bank. Try again in a moment.")
-      return
-    }
+    if (uploading) found.push("Wait for the files to finish uploading.")
+    if (signingMissing.length)
+      found.push(`Set up your ${signingMissing.join(" and ")} first: use the button at the top of this form.`)
+    return found
+  }
+  const problems = attempted ? collectProblems() : []
 
-    if (pin.length !== 6) {
-      toast.error("Enter your 6-digit approval PIN to sign the request")
-      return
-    }
+  // Submit is never greyed out: pressing it either says what is missing or opens the PIN dialog.
+  const pressSubmit = () => {
+    setAttempted(true)
+    const found = collectProblems()
+    if (found.length) return toast.error(found[0])
+    setPinOpen(true)
+  }
 
+  const confirmSubmit = async (pin: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+    if (!formType) return { ok: false, error: "Pick a form first." }
     const beneficiaryPayload = beneficiaries.map((b) => ({
       account_name: b.account_name,
       account_number: b.account_number.replace(/\s/g, ""),
       bank_name: b.bank_name,
       ...(b.bank_code && !b.other_bank ? { bank_code: b.bank_code } : {}),
       ...(b.purpose.trim() ? { purpose: b.purpose.trim() } : {}),
-      ...(showSplit && b.amount ? { amount: Number(b.amount) } : {}),
+      ...(showSplit && b.amount ? { amount: parseNaira(b.amount) } : {}),
     }))
     const common = {
       pin,
@@ -509,7 +527,7 @@ export function NewRequisitionDialog({
       formType === "petty_cash"
         ? {
             form_type: formType,
-            line_items: lines.map((l) => ({ description: l.description, amount: Number(l.amount) || 0 })),
+            line_items: lines.map((l) => ({ description: l.description, amount: parseNaira(l.amount) })),
             ...common,
           }
         : {
@@ -517,7 +535,7 @@ export function NewRequisitionDialog({
             ...(listedProject ? { project_id: listedProject.id } : {}),
             project_name: resolvedProjectName,
             purpose: purpose.trim(),
-            amount: Number(amount) || 0,
+            amount: parseNaira(amount),
             ...common,
           }
 
@@ -529,13 +547,14 @@ export function NewRequisitionDialog({
         body: JSON.stringify(body),
       })
       const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || "Could not submit the requisition")
+      if (!res.ok) return { ok: false, error: json?.error || "Could not submit the requisition" }
       toast.success(json.message || "Submitted")
+      setPinOpen(false)
       onOpenChange(false)
       onSuccess?.(json.data)
+      return { ok: true }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not submit the requisition")
-      setPin("")
+      return { ok: false, error: err instanceof Error ? err.message : "Could not submit the requisition" }
     } finally {
       setSubmitting(false)
     }
@@ -552,6 +571,10 @@ export function NewRequisitionDialog({
               : "Which form do you need? The amount decides."}
           </DialogDescription>
         </DialogHeader>
+
+        {signing ? (
+          <SigningSetupNotice hasSignature={signing.has_signature} hasPin={signing.has_pin} returnPath={pathname} />
+        ) : null}
 
         {!formType ? (
           <FormChoice onPick={setFormType} />
@@ -626,7 +649,7 @@ export function NewRequisitionDialog({
                     id="req-amount"
                     inputMode="decimal"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => setAmount(cleanAmountInput(e.target.value))}
                   />
                 </div>
               </div>
@@ -650,7 +673,7 @@ export function NewRequisitionDialog({
                       placeholder="Amount"
                       inputMode="decimal"
                       value={line.amount}
-                      onChange={(e) => updateLine(i, "amount", e.target.value)}
+                      onChange={(e) => updateLine(i, "amount", cleanAmountInput(e.target.value))}
                     />
                     <Button
                       type="button"
@@ -778,7 +801,7 @@ export function NewRequisitionDialog({
                             inputMode="decimal"
                             className="sm:w-36"
                             value={b.amount}
-                            onChange={(e) => updateBeneficiary(i, { amount: e.target.value })}
+                            onChange={(e) => updateBeneficiary(i, { amount: cleanAmountInput(e.target.value) })}
                           />
                           <Button
                             type="button"
@@ -871,46 +894,61 @@ export function NewRequisitionDialog({
               </div>
             ) : null}
 
-            <div className="space-y-2 rounded-md border p-3">
-              <Label htmlFor="req-pin">Sign and submit</Label>
-              {signingMissing.length ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                  <span>Before you can submit, set up your {signingMissing.join(" and ")}.</span>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/settings/signing?return=${encodeURIComponent(pathname)}`}>Set up signing</Link>
-                  </Button>
-                </div>
-              ) : (
-                <PinInput id="req-pin" value={pin} onChange={setPin} />
-              )}
-              <p className="text-muted-foreground text-xs">
-                Your signature goes on the form as &ldquo;Requested by&rdquo;, with your name and today&apos;s date.
-              </p>
-            </div>
+            <p className="text-muted-foreground text-xs">
+              When you submit, you confirm with your approval PIN. Your signature goes on the form as &ldquo;Requested
+              by&rdquo;.
+            </p>
           </div>
         )}
 
         {formType ? (
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={submit}
-              disabled={
-                submitting ||
-                uploading ||
-                Boolean(rangeProblem) ||
-                total <= 0 ||
-                isPaymentRequestIncomplete ||
-                signingMissing.length > 0 ||
-                pin.length !== 6
-              }
-            >
-              {submitting || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Sign and submit {FORM_LABELS[formType]}
-            </Button>
-          </DialogFooter>
+          <>
+            {problems.length ? (
+              <div role="alert" className="border-danger/30 bg-danger/10 text-danger rounded-md border p-3 text-sm">
+                <p className="font-medium">Before you can submit:</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {problems.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button onClick={pressSubmit} disabled={submitting}>
+                {submitting || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Submit
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
+        {formType ? (
+          <RequisitionPinDialog
+            open={pinOpen}
+            onOpenChange={setPinOpen}
+            title="Confirm with your PIN"
+            description="Your signature goes on the form as Requested by."
+            confirmLabel="Sign and submit"
+            summary={[
+              { label: "Form", value: FORM_LABELS[formType] },
+              { label: "Amount", value: formatNaira(total) },
+              ...(formType === "payment_request" && purpose.trim()
+                ? [
+                    {
+                      label: "For",
+                      value: purpose.trim().length > 70 ? `${purpose.trim().slice(0, 70)}…` : purpose.trim(),
+                    },
+                  ]
+                : []),
+              {
+                label: beneficiaries.length > 1 ? "Paid to" : "Paid to",
+                value: beneficiaries.map((b) => b.account_name || b.account_number).join(", "),
+              },
+            ]}
+            onConfirm={confirmSubmit}
+          />
         ) : null}
       </DialogContent>
     </Dialog>

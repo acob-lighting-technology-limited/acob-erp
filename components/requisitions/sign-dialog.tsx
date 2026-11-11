@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { PinInput } from "@/components/approval-signing/pin-input"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira, stageTitle } from "@/lib/requisitions/format"
-import { amountChangeMessage, lineItemsTotal } from "@/lib/requisitions/limits"
+import { amountChangeMessage, cleanAmountInput, lineItemsTotal, parseNaira } from "@/lib/requisitions/limits"
 import { STAGE_VERBS } from "@/lib/requisitions/routing"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
 
@@ -78,7 +78,7 @@ export function SignDialog({
   const hasSplits =
     requisition.beneficiary_details.length > 1 && requisition.beneficiary_details.some((b) => b.amount != null)
   const newTotal = useMemo(
-    () => (isPetty ? lineItemsTotal(lines.map((v) => ({ amount: Number(v) || 0 }))) : Number(amount) || 0),
+    () => (isPetty ? lineItemsTotal(lines.map((v) => ({ amount: parseNaira(v) }))) : parseNaira(amount)),
     [isPetty, lines, amount]
   )
   const amountProblem = changeAmount
@@ -111,7 +111,7 @@ export function SignDialog({
                     ? {
                         line_items: requisition.line_items.map((l, i) => ({
                           description: l.description,
-                          amount: Number(lines[i]) || 0,
+                          amount: parseNaira(lines[i]),
                         })),
                       }
                     : { amount: newTotal }),
@@ -119,7 +119,7 @@ export function SignDialog({
                     ? {
                         beneficiary_details: requisition.beneficiary_details.map((b, i) => ({
                           ...b,
-                          amount: Number(splits[i]) || 0,
+                          amount: parseNaira(splits[i]),
                         })),
                       }
                     : {}),
@@ -207,7 +207,9 @@ export function SignDialog({
                           inputMode="decimal"
                           aria-label={`Amount for ${line.description}`}
                           value={lines[i]}
-                          onChange={(e) => setLines((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                          onChange={(e) =>
+                            setLines((prev) => prev.map((v, j) => (j === i ? cleanAmountInput(e.target.value) : v)))
+                          }
                         />
                       </div>
                     ))
@@ -218,7 +220,7 @@ export function SignDialog({
                         id="new-amount"
                         inputMode="decimal"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => setAmount(cleanAmountInput(e.target.value))}
                       />
                     </div>
                   )}
@@ -232,7 +234,9 @@ export function SignDialog({
                             inputMode="decimal"
                             aria-label={`Amount for ${b.account_name}`}
                             value={splits[i]}
-                            onChange={(e) => setSplits((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                            onChange={(e) =>
+                              setSplits((prev) => prev.map((v, j) => (j === i ? cleanAmountInput(e.target.value) : v)))
+                            }
                           />
                         </div>
                       ))}

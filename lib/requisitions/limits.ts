@@ -55,8 +55,26 @@ export function amountChangeMessage(
   return null
 }
 
+/**
+ * What a typed or pasted amount means: "1,200,000", "₦50,000.00" and "NGN 3 500" all read as numbers.
+ * Anything that is not a digit or the decimal point is dropped; two decimal points read as nothing.
+ */
+export function parseNaira(value: string | number | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0
+  const cleaned = String(value ?? "").replace(/[^\d.]/g, "")
+  if (!cleaned || cleaned.split(".").length > 2) return 0
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+/** The text to keep in an amount box: pasted separators and symbols are removed as they land, two decimals at most. */
+export function cleanAmountInput(value: string): string {
+  const [whole, ...rest] = value.replace(/[^\d.]/g, "").split(".")
+  return rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole
+}
+
 /** Total of petty-cash line items, rounded to kobo. */
 export function lineItemsTotal(items: { amount: number | string }[]): number {
-  const total = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+  const total = items.reduce((sum, item) => sum + parseNaira(item.amount), 0)
   return Math.round(total * 100) / 100
 }
