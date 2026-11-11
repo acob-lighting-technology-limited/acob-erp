@@ -191,7 +191,7 @@ export function SignDialog({
             </div>
           ) : null}
 
-          {mode === "sign" ? (
+          {mode === "sign" && requisition.status === "pending" ? (
             <div className="space-y-3 rounded-md border p-3">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Checkbox checked={changeAmount} onCheckedChange={(v) => setChangeAmount(v === true)} />

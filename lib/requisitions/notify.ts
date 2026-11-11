@@ -17,7 +17,8 @@ const log = logger("requisition-notify")
  * Who hears about what:
  *   next signer           in-app + email   (approval_request)
  *   payment processors    in-app + email   (approval_request) once fully signed
- *   requester             in-app           (progress, amount change, rejection, payment)
+ *   requester             in-app           (progress, amount change)
+ *   requester             in-app + email   (rejection, payment)
  *   bypassed signers      in-app           (their stage was skipped)
  *   admins                in-app           when the next stage has nobody assigned
  * Never throws: a failed notification must not fail the action.
@@ -27,6 +28,7 @@ export type RequisitionEvent =
   | { kind: "signed"; req: Requisition; actorId: string; bypassedStageIds: string[]; amountChanged: boolean }
   | { kind: "rejected"; req: Requisition; actorId: string }
   | { kind: "payment"; req: Requisition; actorId: string; amount: number }
+  | { kind: "unpaid"; req: Requisition; actorId: string; note: string; scheduleNumber: string }
 
 interface Person {
   id: string
@@ -178,6 +180,16 @@ async function notifyProcessors(admin: SupabaseClient, req: Requisition, actorId
   await emailActionNeeded(admin, ids, req, title, message, "Record payment")
 }
 
+function paidInFull(req: Requisition) {
+  return req.status === "paid" || req.status === "awaiting_approval"
+}
+
+/** The requester and everyone who signed: the people who follow a payment up. */
+function partiesOf(req: Requisition): string[] {
+  const signers = (req.stages || []).map((s) => s.acted_by).filter((id): id is string => Boolean(id))
+  return Array.from(new Set([req.user_id, ...signers]))
+}
+
 export async function notifyRequisitionEvent(admin: SupabaseClient, event: RequisitionEvent): Promise<void> {
   const { req } = event
   try {
@@ -218,7 +230,14 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
           })
         }
 
-        if (req.status === "awaiting_payment") {
+        if (req.status === "paid") {
+          // The MD's Approved signature on a Payment Request already paid: it is closed.
+          await notifyInApp(admin, [req.user_id], req, event.actorId, {
+            type: "approval_granted",
+            title: "Requisition approved",
+            message: `${signerName} approved ${req.requisition_number}. It is paid and closed.`,
+          })
+        } else if (req.status === "awaiting_payment") {
           await notifyInApp(admin, [req.user_id], req, event.actorId, {
             type: "approval_granted",
             title: "Requisition fully signed",
@@ -245,21 +264,128 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
           message: `${req.requisition_number} was rejected: ${req.rejection_reason || "no reason given"}`,
           priority: "high",
         })
+        await emailActionNeeded(
+          admin,
+          [req.user_id],
+          req,
+          "Requisition rejected",
+          `Your ${label(req)} was rejected. Reason: ${req.rejection_reason || "no reason given"}`,
+          "Open requisition"
+        )
         return
+
+      case "unpaid": {
+        const message = `${req.requisition_number} was not paid on schedule ${event.scheduleNumber}: ${event.note}. It goes back to Accounts for the next schedule.`
+        await notifyInApp(admin, partiesOf(req), req, event.actorId, {
+          type: "system",
+          title: "Requisition not paid",
+          message,
+          priority: "high",
+        })
+        await emailActionNeeded(admin, partiesOf(req), req, "Requisition not paid", message, "Open requisition")
+        return
+      }
 
       case "payment":
         await notifyInApp(admin, [req.user_id], req, event.actorId, {
           type: "approval_granted",
-          title: req.status === "paid" ? "Requisition paid" : "Requisition partly paid",
-          message:
-            req.status === "paid"
-              ? `${req.requisition_number} has been paid in full (${formatNaira(req.amount)}).`
-              : `${formatNaira(event.amount)} was paid on ${req.requisition_number}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} paid so far.`,
+          title: paidInFull(req) ? "Requisition paid" : "Requisition partly paid",
+          message: paidInFull(req)
+            ? `${req.requisition_number} has been paid in full (${formatNaira(req.amount)}).`
+            : `${formatNaira(event.amount)} was paid on ${req.requisition_number}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} paid so far.`,
           priority: "high",
         })
+        await emailActionNeeded(
+          admin,
+          [req.user_id],
+          req,
+          paidInFull(req) ? "Requisition paid" : "Requisition partly paid",
+          paidInFull(req)
+            ? `Your ${label(req)} has been paid in full (${formatNaira(req.amount)}).`
+            : `${formatNaira(event.amount)} was paid on your ${label(req)}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} has been paid so far.`,
+          "Open requisition"
+        )
         return
     }
   } catch (err) {
     log.error({ err: String(err), kind: event.kind, requisition: req.id }, "Requisition notifications failed")
+  }
+}
+
+/**
+ * The MD hears about a payment schedule twice: when Accounts sends it for
+ * payment, and when what was paid is ready for his Approved signature.
+ */
+export async function notifyScheduleForMd(
+  admin: SupabaseClient,
+  input: {
+    mdId: string | null
+    actorId: string
+    scheduleId: string
+    scheduleNumber: string
+    kind: "sent" | "approve"
+    count: number
+    total: number
+  }
+): Promise<void> {
+  if (!input.mdId || input.count === 0) return
+  const link = `/accounts/requisitions/schedules/${input.scheduleId}`
+  const title =
+    input.kind === "sent"
+      ? `Payment schedule ${input.scheduleNumber} for payment`
+      : `Payment schedule ${input.scheduleNumber}: paid, ready to approve`
+  const message =
+    input.kind === "sent"
+      ? `${input.count} payment${input.count === 1 ? "" : "s"} totalling ${formatNaira(input.total)} are scheduled for payment.`
+      : `${input.count} paid payment request${input.count === 1 ? " is" : "s are"} waiting for your Approved signature (${formatNaira(input.total)}).`
+  try {
+    const { error } = await admin.rpc("create_notification", {
+      p_user_id: input.mdId,
+      p_type: "approval_request",
+      p_category: "approvals",
+      p_title: title,
+      p_message: message,
+      p_priority: "high",
+      p_link_url: link,
+      p_actor_id: input.actorId,
+      p_entity_type: "requisition_schedule",
+      p_entity_id: input.scheduleId,
+    })
+    if (error) log.error({ err: error.message }, "Schedule notification rejected")
+
+    const eligible = await resolveChannelEligibleUserIds(admin, {
+      userIds: [input.mdId],
+      notificationKey: "approvals",
+      channel: "email",
+    })
+    if (!eligible.length) return
+    const { data: person } = await admin
+      .from("profiles")
+      .select("id, first_name, full_name, company_email, additional_email")
+      .eq("id", input.mdId)
+      .maybeSingle<Person>()
+    const to = (person?.company_email || person?.additional_email || "").trim()
+    if (!to.includes("@")) return
+    await sendNotificationEmailWithRetry({
+      from: orgDepartmentSenderBare("Accounts"),
+      to: [to],
+      subject: `${title} (${formatNaira(input.total)})`,
+      html: renderActionEmail({
+        recipientFirstName: person?.first_name || "",
+        heading: title,
+        intro: message,
+        detailsTitle: "Payment schedule",
+        details: [
+          ["Schedule", input.scheduleNumber],
+          ["Payments", String(input.count)],
+          ["Total", formatNaira(input.total)],
+        ],
+        ctaLabel: input.kind === "sent" ? "Open schedule" : "Review and approve",
+        ctaPath: link,
+        footerLabel: "Requisitions",
+      }),
+    })
+  } catch (err) {
+    log.error({ err: String(err), schedule: input.scheduleId }, "Schedule notification failed")
   }
 }

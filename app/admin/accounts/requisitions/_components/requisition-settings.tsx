@@ -20,6 +20,7 @@ import { apiFetch } from "@/lib/api-client"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { RequisitionFormType } from "@/lib/requisitions/types"
 import { useConfirm } from "@/providers/confirm-provider"
+import { DebitAccountSetting } from "./debit-account-setting"
 
 interface OfficerRow {
   profile_id: string
@@ -243,9 +244,14 @@ export function RequisitionSettingsButton() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Requisition settings</DialogTitle>
-            <DialogDescription>Who records payments on each form.</DialogDescription>
+            <DialogDescription>The account the bank debits, and who records payments on each form.</DialogDescription>
           </DialogHeader>
-          {open ? <OfficersPanel /> : null}
+          {open ? (
+            <>
+              <DebitAccountSetting />
+              <OfficersPanel />
+            </>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

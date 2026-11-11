@@ -109,15 +109,17 @@ export function RequisitionPreviewSheet({
             ) : null}
             {requisition && viewer?.sign_stage_id && onSign ? (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive h-8 text-xs"
-                  onClick={() => onSign(requisition, viewer, "reject")}
-                >
-                  <XCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                  Reject
-                </Button>
+                {viewer.can_reject ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive h-8 text-xs"
+                    onClick={() => onSign(requisition, viewer, "reject")}
+                  >
+                    <XCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Reject
+                  </Button>
+                ) : null}
                 <Button size="sm" className="h-8 text-xs" onClick={() => onSign(requisition, viewer, "sign")}>
                   {viewer.would_bypass_stage_ids.length ? (
                     <>

@@ -192,3 +192,75 @@ export const PaymentProcessorSchema = z.object({
   profile_id: z.string().uuid("Pick someone"),
   form_type: z.enum(["payment_request", "petty_cash"], { message: "Pick Payment Request or Petty Cash" }),
 })
+
+const ISO_DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+const ACCOUNT_10 = z.string().regex(/^\d{10}$/, "Enter the 10-digit account number")
+const BANK_CODE = z.string().regex(/^\d{3,6}$/, "Pick the bank")
+
+/** POST /api/requisitions/schedules */
+export const CreateScheduleSchema = z.object({
+  payment_date: ISO_DATE,
+  note: z.string().trim().max(500).optional(),
+})
+
+/** POST /api/requisitions/schedules/[id]/items */
+export const AddScheduleItemsSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        requisition_id: z.string().uuid(),
+        beneficiary_index: z.number().int().min(0).max(10),
+        amount: money,
+        /** Only when the requisition's bank could not be worked out from its name. */
+        bank_code: BANK_CODE.optional(),
+      })
+    )
+    .min(1, "Pick at least one payment")
+    .max(200),
+})
+
+/** POST /api/requisitions/schedules/[id]/outcomes */
+export const ScheduleOutcomesSchema = z.object({
+  paid_on: ISO_DATE,
+  pin: PIN,
+  outcomes: z
+    .array(
+      z.object({
+        item_id: z.string().uuid(),
+        outcome: z.enum(["paid", "unpaid"]),
+        bank_reference: z.string().trim().max(120).optional(),
+        receipt_path: z.string().trim().max(500).optional(),
+        note: z.string().trim().max(500).optional(),
+      })
+    )
+    .min(1, "Mark at least one line as paid or not paid")
+    .max(200)
+    .refine((rows) => rows.every((r) => r.outcome === "paid" || (r.note?.length ?? 0) >= 3), {
+      message: "Say why each unpaid line was not paid",
+    }),
+})
+
+/** POST /api/requisitions/schedules/[id]/approve — the MD signs off what was paid. */
+export const ApproveScheduleSchema = z.object({
+  pin: PIN,
+  comments: z.string().trim().max(500).optional(),
+})
+
+/** PATCH /api/requisitions/payees/[id] */
+export const UpdatePayeeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(2, "Enter a code")
+    .max(35, "At most 35 characters")
+    .regex(/^[^,;' ]+$/, "No spaces, commas, semicolons or apostrophes")
+    .optional(),
+  profile_id: z.string().uuid().nullable().optional(),
+  rc_number: z.string().trim().max(30).nullable().optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+})
+
+/** PUT /api/requisitions/settings */
+export const RequisitionSettingsSchema = z.object({
+  bank_debit_account: ACCOUNT_10,
+})

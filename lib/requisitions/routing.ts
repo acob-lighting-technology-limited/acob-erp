@@ -73,6 +73,11 @@ interface Holders {
   departmentLead: string | null
 }
 
+/** The Managing Director: the lead of Executive Management. */
+export function findMdId(profiles: RoutingProfile[]): string | null {
+  return findDepartmentLead(profiles, DEPT_EXECUTIVE_MANAGEMENT)?.id ?? null
+}
+
 function resolveHolders(requester: RoutingProfile, profiles: RoutingProfile[]): Holders {
   return {
     hrLead: findDepartmentLead(profiles, DEPT_ADMIN_HR)?.id ?? null,

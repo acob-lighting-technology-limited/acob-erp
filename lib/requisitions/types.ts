@@ -1,6 +1,21 @@
 export type RequisitionFormType = "payment_request" | "petty_cash"
 
-export type RequisitionStatus = "pending" | "awaiting_payment" | "partly_paid" | "paid" | "rejected"
+/**
+ * pending            in approval
+ * awaiting_payment   signed off; Payment Requests wait to be put on a payment schedule
+ * scheduled          on a payment schedule, waiting for the bank (Payment Requests)
+ * partly_paid        some of it paid
+ * awaiting_approval  paid in full, waiting for the MD's Approved signature (Payment Requests)
+ * paid               closed
+ */
+export type RequisitionStatus =
+  | "pending"
+  | "awaiting_payment"
+  | "scheduled"
+  | "partly_paid"
+  | "awaiting_approval"
+  | "paid"
+  | "rejected"
 
 export type RequisitionStageCode = "reviewed" | "authorized" | "verified" | "approved"
 
@@ -135,6 +150,11 @@ export interface Requisition {
   funding_category_name?: string | null
   help_desk_ticket_id?: string | null
 
+  /** Set when a schedule line came back unpaid; cleared once paid in full. */
+  unpaid_at?: string | null
+  unpaid_note?: string | null
+  unpaid_count?: number
+
   rejection_reason?: string | null
   rejected_by?: string | null
   rejected_at?: string | null
@@ -158,6 +178,94 @@ export interface RequisitionViewerActions {
   /** Stage ids that signing now would bypass. */
   would_bypass_stage_ids: string[]
   can_record_payment: boolean
+  /** False once a Payment Request is paid: the MD signs it off but cannot reject. */
+  can_reject: boolean
   /** What is missing before this user can sign or record a payment. */
   signing_setup_missing: ("signature" | "pin")[]
+}
+
+/** Someone ACOB pays, with the stable code the bank file uses as Beneficiary Code. */
+export interface RequisitionPayee {
+  id: string
+  code: string
+  kind: "staff" | "vendor"
+  profile_id: string | null
+  account_name: string
+  account_number: string
+  bank_code: string
+  bank_name: string
+  rc_number: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  profile?: RequisitionPerson | null
+}
+
+export type PaymentScheduleStatus = "draft" | "sent" | "closed"
+
+export type ScheduleItemOutcome = "pending" | "paid" | "unpaid"
+
+export interface PaymentScheduleItem {
+  id: string
+  schedule_id: string
+  requisition_id: string
+  beneficiary_index: number
+  payee_id: string
+  amount: number
+  transaction_ref: string
+  beneficiary_code: string
+  account_name: string
+  account_number: string
+  bank_code: string
+  bank_name: string
+  outcome: ScheduleItemOutcome
+  outcome_note: string | null
+  bank_reference: string | null
+  receipt_path: string | null
+  recorded_at: string | null
+  recorder?: RequisitionPerson | null
+  requisition?: Pick<
+    Requisition,
+    "id" | "requisition_number" | "department" | "purpose" | "status" | "amount" | "amount_paid" | "user_id"
+  > & { requester?: RequisitionPerson | null }
+  receipt_url?: string | null
+}
+
+export interface PaymentSchedule {
+  id: string
+  schedule_number: string
+  status: PaymentScheduleStatus
+  payment_date: string
+  debit_account: string
+  note: string | null
+  created_by: string | null
+  sent_at: string | null
+  closed_at: string | null
+  created_at: string
+  creator?: RequisitionPerson | null
+  sender?: RequisitionPerson | null
+  items?: PaymentScheduleItem[]
+  /** List rows: totals worked out by the API. */
+  line_count?: number
+  total_amount?: number
+  paid_amount?: number
+}
+
+/** A verified Payment Request line that can go on a schedule. */
+export interface SchedulableLine {
+  requisition_id: string
+  requisition_number: string
+  department: string
+  purpose: string | null
+  requester_name: string | null
+  beneficiary_index: number
+  account_name: string
+  account_number: string
+  bank_name: string
+  /** Null when the bank could not be worked out; the officer picks it. */
+  bank_code: string | null
+  /** Suggested amount for this line; null when the officer must enter it. */
+  amount: number | null
+  outstanding: number
+  unpaid_before: boolean
 }

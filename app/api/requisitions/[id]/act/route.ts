@@ -9,6 +9,10 @@ import { RequisitionActSchema } from "@/lib/requisitions/schemas"
 import { findSignableStage, loadRequisition } from "@/lib/requisitions/server"
 import { requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { archiveRequisitionToSharePoint } from "@/lib/requisitions/archive"
+import { logger } from "@/lib/logger"
+
+const log = logger("requisitions-act")
 
 /**
  * POST /api/requisitions/[id]/act
@@ -133,6 +137,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }
           : { kind: "rejected", req: updated, actorId: user.id }
       )
+      // A Payment Request the MD signs off after payment is closed: file it like a paid voucher.
+      if (updated.status === "paid") {
+        archiveRequisitionToSharePoint(admin, id).catch((archiveErr) => {
+          log.error("Failed to auto-archive approved requisition to SharePoint", { id, err: archiveErr })
+        })
+      }
     }
 
     await writeAuditLog(

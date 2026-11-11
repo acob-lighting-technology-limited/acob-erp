@@ -47,6 +47,7 @@ import { NIGERIAN_BANKS, checkNuban, type NigerianBank, type NubanResult } from 
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import type { Requisition, RequisitionAttachment, RequisitionFormType } from "@/lib/requisitions/types"
 import { uploadRequisitionFiles } from "@/lib/requisitions/upload"
+import { SavedBeneficiaryPicker } from "./saved-beneficiary-picker"
 
 type CostCategory = "admin" | "operational"
 
@@ -697,6 +698,17 @@ export function NewRequisitionDialog({
                 const nameEditable = b.other_bank || lookup?.status === "unavailable"
                 return (
                   <div key={`row-${i}`} className="space-y-2 rounded-md border p-3">
+                    <SavedBeneficiaryPicker
+                      index={i}
+                      onPick={(saved) =>
+                        updateBeneficiary(i, {
+                          account_number: saved.account_number,
+                          bank_code: saved.bank_code,
+                          bank_name: saved.bank_name,
+                          other_bank: false,
+                        })
+                      }
+                    />
                     <div className="grid gap-2 sm:grid-cols-3">
                       <Input
                         aria-label={`Beneficiary ${i + 1} account number`}
