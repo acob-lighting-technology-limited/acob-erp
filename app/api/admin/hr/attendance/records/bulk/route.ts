@@ -16,6 +16,9 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import { randomUUID } from "node:crypto"
+import { classifyBulkDay, summarizeDays, type DayReview } from "@/lib/hr/bulk-day-review"
+import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { planRecordRemoval, type RecordRemovalChange, type RemovableRecord } from "@/lib/hr/record-removal"
 import {
   loadDepartmentLeads,
   notifyAppealReviewers,
@@ -51,6 +54,8 @@ const BulkCreateSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z.enum(DB_WRITABLE_STATUSES),
   manual_comment: z.string().trim().min(3, "A comment of at least 3 characters is required").max(500),
+  /** Returns what the apply would do to each person's days, and stages nothing. */
+  dry_run: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 })
     }
 
-    const { user_ids, start_date, end_date, status, manual_comment } = parsed.data
+    const { user_ids, start_date, end_date, status, manual_comment, dry_run } = parsed.data
 
     if (status === "waiver" && !manual_comment.trim()) {
       return NextResponse.json({ error: "Waiver requires a reason or comment" }, { status: 400 })
@@ -140,10 +145,11 @@ export async function POST(request: NextRequest) {
       status: string
       clock_in: string | null
       clock_out: string | null
+      source: string | null
     }
     const { data: existingRecords } = await dataClient
       .from("attendance_records")
-      .select("id, user_id, date, status, clock_in, clock_out")
+      .select("id, user_id, date, status, clock_in, clock_out, source")
       .in("user_id", allowedIds)
       .in("date", dates)
 
@@ -157,10 +163,55 @@ export async function POST(request: NextRequest) {
       .returns<Array<StagingTarget & { id: string }>>()
     const targets = new Map((targetRows ?? []).map((t) => [t.id, t]))
 
+    const statusLabel = ATTENDANCE_STATUS_LABELS[status as UnifiedAttendanceStatus] ?? status
+
+    // What each day already has decides what the apply does and what the admin is told first.
+    // The same classification drives the preview and the real run, so they cannot disagree.
+    const { data: pendingRows } = await dataClient
+      .from("attendance_appeals")
+      .select("user_id, appeal_date")
+      .eq("status", "pending")
+      .in("user_id", allowedIds)
+      .in("appeal_date", dates)
+    const pendingKeys = new Set((pendingRows ?? []).map((p) => `${p.user_id}::${p.appeal_date}`))
+    const dayContext = await loadDayContext(dataClient, { userIds: allowedIds, start: start_date, end: end_date })
+
+    const reviewsByUser = new Map<string, DayReview[]>()
+    for (const userId of allowedIds) {
+      reviewsByUser.set(
+        userId,
+        dates.map((date) =>
+          classifyBulkDay({
+            status,
+            date,
+            existing: existingByKey.get(`${userId}::${date}`) ?? null,
+            hasPending: pendingKeys.has(`${userId}::${date}`),
+            onLeave: dayContext.isOnLeave(userId, date),
+          })
+        )
+      )
+    }
+
+    if (dry_run) {
+      return NextResponse.json({
+        dry_run: true,
+        status_label: statusLabel,
+        people: allowedIds.map((userId) => {
+          const days = reviewsByUser.get(userId) ?? []
+          return {
+            user_id: userId,
+            name: targets.get(userId)?.full_name ?? "Employee",
+            total: days.length,
+            will_stage: days.filter((d) => d.action === "stage").length,
+            items: summarizeDays(days),
+          }
+        }),
+      })
+    }
+
     let stagedCount = 0
     let skipped = 0
     let alreadyPending = 0
-    const statusLabel = ATTENDANCE_STATUS_LABELS[status as UnifiedAttendanceStatus] ?? status
 
     const departmentLeads = await loadDepartmentLeads(dataClient)
     for (const userId of allowedIds) {
@@ -171,21 +222,14 @@ export async function POST(request: NextRequest) {
       // One person's days of this range list and are decided as one item.
       const batchId = dates.length > 1 ? randomUUID() : null
       const stagedForUser: Array<{ appealId: string; date: string }> = []
-      for (const date of dates) {
+      for (const review of reviewsByUser.get(userId) ?? []) {
+        const date = review.date
+        if (review.action === "skip") {
+          if (review.flags.includes("pending")) alreadyPending++
+          else skipped++
+          continue
+        }
         const existing = existingByKey.get(`${userId}::${date}`)
-        // OOS never overrides a fully-present day (clock-in AND clock-out): the person
-        // was demonstrably in the office, so they cannot be out of station that day. A
-        // day with a clock-in but NO clock-out is the "clocked in, then left for OOS
-        // and never clocked out" case, which IS a legitimate override. Waiver keeps
-        // overriding any day — its purpose is to forgive a late/complete clock-in.
-        if (status === "out_of_station" && existing?.clock_in && existing.clock_out) {
-          skipped++
-          continue
-        }
-        if (existing?.status === status) {
-          skipped++
-          continue
-        }
         const result = await stageAttendanceChange(dataClient, {
           actor: scope,
           userId,
@@ -261,8 +305,16 @@ export async function POST(request: NextRequest) {
 
 const BulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(500),
+  /** Why the entry is being removed; shown to whoever confirms it. */
+  reason: z.string().trim().max(500).optional(),
 })
 
+/**
+ * Removing a manual record (OOS, waiver, an override) is staged like applying one: each day
+ * becomes a pending change the Department Lead confirms, and only the final approval removes
+ * (or, for a day with real punches, reverts) the record. It used to delete on the spot, which
+ * let approved days be wiped with no second approval.
+ */
 export async function DELETE(request: NextRequest) {
   const rl = await rateLimit(`admin-attendance-bulk-delete:${getClientId(request)}`, { limit: 20, windowSec: 60 })
   if (!rl.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -283,20 +335,12 @@ export async function DELETE(request: NextRequest) {
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
     // Load the target rows and restrict to the caller's department scope
-    type TargetRow = {
-      id: string
-      user_id: string
-      date: string
-      status: string
-      clock_in: string | null
-      clock_out: string | null
-    }
     const { data: rows } = await dataClient
       .from("attendance_records")
       .select("id, user_id, date, status, clock_in, clock_out")
       .in("id", parsed.data.ids)
 
-    let target = (rows ?? []) as TargetRow[]
+    let target = (rows ?? []) as RemovableRecord[]
     const depts = getScopedDepartments(scope)
     if (depts !== null) {
       const userIds = [...new Set(target.map((r) => r.user_id))]
@@ -313,77 +357,97 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "No deletable records found in your scope" }, { status: 403 })
     }
 
-    // Graceful reversal: rows that have real punches were overrides — revert their status by
-    // re-deriving from the punches (keeping the clock-ins). Rows with no punch were pure
-    // manual records (OOS/waiver on an absent day) — delete them.
-    const toRevert = target.filter((r) => Boolean(r.clock_in || r.clock_out))
-    const toRemove = target.filter((r) => !(r.clock_in || r.clock_out))
+    const userIds = [...new Set(target.map((r) => r.user_id))]
+    const { data: targetRows } = await dataClient
+      .from("profiles")
+      .select("id, department, department_id, is_department_lead, full_name")
+      .in("id", userIds)
+      .returns<Array<StagingTarget & { id: string }>>()
+    const targets = new Map((targetRows ?? []).map((t) => [t.id, t]))
+    const departmentLeads = await loadDepartmentLeads(dataClient)
 
-    if (toRemove.length > 0) {
-      const { error } = await dataClient
-        .from("attendance_records")
-        .delete()
-        .in(
-          "id",
-          toRemove.map((r) => r.id)
-        )
-      if (error) {
-        log.error({ err: JSON.stringify(error) }, "Bulk delete failed")
-        return NextResponse.json({ error: "Failed to delete records" }, { status: 500 })
+    let stagedCount = 0
+    let alreadyPending = 0
+    for (const userId of userIds) {
+      const days = target.filter((r) => r.user_id === userId).sort((a, b) => a.date.localeCompare(b.date))
+      const person = targets.get(userId) ?? null
+      const hasLead = Boolean(
+        person?.department && (departmentLeads.idsByDepartment.get(person.department) ?? []).length > 0
+      )
+      const label = ATTENDANCE_STATUS_LABELS[days[0].status as UnifiedAttendanceStatus] ?? days[0].status
+      const reason = parsed.data.reason || `Remove the ${label} entry`
+      // One person's days of a removal list and are decided as one item.
+      const batchId = days.length > 1 ? randomUUID() : null
+      const stagedForUser: Array<{ appealId: string; date: string }> = []
+
+      for (const day of days) {
+        const result = await stageAttendanceChange(dataClient, {
+          actor: scope,
+          userId,
+          date: day.date,
+          attendanceRecordId: day.id,
+          currentStatus: day.status,
+          requestedStatus: planRecordRemoval(day, policy).status,
+          reason,
+          target: person,
+          departmentHasLead: hasLead,
+          batchId,
+          notify: false,
+          change: {
+            kind: "record_removal",
+            payload: { record_id: day.id } satisfies RecordRemovalChange,
+            summary: `Remove ${label} on ${day.date}`,
+          },
+        })
+        if (result.ok) {
+          stagedCount++
+          stagedForUser.push({ appealId: result.appealId, date: day.date })
+        } else if (result.status === 409) {
+          alreadyPending++
+        } else {
+          return NextResponse.json(
+            { error: `${result.error}. ${stagedCount} day(s) were staged before this failed.` },
+            { status: result.status }
+          )
+        }
+      }
+
+      if (stagedForUser.length > 0) {
+        const first = stagedForUser[0].date
+        const last = stagedForUser[stagedForUser.length - 1].date
+        await notifyAppealReviewers(dataClient, {
+          stage: stagingRoute(scope, person, hasLead).stage,
+          department: person?.department ?? null,
+          departmentId: person?.department_id ?? null,
+          appealId: stagedForUser[0].appealId,
+          actorId: scope.userId,
+          title: "Attendance Removal Staged",
+          message: `Removing ${stagedForUser.length} day(s) of ${label} for ${person?.full_name ?? "an employee"} (${first === last ? first : `${first} to ${last}`}) requires your confirmation.`,
+        })
       }
     }
 
-    for (const row of toRevert) {
-      const revertedStatus = deriveUnifiedAttendanceStatus(
-        {
-          record: { clock_in: row.clock_in, clock_out: row.clock_out, waived: false, status: null },
-          recordDate: row.date,
-        },
-        policy
-      )
-      await dataClient
-        .from("attendance_records")
-        .update({ status: revertedStatus, waived: false, manual_comment: null, source: "hikvision" })
-        .eq("id", row.id)
-    }
-
-    for (const row of target) {
-      const reverted = Boolean(row.clock_in || row.clock_out)
-      await writeAuditLog(
-        supabase,
-        {
-          action: reverted ? "update" : "delete",
-          entityType: "attendance_record",
-          entityId: row.id,
-          oldValues: { status: row.status, date: row.date, user_id: row.user_id },
-          context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/records/bulk" },
-        },
-        { failOpen: true }
-      )
-    }
-
-    // Provenance: reverted days log a manual_update (restored), removed days a bulk_delete.
-    await recordAttendanceEvents(
-      dataClient,
-      target.map((row) => {
-        const reverted = Boolean(row.clock_in || row.clock_out)
-        return {
-          userId: row.user_id,
-          eventDate: row.date,
-          eventType: reverted ? ("manual_update" as const) : ("bulk_delete" as const),
-          attendanceRecordId: reverted ? row.id : null,
-          fromStatus: row.status,
-          source: "manual" as const,
-          comment: reverted ? "Override removed — reverted to recorded attendance" : null,
-          actorId: scope.userId,
-        }
-      })
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "attendance_record_bulk",
+        entityId: `bulk-removal-${target[0].id}`,
+        newValues: { record_ids: target.map((r) => r.id), staged: stagedCount, removal: true },
+        context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/records/bulk" },
+      },
+      { failOpen: true }
     )
 
+    const notes = alreadyPending > 0 ? ` ${alreadyPending} day(s) already have a pending change.` : ""
     return NextResponse.json({
-      message: `Removed ${target.length} entr(ies)`,
-      deleted: toRemove.length,
-      reverted: toRevert.length,
+      staged: true,
+      message:
+        stagedCount > 0
+          ? `Removal staged for ${stagedCount} day(s). It takes effect once the Department Lead confirms.${notes}`
+          : `Nothing staged.${notes}`,
+      staged_count: stagedCount,
+      already_pending: alreadyPending,
     })
   } catch (error) {
     log.error({ err: String(error) }, "Error in DELETE /api/admin/hr/attendance/records/bulk")

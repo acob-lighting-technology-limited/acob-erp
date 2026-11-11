@@ -10,6 +10,7 @@ import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import { applyExemptionChange, type ExemptionChange } from "@/lib/hr/exemptions"
 import { openOosPeriod, type OosPeriodChange } from "@/lib/hr/oos-materialize"
+import { applyRecordRemoval, type RecordRemovalChange } from "@/lib/hr/record-removal"
 import {
   appealReviewBlock,
   appealStuckReason,
@@ -104,7 +105,7 @@ type AppealRow = {
   resolution_note: string | null
   created_at: string
   updated_at: string
-  change_kind?: "oos_period" | "exemption" | null
+  change_kind?: "oos_period" | "exemption" | "record_removal" | null
   change_payload?: unknown
   batch_id?: string | null
   overridden_by?: string | null
@@ -474,14 +475,26 @@ async function decideAppeal(
       })
       .eq("id", appeal.id)
 
-  // A confirmed period change (open-ended OOS, exemption) is applied as a whole. It runs
-  // after the appeal update: applying OOS closes pending appeals on its days, which would
-  // otherwise include this one.
+  // A confirmed period change (open-ended OOS, exemption) or record removal is applied as a
+  // whole. It runs after the appeal update: applying OOS closes pending appeals on its days,
+  // which would otherwise include this one.
   if (isFinalApproval && appeal.change_kind) {
     const applied =
       appeal.change_kind === "oos_period"
         ? await openOosPeriod(dataClient, appeal.user_id, appeal.change_payload as OosPeriodChange, scope.userId)
-        : await applyExemptionChange(dataClient, appeal.user_id, appeal.change_payload as ExemptionChange, scope.userId)
+        : appeal.change_kind === "record_removal"
+          ? await applyRecordRemoval(
+              dataClient,
+              appeal.user_id,
+              appeal.change_payload as RecordRemovalChange,
+              scope.userId
+            )
+          : await applyExemptionChange(
+              dataClient,
+              appeal.user_id,
+              appeal.change_payload as ExemptionChange,
+              scope.userId
+            )
     if (applied.error) {
       log.error({ err: applied.error, appealId: appeal.id }, "Failed to apply confirmed period change")
       await revertAppeal()

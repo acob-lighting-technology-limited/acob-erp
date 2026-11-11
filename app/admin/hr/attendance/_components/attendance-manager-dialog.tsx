@@ -35,6 +35,8 @@ import { toLocalISODate } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { groupRecords, idsLeavingRange, type EntryGroup, type ManualRecord } from "@/lib/hr/manual-entry-groups"
+import { BulkApplyReviewDialog, type BulkReview } from "./bulk-apply-review-dialog"
 
 import { LinesSkeleton, RowsSkeleton } from "@/components/skeletons"
 const log = logger("attendance-manager-dialog")
@@ -80,69 +82,6 @@ function formatDay(date: string) {
 function formatRangeLabel(start: string, end: string) {
   if (start === end) return formatDay(start)
   return `${formatDay(start)} – ${formatDay(end)}`
-}
-
-interface ManualRecord {
-  id: string
-  user_id: string
-  user_name: string
-  date: string
-  manual_comment: string | null
-}
-
-interface EntryGroup {
-  user_id: string
-  user_name: string
-  ids: string[]
-  start: string
-  end: string
-  comment: string | null
-}
-
-/** Groups per-day manual records (same employee + comment, contiguous workdays) into ranges. */
-function groupRecords(records: ManualRecord[]): EntryGroup[] {
-  const byKey = new Map<string, ManualRecord[]>()
-  for (const r of records) {
-    const key = `${r.user_id}::${r.manual_comment ?? ""}`
-    if (!byKey.has(key)) byKey.set(key, [])
-    byKey.get(key)!.push(r)
-  }
-
-  const groups: EntryGroup[] = []
-  for (const list of byKey.values()) {
-    list.sort((a, b) => a.date.localeCompare(b.date))
-    let cur: ManualRecord[] = []
-    const flush = () => {
-      if (cur.length === 0) return
-      groups.push({
-        user_id: cur[0].user_id,
-        user_name: cur[0].user_name,
-        ids: cur.map((c) => c.id),
-        start: cur[0].date,
-        end: cur[cur.length - 1].date,
-        comment: cur[0].manual_comment,
-      })
-      cur = []
-    }
-    for (const r of list) {
-      if (cur.length === 0) {
-        cur = [r]
-        continue
-      }
-      const prev = cur[cur.length - 1].date
-      const gapDays = (Date.parse(`${r.date}T00:00:00Z`) - Date.parse(`${prev}T00:00:00Z`)) / 86_400_000
-      // Bridge weekends so Fri→Mon stays one range, but split on real gaps.
-      if (gapDays >= 1 && gapDays <= 3) cur.push(r)
-      else {
-        flush()
-        cur = [r]
-      }
-    }
-    flush()
-  }
-
-  groups.sort((a, b) => b.start.localeCompare(a.start))
-  return groups
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1456,7 +1395,7 @@ function ManualRecordsTab({
   const [confirmGroup, setConfirmGroup] = useState<EntryGroup | null>(null)
   const [deleting, setDeleting] = useState(false)
   // When set: a punch conflict was detected — incomplete days will be overridden, complete days skipped.
-  const [confirmOverride, setConfirmOverride] = useState<{ incomplete: number; complete: number } | null>(null)
+  const [review, setReview] = useState<BulkReview | null>(null)
 
   // Indefinite OOS directives (open-ended) — only used when oosModes is set.
   const [openOos, setOpenOos] = useState<OpenOosPeriod[] | null>(null)
@@ -1504,18 +1443,19 @@ function ManualRecordsTab({
     return { start, end: `${ym}-${String(last).padStart(2, "0")}` }
   }
 
-  async function deleteIds(ids: string[]): Promise<boolean> {
+  /** Stages the removal of these days for confirmation; returns the server's message, or null on failure. */
+  async function deleteIds(ids: string[]): Promise<string | null> {
     const res = await apiFetch("/api/admin/hr/attendance/records/bulk", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
     })
+    const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
     if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
-      toast.error(payload?.error || "Failed to delete records")
-      return false
+      toast.error(payload?.error || "Failed to stage the removal")
+      return null
     }
-    return true
+    return payload?.message ?? "Removal staged for confirmation"
   }
 
   async function postRange(
@@ -1544,48 +1484,43 @@ function ManualRecordsTab({
     return { message: payload?.message || "Staged for confirmation" }
   }
 
-  /**
-   * Split the selected employees' days in the range into fully-present (clock-in AND
-   * clock-out) vs incomplete (a punch but no complete day). OOS skips the former and
-   * overrides the latter; waiver overrides both.
-   */
-  async function countPunched(
-    userIds: string[],
-    start: string,
-    end: string
-  ): Promise<{ complete: number; incomplete: number }> {
-    try {
-      const qs = new URLSearchParams({ start_date: start, end_date: end })
-      const res = await apiFetch(`/api/admin/hr/attendance/records?${qs.toString()}`, { cache: "no-store" })
-      const payload = (await res.json().catch(() => null)) as {
-        records?: Array<{ user_id: string; clock_in: string | null; clock_out: string | null }>
-      } | null
-      const sel = new Set(userIds)
-      let complete = 0
-      let incomplete = 0
-      for (const r of payload?.records ?? []) {
-        if (!sel.has(r.user_id)) continue
-        if (r.clock_in && r.clock_out) complete++
-        else if (r.clock_in || r.clock_out) incomplete++
-      }
-      return { complete, incomplete }
-    } catch {
-      return { complete: 0, incomplete: 0 }
+  /** Asks the server what applying this would do to each person's days, without applying it. */
+  async function previewRange(start: string, end: string): Promise<BulkReview | null> {
+    const res = await apiFetch("/api/admin/hr/attendance/records/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_ids: selectedIds,
+        start_date: start,
+        end_date: end,
+        status,
+        manual_comment: comment.trim(),
+        dry_run: true,
+      }),
+    })
+    const payload = (await res.json().catch(() => null)) as (BulkReview & { error?: string }) | null
+    if (!res.ok || !payload) {
+      toast.error(payload?.error || "Could not check these days")
+      return null
     }
+    return payload
   }
 
   async function save() {
     if (selectedIds.length === 0) return toast.error("Select at least one employee")
     if (!comment.trim()) return toast.error("A comment is required")
 
+    // Anything already on those days (a clock-in, an existing OOS, another manual entry) is
+    // shown first, so nobody is surprised by what the apply skips or overrides.
     if (oosModes && mode === "indefinite") {
       if (!startDate) return toast.error("Choose a start date")
       const todayIso = toLocalISODate()
+      if (startDate > todayIso) return applyIndefinite()
       setSaving(true)
-      const { complete, incomplete } = await countPunched(selectedIds, startDate, todayIso)
+      const found = await previewRange(startDate, todayIso)
       setSaving(false)
-      if (incomplete > 0) return setConfirmOverride({ incomplete, complete })
-      return applyIndefinite()
+      if (!found) return
+      return found.people.some((p) => p.items.length > 0) ? setReview(found) : applyIndefinite()
     }
 
     const start = oosModes && mode === "monthly" ? monthBounds(month).start : startDate
@@ -1593,17 +1528,16 @@ function ManualRecordsTab({
     if (!start || !end || end < start) return toast.error("Set a valid date range")
 
     setSaving(true)
-    const { complete, incomplete } = await countPunched(selectedIds, start, end)
+    const found = await previewRange(start, end)
     setSaving(false)
-    // OOS only overrides incomplete days (fully-present days are skipped); waiver overrides all.
-    const conflicts = status === "out_of_station" ? incomplete : complete + incomplete
-    if (conflicts > 0) return setConfirmOverride({ incomplete, complete })
+    if (!found) return
+    if (found.people.some((p) => p.items.length > 0)) return setReview(found)
     await doApply(start, end)
   }
 
   /** Dispatch the correct apply after the override confirm. */
   async function proceed() {
-    setConfirmOverride(null)
+    setReview(null)
     if (oosModes && mode === "indefinite") return applyIndefinite()
     const start = oosModes && mode === "monthly" ? monthBounds(month).start : startDate
     const end = oosModes && mode === "monthly" ? monthBounds(month).end : endDate
@@ -1611,7 +1545,7 @@ function ManualRecordsTab({
   }
 
   async function doApply(start: string, end: string) {
-    setConfirmOverride(null)
+    setReview(null)
     setSaving(true)
     try {
       const result = await postRange(selectedIds, start, end, comment.trim())
@@ -1630,7 +1564,7 @@ function ManualRecordsTab({
   }
 
   async function applyIndefinite() {
-    setConfirmOverride(null)
+    setReview(null)
     setSaving(true)
     try {
       const res = await apiFetch("/api/admin/hr/attendance/oos-periods", {
@@ -1691,9 +1625,10 @@ function ManualRecordsTab({
     if (!eStart || !eEnd || eEnd < eStart || !eComment.trim()) return toast.error("Set a valid date range and comment")
     setEditSaving(true)
     try {
-      // Edit = delete the old range then create the new one cleanly.
-      const removed = await deleteIds(editing.ids)
-      if (!removed) return
+      // Edit = stage the removal of the days that leave the range, then the new range. Days still
+      // in it are skipped by the server, so the person stays listed while the lead decides.
+      const leaving = idsLeavingRange(editing, eStart, eEnd)
+      if (leaving.length > 0 && !(await deleteIds(leaving))) return
       const result = await postRange([editing.user_id], eStart, eEnd, eComment.trim())
       if (!result) return
       toast.info(result.message)
@@ -1709,9 +1644,9 @@ function ManualRecordsTab({
     if (!confirmGroup) return
     setDeleting(true)
     try {
-      const ok = await deleteIds(confirmGroup.ids)
-      if (!ok) return
-      toast.success("Entry removed")
+      const message = await deleteIds(confirmGroup.ids)
+      if (!message) return
+      toast.info(message)
       setConfirmGroup(null)
       void loadEntries()
       onDone()
@@ -1909,28 +1844,19 @@ function ManualRecordsTab({
         title={`Remove ${badge} entry?`}
         description={
           confirmGroup
-            ? `This removes ${confirmGroup.user_name}'s ${badge} (${formatRangeLabel(confirmGroup.start, confirmGroup.end)}).`
+            ? `This stages the removal of ${confirmGroup.user_name}'s ${badge} (${formatRangeLabel(confirmGroup.start, confirmGroup.end)}). The days stay until the Department Lead confirms; days with a clock-in then go back to the recorded attendance.`
             : undefined
         }
-        confirmLabel="Remove"
+        confirmLabel="Stage removal"
         onConfirm={() => void doDelete()}
         busy={deleting}
       />
 
-      <ConfirmDialog
-        open={confirmOverride !== null}
-        onOpenChange={(o) => !o && setConfirmOverride(null)}
-        title="Some days have clock-ins"
-        description={
-          confirmOverride
-            ? status === "out_of_station"
-              ? `${confirmOverride.incomplete} day(s) have a clock-in but no clock-out (looks like they left mid-day) — applying OOS will override those.${confirmOverride.complete > 0 ? ` ${confirmOverride.complete} fully-present day(s) are skipped.` : ""} Punches are kept and restored if you remove this entry. Proceed?`
-              : `${confirmOverride.complete + confirmOverride.incomplete} of these day(s) already have a clock-in. Applying ${badge} will override them. Their attendance is kept and restored if you remove this entry. Proceed?`
-            : undefined
-        }
-        confirmLabel="Proceed"
-        onConfirm={() => void proceed()}
+      <BulkApplyReviewDialog
+        review={review}
         busy={saving}
+        onCancel={() => setReview(null)}
+        onConfirm={() => void proceed()}
       />
 
       <ConfirmDialog

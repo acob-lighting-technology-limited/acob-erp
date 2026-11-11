@@ -57,6 +57,8 @@ export const RELEASES: Release[] = [
           "Overriding an approval is only open once it is stuck: five working days with no decision, or the approver on leave with no delegate",
           "Appeals approved by the person they are about are marked Self-approved and listed for the MD under MD's Desk, with a monthly notice",
           "Attendance policy settings are now in the Attendance page menu, and CBT settings are a button on the CBT page",
+          "Removing an OOS, waiver or other manual attendance entry now waits for the department lead's confirmation, like applying one. Editing an entry removes only the days that leave the range, so the person stays listed meanwhile",
+          "Before applying OOS or a waiver, a review lists the days that already have a clock-in, an existing OOS or another manual entry, and what will be skipped or overridden",
         ],
       },
       {
