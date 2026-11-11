@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { formatLeaveReference, leaveStageLabel, notifyUsers } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -289,7 +290,7 @@ export async function PATCH() {
               userIds: [approverId],
               title: "A leave request lapsed awaiting your action",
               message: `${requesterName}'s ${leaveTypeName} request (${period}) was cancelled because it reached its start date while still awaiting your review as ${stuckAt}. No action is needed now; ${requesterName} has been told to resubmit if the leave is still required.`,
-              linkUrl: "/admin/hr/leave",
+              linkUrl: "/admin/hr/leave?tab=all",
               entityId: request.id,
               emailEvent: "lapsed",
               badgeText: "Lapsed at Your Stage",
@@ -380,7 +381,7 @@ export async function PATCH() {
         message: single
           ? `Leave request ${formatLeaveReference(single.id)} is due soon. Please review before SLA breach.`
           : `${requests.length} leave requests waiting on you are due soon. Please review them before SLA breach.`,
-        linkUrl: "/hr/leave",
+        linkUrl: LEAVE_REVIEWS_PATH,
         entityId: single?.id,
         emailEvent: "sla_reminder",
         ...(single
@@ -407,7 +408,7 @@ export async function PATCH() {
           breaches.length === 1
             ? `${breaches[0].requesterName}'s ${breaches[0].leaveTypeName} request is overdue at the ${breaches[0].pendingStage} stage. Review it now and ensure it is approved, rejected, or reassigned so the employee is not left waiting.`
             : `${breaches.length} leave requests are overdue for approval. Review each one and ensure it is approved, rejected, or reassigned so no employee is left waiting.`,
-        linkUrl: "/admin/hr/leave",
+        linkUrl: "/admin/hr/leave?tab=pending",
         emailEvent: "sla_breached",
         emailSubject:
           breaches.length === 1

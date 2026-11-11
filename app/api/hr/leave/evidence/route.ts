@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy, notifyUsers } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -76,7 +77,7 @@ export async function PATCH(request: NextRequest) {
         title: "Leave request ready for approval",
         message: "Required evidence has been completed. The leave request has entered approval workflow.",
         actorId: user.id,
-        linkUrl: "/hr/leave",
+        linkUrl: LEAVE_REVIEWS_PATH,
         entityId: leave_request_id,
         emailEvent: "ready_for_approval",
       })

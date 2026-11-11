@@ -48,6 +48,9 @@ import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const MY_ATTENDANCE_TAB_KEYS = ["log", "calendar"] as const
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -246,7 +249,7 @@ const ATTENDANCE_TABS: DataTableTab[] = [
 const EMPTY_APPEALS: AppealRecord[] = []
 
 export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: AttendanceContentProps) {
-  const [activeTab, setActiveTab] = useState<"log" | "calendar">("log")
+  const [activeTab, setActiveTab] = useUrlTab(MY_ATTENDANCE_TAB_KEYS, "log")
   // Current month + the two before it, so the log and filter show history.
   const daysQuery = useQuery({
     queryKey: QUERY_KEYS.myAttendanceRecent(),

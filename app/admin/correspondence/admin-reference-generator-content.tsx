@@ -38,6 +38,9 @@ import {
 } from "@/lib/correspondence/correspondence-export"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const LETTER_TAB_KEYS = ["all", "external", "internal"] as const
 
 const log = logger("reference-generator")
 
@@ -60,7 +63,7 @@ export function AdminReferenceGeneratorContent({
   const availableDepartments = dynamicDepartments.length > 0 ? dynamicDepartments : getCanonicalDepartmentOrder()
 
   const [loadingRecordId, setLoadingRecordId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"all" | "external" | "internal">("all")
+  const [activeTab, setActiveTab] = useUrlTab(LETTER_TAB_KEYS, "all")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
   const [isExporting, setIsExporting] = useState(false)

@@ -125,7 +125,7 @@ export async function notifySeriesChange(
       p_title: title,
       p_message: message,
       p_priority: "normal",
-      p_link_url: "/tasks/management",
+      p_link_url: "/tasks/management?tab=recurring",
       p_actor_id: actor.id,
       p_entity_type: "task_series",
       p_entity_id: series.id,

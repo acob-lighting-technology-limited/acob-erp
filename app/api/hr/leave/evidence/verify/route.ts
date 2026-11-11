@@ -7,6 +7,7 @@ import {
   getLeavePolicy,
   notifyUsers,
 } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -129,7 +130,7 @@ export async function PATCH(request: NextRequest) {
               title: "Leave request ready for approval",
               message: `Evidence has been verified for ${requesterName}'s leave request for ${leaveTypeName} (${leaveRequest.start_date} to ${leaveRequest.end_date}). The request is now awaiting your approval.`,
               actorId: user.id,
-              linkUrl: "/hr/leave",
+              linkUrl: LEAVE_REVIEWS_PATH,
               entityId: leaveRequest.id,
               emailEvent: "ready_for_approval",
               emailSubject: `Action Required: Leave Request Ready for Approval — ${requesterName}${refSuffix}`,

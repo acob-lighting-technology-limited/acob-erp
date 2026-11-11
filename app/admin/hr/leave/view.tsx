@@ -48,6 +48,9 @@ import { formatName, cn } from "@/lib/utils"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const LEAVE_TAB_KEYS = ["all", "pending", "calendar", "history"] as const
 
 export { resolveLeaveRouteStages }
 export type { RouteSnapshotStage }
@@ -340,7 +343,7 @@ export function LeaveApprovePage({
   const deptCode = useDepartmentCodes()
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
-  const [activeTab, setActiveTab] = useState("all")
+  const [activeTab, setActiveTab] = useUrlTab(LEAVE_TAB_KEYS, "all")
   const [actionDialog, setActionDialog] = useState<ActionDialogState>({
     open: false,
     id: "",
@@ -953,22 +956,6 @@ export function LeaveApprovePage({
                     </Badge>
                   </div>
                 </div>
-
-                {activeTab === "my-actions" && (
-                  <div className="flex gap-2 pt-2">
-                    <Button size="sm" className="flex-1" onClick={() => handleAction(r.id, "approve")}>
-                      Endorse
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="flex-1"
-                      onClick={() => handleAction(r.id, "reject")}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
             urlSync

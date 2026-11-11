@@ -18,6 +18,9 @@ import { MeetingEmailRecipientsDialog } from "./meeting-email-recipients-dialog"
 
 import { apiFetch } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const ARTIFACT_TAB_KEYS = ["attendance", "transcript"] as const satisfies readonly ArtifactTab[]
 type ArtifactTab = "attendance" | "transcript"
 
 type Row = {
@@ -45,7 +48,7 @@ function formatMeetingDate(value: string | null): string {
 }
 
 export function MeetingRecordsContent() {
-  const [tab, setTab] = useState<ArtifactTab>("attendance")
+  const [tab, setTab] = useUrlTab(ARTIFACT_TAB_KEYS, "attendance")
   const [syncOpen, setSyncOpen] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const officeWeek = getCurrentOfficeWeek()

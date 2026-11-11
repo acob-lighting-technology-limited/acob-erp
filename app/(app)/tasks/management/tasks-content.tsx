@@ -46,6 +46,9 @@ import { RecurringSeriesTable } from "@/components/tasks/recurring-series-table"
 import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/scheduled-task-rows"
 import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
 import { RecurringTaskBadge } from "@/components/tasks/recurring-task-badge"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const TASK_TAB_KEYS = ["tasks", "recurring"] as const
 
 export type { Task, TaskUserProfile } from "@/types/task"
 
@@ -110,7 +113,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const staffAvatars = useStaffAvatars()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [openSeriesId, setOpenSeriesId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"tasks" | "recurring">("tasks")
+  const [activeTab, setActiveTab] = useUrlTab(TASK_TAB_KEYS, "tasks")
   // Series you hold whose next task is not created yet; table rows only, never the stats.
   const scheduledRows = useScheduledSeriesRows(tasks, { mine: true })
   const tableRows = useMemo(() => [...tasks, ...scheduledRows], [tasks, scheduledRows])

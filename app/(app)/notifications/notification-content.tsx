@@ -36,6 +36,9 @@ import type { Notification } from "./page"
 
 import { logger } from "@/lib/logger"
 import { notificationTier } from "@/lib/notifications/tiers"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const NOTIFICATION_TAB_KEYS = ["action", "fyi", "announcement", "all"] as const
 
 const log = logger("notification-notification-content")
 
@@ -123,7 +126,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   const [supabase] = useState(() => createClient())
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   // Default to the work waiting on the viewer (audit 2.1).
-  const [activeTab, setActiveTab] = useState("action")
+  const [activeTab, setActiveTab] = useUrlTab(NOTIFICATION_TAB_KEYS, "action")
 
   // A fresh server list replaces local edits — adjusted during render, not in an effect.
   const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
