@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { PinInput } from "@/components/approval-signing/pin-input"
 import { apiFetch } from "@/lib/api-client"
 import { formatNaira } from "@/lib/requisitions/format"
+import { cleanAmountInput, parseNaira } from "@/lib/requisitions/limits"
 import { uploadRequisitionFiles } from "@/lib/requisitions/upload"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
 
@@ -64,7 +65,7 @@ export function PaymentDialog({
     setPin("")
   }, [open, outstanding, requisition.form_type])
 
-  const value = Number(amount) || 0
+  const value = parseNaira(amount)
   const partial = value > 0 && value < outstanding
 
   const submit = async () => {
@@ -112,7 +113,12 @@ export function PaymentDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="pay-amount">Amount paid (₦)</Label>
-            <Input id="pay-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Input
+              id="pay-amount"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(cleanAmountInput(e.target.value))}
+            />
             {partial ? <p className="text-muted-foreground text-xs">This will be recorded as a part payment.</p> : null}
           </div>
           <div className="space-y-1.5">
