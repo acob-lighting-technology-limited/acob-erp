@@ -210,7 +210,6 @@ export const AddScheduleItemsSchema = z.object({
       z.object({
         requisition_id: z.string().uuid(),
         beneficiary_index: z.number().int().min(0).max(10),
-        amount: money,
         /** Only when the requisition's bank could not be worked out from its name. */
         bank_code: BANK_CODE.optional(),
       })

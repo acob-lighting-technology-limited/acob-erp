@@ -59,12 +59,13 @@ export function NewScheduleDialog({
         <DialogHeader>
           <DialogTitle>New payment schedule</DialogTitle>
           <DialogDescription>
-            A batch of verified Payment Requests for the MD to pay at the bank. You add the payments next.
+            A batch of verified Payment Requests for the MD to pay at the bank. You pick which ones go in next, by day,
+            week or one by one.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="schedule-date">Payment date</Label>
+            <Label htmlFor="schedule-date">Bank payment date</Label>
             <Input
               id="schedule-date"
               type="date"
@@ -72,7 +73,10 @@ export function NewScheduleDialog({
               min={todayInLagos()}
               onChange={(e) => setPaymentDate(e.target.value)}
             />
-            <p className="text-muted-foreground text-xs">The due date written on every line of the bank file.</p>
+            <p className="text-muted-foreground text-xs">
+              The day the MD pays. It is written on every line of the bank file. It is not the day the requests were
+              made: you choose those when you add payments.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="schedule-note">Note (optional)</Label>

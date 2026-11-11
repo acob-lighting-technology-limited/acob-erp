@@ -56,6 +56,8 @@ async function notifyInApp(
     title: string
     message: string
     priority?: string
+    /** Where the notification opens; defaults to the requisition's staff page. */
+    link?: string
   }
 ) {
   for (const userId of new Set(userIds)) {
@@ -67,7 +69,7 @@ async function notifyInApp(
         p_title: n.title,
         p_message: n.message,
         p_priority: n.priority || "normal",
-        p_link_url: linkFor(req),
+        p_link_url: n.link ?? linkFor(req),
         p_actor_id: actorId,
         p_entity_type: "requisition",
         p_entity_id: req.id,
@@ -85,7 +87,8 @@ async function emailActionNeeded(
   req: Requisition,
   heading: string,
   intro: string,
-  ctaLabel: string
+  ctaLabel: string,
+  ctaPath: string = linkFor(req)
 ) {
   try {
     const eligible = await resolveChannelEligibleUserIds(admin, {
@@ -124,7 +127,7 @@ async function emailActionNeeded(
           detailsTitle: "Requisition",
           details,
           ctaLabel,
-          ctaPath: linkFor(req),
+          ctaPath,
           footerLabel: "Requisitions",
         }),
       })
@@ -172,12 +175,40 @@ async function notifyNextSigner(admin: SupabaseClient, req: Requisition, actorId
   await emailActionNeeded(admin, [next.assignee_id], req, title, message, "Review and sign")
 }
 
+/** Payment officers work in the admin area: Payment Requests go to the schedules, Petty Cash to its requisition. */
 async function notifyProcessors(admin: SupabaseClient, req: Requisition, actorId: string | null) {
   const ids = await processorIds(admin, req)
-  const title = `${FORM_LABELS[req.form_type]} ready for payment`
-  const message = `${req.requisition_number} for ${formatNaira(req.amount)} is fully signed and waiting to be paid.`
-  await notifyInApp(admin, ids, req, actorId, { type: "approval_request", title, message, priority: "high" })
-  await emailActionNeeded(admin, ids, req, title, message, "Record payment")
+  const isPaymentRequest = req.form_type === "payment_request"
+  const link = isPaymentRequest ? "/admin/accounts/schedules" : `/admin/accounts/requisitions/${req.id}`
+  const title = isPaymentRequest
+    ? `${FORM_LABELS[req.form_type]} ready for a payment schedule`
+    : `${FORM_LABELS[req.form_type]} ready for payment`
+  const message = isPaymentRequest
+    ? `${req.requisition_number} for ${formatNaira(req.amount)} is verified and waiting to go on a payment schedule.`
+    : `${req.requisition_number} for ${formatNaira(req.amount)} is fully signed and waiting to be paid.`
+  await notifyInApp(admin, ids, req, actorId, { type: "approval_request", title, message, priority: "high", link })
+  await emailActionNeeded(
+    admin,
+    ids,
+    req,
+    title,
+    message,
+    isPaymentRequest ? "Open payment schedules" : "Record payment",
+    link
+  )
+}
+
+/** Who still has to sign Approved on a Payment Request that has been paid. */
+function awaitingApprover(req: Requisition): string | null {
+  if (req.status !== "awaiting_approval") return null
+  const stage = (req.stages || []).find((s) => s.stage_code === "approved" && s.state === "pending")
+  return stage?.assignee?.full_name || "the MD"
+}
+
+/** " It now waits for X to approve it." once a Payment Request is paid but not yet signed off. */
+function approvalNote(req: Requisition): string {
+  const approver = awaitingApprover(req)
+  return approver ? ` It now waits for ${approver} to approve it; you will be told when it is closed.` : ""
 }
 
 function paidInFull(req: Requisition) {
@@ -291,7 +322,7 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
           type: "approval_granted",
           title: paidInFull(req) ? "Requisition paid" : "Requisition partly paid",
           message: paidInFull(req)
-            ? `${req.requisition_number} has been paid in full (${formatNaira(req.amount)}).`
+            ? `${req.requisition_number} has been paid in full (${formatNaira(req.amount)}).${approvalNote(req)}`
             : `${formatNaira(event.amount)} was paid on ${req.requisition_number}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} paid so far.`,
           priority: "high",
         })
@@ -301,7 +332,7 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
           req,
           paidInFull(req) ? "Requisition paid" : "Requisition partly paid",
           paidInFull(req)
-            ? `Your ${label(req)} has been paid in full (${formatNaira(req.amount)}).`
+            ? `Your ${label(req)} has been paid in full (${formatNaira(req.amount)}).${approvalNote(req)}`
             : `${formatNaira(event.amount)} was paid on your ${label(req)}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} has been paid so far.`,
           "Open requisition"
         )
@@ -313,8 +344,63 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
 }
 
 /**
- * The MD hears about a payment schedule twice: when Accounts sends it for
- * payment, and when what was paid is ready for his Approved signature.
+ * When a schedule is finalized the bank file is emailed to the officer who
+ * finalized it, to check it is exactly what he wants before anything goes to
+ * the MD. The MD is not contacted here.
+ */
+export async function emailScheduleSheetToOfficer(
+  admin: SupabaseClient,
+  input: {
+    officerId: string
+    scheduleId: string
+    scheduleNumber: string
+    paymentDate: string
+    count: number
+    total: number
+    fileName: string
+    file: Buffer
+  }
+): Promise<boolean> {
+  try {
+    const { data: person } = await admin
+      .from("profiles")
+      .select("id, first_name, full_name, company_email, additional_email")
+      .eq("id", input.officerId)
+      .maybeSingle<Person>()
+    const to = (person?.company_email || person?.additional_email || "").trim()
+    if (!to.includes("@")) return false
+    await sendNotificationEmailWithRetry({
+      from: orgDepartmentSenderBare("Accounts"),
+      to: [to],
+      subject: `Check payment schedule ${input.scheduleNumber} (${formatNaira(input.total)})`,
+      html: renderActionEmail({
+        recipientFirstName: person?.first_name || "",
+        heading: `Check payment schedule ${input.scheduleNumber}`,
+        intro:
+          "You finalized this schedule. The bank file is attached. Open it and check every line before it goes to the MD. The MD has not been told yet.",
+        detailsTitle: "Payment schedule",
+        details: [
+          ["Schedule", input.scheduleNumber],
+          ["Bank payment date", input.paymentDate],
+          ["Payments", String(input.count)],
+          ["Total", formatNaira(input.total)],
+        ],
+        ctaLabel: "Open schedule",
+        ctaPath: `/admin/accounts/schedules/${input.scheduleId}`,
+        footerLabel: "Requisitions",
+      }),
+      attachments: [{ filename: input.fileName, content: new Uint8Array(input.file) }],
+    })
+    return true
+  } catch (err) {
+    log.error({ err: String(err), schedule: input.scheduleId }, "Schedule sheet email failed")
+    return false
+  }
+}
+
+/**
+ * The MD hears about a payment schedule once: when what was paid is ready for
+ * his Approved signature.
  */
 export async function notifyScheduleForMd(
   admin: SupabaseClient,
@@ -323,21 +409,15 @@ export async function notifyScheduleForMd(
     actorId: string
     scheduleId: string
     scheduleNumber: string
-    kind: "sent" | "approve"
+    kind: "approve"
     count: number
     total: number
   }
 ): Promise<void> {
   if (!input.mdId || input.count === 0) return
-  const link = `/accounts/requisitions/schedules/${input.scheduleId}`
-  const title =
-    input.kind === "sent"
-      ? `Payment schedule ${input.scheduleNumber} for payment`
-      : `Payment schedule ${input.scheduleNumber}: paid, ready to approve`
-  const message =
-    input.kind === "sent"
-      ? `${input.count} payment${input.count === 1 ? "" : "s"} totalling ${formatNaira(input.total)} are scheduled for payment.`
-      : `${input.count} paid payment request${input.count === 1 ? " is" : "s are"} waiting for your Approved signature (${formatNaira(input.total)}).`
+  const link = `/admin/accounts/schedules/${input.scheduleId}`
+  const title = `Payment schedule ${input.scheduleNumber}: paid, ready to approve`
+  const message = `${input.count} paid payment request${input.count === 1 ? " is" : "s are"} waiting for your Approved signature (${formatNaira(input.total)}).`
   try {
     const { error } = await admin.rpc("create_notification", {
       p_user_id: input.mdId,
@@ -380,12 +460,84 @@ export async function notifyScheduleForMd(
           ["Payments", String(input.count)],
           ["Total", formatNaira(input.total)],
         ],
-        ctaLabel: input.kind === "sent" ? "Open schedule" : "Review and approve",
+        ctaLabel: "Review and approve",
         ctaPath: link,
         footerLabel: "Requisitions",
       }),
     })
   } catch (err) {
     log.error({ err: String(err), schedule: input.scheduleId }, "Schedule notification failed")
+  }
+}
+
+/**
+ * The officer, having checked the sheet, tells the MD it is ready to pay. The
+ * bank file is attached so he can pay from the email as well as the page.
+ */
+export async function notifyMdToPay(
+  admin: SupabaseClient,
+  input: {
+    mdId: string | null
+    actorId: string
+    scheduleId: string
+    scheduleNumber: string
+    paymentDate: string
+    count: number
+    total: number
+    fileName: string
+    file: Buffer
+  }
+): Promise<boolean> {
+  if (!input.mdId) return false
+  const link = `/admin/accounts/schedules/${input.scheduleId}`
+  const title = `Payment schedule ${input.scheduleNumber} ready for payment`
+  const message = `${input.count} payment${input.count === 1 ? "" : "s"} totalling ${formatNaira(input.total)} are ready to be paid on ${input.paymentDate}. The bank file is attached.`
+  try {
+    const { error } = await admin.rpc("create_notification", {
+      p_user_id: input.mdId,
+      p_type: "approval_request",
+      p_category: "approvals",
+      p_title: title,
+      p_message: message,
+      p_priority: "high",
+      p_link_url: link,
+      p_actor_id: input.actorId,
+      p_entity_type: "requisition_schedule",
+      p_entity_id: input.scheduleId,
+    })
+    if (error) log.error({ err: error.message }, "Schedule notification rejected")
+
+    const { data: person } = await admin
+      .from("profiles")
+      .select("id, first_name, full_name, company_email, additional_email")
+      .eq("id", input.mdId)
+      .maybeSingle<Person>()
+    const to = (person?.company_email || person?.additional_email || "").trim()
+    if (!to.includes("@")) return false
+    await sendNotificationEmailWithRetry({
+      from: orgDepartmentSenderBare("Accounts"),
+      to: [to],
+      subject: `${title} (${formatNaira(input.total)})`,
+      html: renderActionEmail({
+        recipientFirstName: person?.first_name || "",
+        heading: title,
+        intro: message,
+        detailsTitle: "Payment schedule",
+        details: [
+          ["Schedule", input.scheduleNumber],
+          ["Bank payment date", input.paymentDate],
+          ["Payments", String(input.count)],
+          ["Total", formatNaira(input.total)],
+        ],
+        ctaLabel: "Open schedule",
+        ctaPath: link,
+        footerLabel: "Requisitions",
+      }),
+      attachments: [{ filename: input.fileName, content: new Uint8Array(input.file) }],
+    })
+    return true
+  } catch (err) {
+    log.error({ err: String(err), schedule: input.scheduleId }, "Notify MD failed")
+    return false
   }
 }

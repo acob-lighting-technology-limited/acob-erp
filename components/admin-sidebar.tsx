@@ -204,6 +204,7 @@ const adminNavigation: NavItem[] = [
     icon: Landmark,
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
+      { name: "Payment schedules", href: "/admin/accounts/schedules" },
       { name: "Payroll", href: "/admin/accounts/payroll" },
       {
         name: "Inventory",

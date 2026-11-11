@@ -56,7 +56,6 @@ import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeClass } from "./requisition-detail"
-import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
 import { SCHEDULES_PATH } from "./requisition-paths"
 import { UnpaidTag } from "./unpaid-tag"
 import { RequisitionRowPanel } from "./requisition-row-panel"
@@ -71,7 +70,7 @@ type View = "mine" | "action" | "signed" | "payment" | "all" | "department"
 interface ViewerFlags {
   is_admin: boolean
   is_payment_processor: boolean
-  can_view_schedules?: boolean
+  can_manage_schedules?: boolean
 }
 
 export interface ExtraTab {
@@ -124,11 +123,11 @@ export function RequisitionsListPage({
       return list
     }
     if (surface === "admin") return ["all", "action", "payment"]
-    // Everything company-wide lives in the admin console; a person's page holds only what is theirs.
+    // Like "Needs my signature", a payment officer sees what is waiting on them here too.
     const list: View[] = ["mine", "action", "signed"]
     if (viewer.is_payment_processor) list.push("payment")
     return list
-  }, [surface, viewer])
+  }, [surface, viewer.is_payment_processor])
 
   const [tab, setTab] = useState<string>(surface === "dept" ? "department" : surface === "admin" ? "all" : "mine")
   const [rows, setRows] = useState<Requisition[]>([])
@@ -136,7 +135,6 @@ export function RequisitionsListPage({
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const [previewId, setPreviewId] = useState<string | null>(null)
   const [signing, setSigning] = useState<{
     requisition: Requisition
     viewer: RequisitionViewerActions
@@ -203,16 +201,7 @@ export function RequisitionsListPage({
       sortable: true,
       accessor: (r) => r.requisition_number,
       render: (r) => (
-        <Link
-          href={detailHref(r)}
-          onClick={(e) => {
-            if (!e.metaKey && !e.ctrlKey && e.button === 0) {
-              e.preventDefault()
-              setPreviewId(r.id)
-            }
-          }}
-          className="flex flex-col hover:underline"
-        >
+        <Link href={detailHref(r)} className="flex flex-col hover:underline">
           <span className="text-primary font-mono text-xs font-semibold whitespace-nowrap">{r.requisition_number}</span>
           <span className="text-muted-foreground text-xs whitespace-nowrap">{FORM_LABELS[r.form_type]}</span>
         </Link>
@@ -386,7 +375,7 @@ export function RequisitionsListPage({
         ) : (
           <div className="flex items-center gap-2">
             {headerActions}
-            {viewer.can_view_schedules ? (
+            {surface === "admin" && viewer.can_manage_schedules ? (
               <Button asChild variant="outline" size="sm" aria-label="Payment schedules">
                 <Link href={SCHEDULES_PATH}>
                   <CalendarClock className="h-4 w-4 sm:mr-2" />
@@ -441,7 +430,7 @@ export function RequisitionsListPage({
             render: (r) => (
               <RequisitionRowPanel
                 requisition={r}
-                onOpen={() => setPreviewId(r.id)}
+                onOpen={() => router.push(detailHref(r))}
                 onSign={r.sign_stage_id ? (mode) => void openSign(r, mode) : undefined}
                 onPay={r.can_pay ? () => void openPay(r) : undefined}
               />
@@ -475,7 +464,16 @@ export function RequisitionsListPage({
               onClick: (r) => void openPay(r),
               hidden: (r) => !r.can_pay,
             },
-            { label: "View", icon: Eye, onClick: (r) => setPreviewId(r.id) },
+            {
+              // A Payment Request is paid through a schedule, which lives in the admin area.
+              label: "Add to a schedule",
+              icon: CalendarClock,
+              primary: true,
+              onClick: () => router.push(SCHEDULES_PATH),
+              hidden: (r) =>
+                r.form_type !== "payment_request" || r.status !== "awaiting_payment" || !viewer.is_payment_processor,
+            },
+            { label: "Preview", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
           ]}
           inlineRowActions={tab === "payment"}
           isLoading={isLoading}
@@ -495,8 +493,7 @@ export function RequisitionsListPage({
                 {STATUS_LABELS[r.status]}
               </Badge>
             ),
-            // The detail opens in a slide-over preview drawer, keeping list position intact.
-            onSelect: (r) => setPreviewId(r.id),
+            onSelect: (r) => router.push(detailHref(r)),
           }}
           emptyTitle={
             tab === "action"
@@ -523,11 +520,11 @@ export function RequisitionsListPage({
             <div
               role="button"
               tabIndex={0}
-              onClick={() => setPreviewId(r.id)}
+              onClick={() => router.push(detailHref(r))}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault()
-                  setPreviewId(r.id)
+                  router.push(detailHref(r))
                 }
               }}
               className="bg-card hover:border-primary/40 block h-full cursor-pointer space-y-3 rounded-xl border p-4 text-left shadow-sm transition"
@@ -582,16 +579,6 @@ export function RequisitionsListPage({
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSuccess={(r) => router.push(detailHref(r))}
-      />
-      <RequisitionPreviewSheet
-        requisitionId={previewId}
-        open={Boolean(previewId)}
-        onOpenChange={(open) => !open && setPreviewId(null)}
-        detailBasePath={basePath}
-        onSign={(req, viewerActions, mode) => {
-          setSigning({ requisition: req, viewer: viewerActions, mode })
-        }}
-        onPay={(req, viewerActions) => setPaying({ requisition: req, viewer: viewerActions })}
       />
       <ExportOptionsDialog
         open={isExportOpen}

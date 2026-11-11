@@ -226,7 +226,22 @@ export interface PaymentScheduleItem {
   recorder?: RequisitionPerson | null
   requisition?: Pick<
     Requisition,
-    "id" | "requisition_number" | "department" | "purpose" | "status" | "amount" | "amount_paid" | "user_id"
+    | "id"
+    | "requisition_number"
+    | "department"
+    | "purpose"
+    | "status"
+    | "amount"
+    | "amount_paid"
+    | "user_id"
+    | "form_type"
+    | "created_at"
+    | "stages"
+    | "payments"
+    | "payment_officers"
+    | "unpaid_at"
+    | "unpaid_note"
+    | "unpaid_count"
   > & { requester?: RequisitionPerson | null }
   receipt_url?: string | null
 }
@@ -258,13 +273,17 @@ export interface SchedulableLine {
   department: string
   purpose: string | null
   requester_name: string | null
+  /** When the requisition was raised. */
+  requested_at: string
+  /** The whole requisition's amount, for context beside its lines. */
+  requisition_amount: number
   beneficiary_index: number
   account_name: string
   account_number: string
   bank_name: string
   /** Null when the bank could not be worked out; the officer picks it. */
   bank_code: string | null
-  /** Suggested amount for this line; null when the officer must enter it. */
+  /** What this line pays, fixed by the requisition: never typed in. Null only when a split was never recorded. */
   amount: number | null
   outstanding: number
   unpaid_before: boolean

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { CircleAlert, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, CircleAlert, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -22,18 +22,32 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNaira } from "@/lib/requisitions/format"
 import { NIGERIAN_BANKS } from "@/lib/requisitions/nuban"
 import type { SchedulableLine } from "@/lib/requisitions/types"
+import { cn } from "@/lib/utils"
+import { formatWATDateTime } from "@/lib/utils/date"
 
 const BANK_OPTIONS = NIGERIAN_BANKS.map((b) => ({ value: b.code, label: b.name }))
 
 const lineKey = (l: Pick<SchedulableLine, "requisition_id" | "beneficiary_index">) =>
   `${l.requisition_id}:${l.beneficiary_index}`
 
-interface Picked {
-  amount: string
-  bank_code: string
+interface Group {
+  requisitionId: string
+  number: string
+  requester: string | null
+  department: string
+  purpose: string | null
+  requestedAt: string
+  total: number
+  lines: SchedulableLine[]
 }
 
-/** Pick verified Payment Request lines to put on a draft schedule. */
+/**
+ * Pick verified Payment Requests for a draft schedule. They are grouped by
+ * requisition: the first-level tick takes the whole request, and its lines can
+ * be opened to tick or untick one beneficiary. Amounts are fixed by the
+ * requisition and cannot be changed here. The period filter works on when each
+ * request was raised.
+ */
 export function AddLinesDialog({
   open,
   onOpenChange,
@@ -51,48 +65,80 @@ export function AddLinesDialog({
     enabled: open,
   })
   const lines = useMemo(() => data?.data || [], [data])
-  const [picked, setPicked] = useState<Record<string, Picked>>({})
+  // Selected line key -> the bank, only needed when the requisition's bank could not be worked out.
+  const [picked, setPicked] = useState<Record<string, string>>({})
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (open) {
       setPicked({})
+      setExpanded(new Set())
       setQuery("")
       void refetch()
     }
   }, [open, refetch])
 
-  const shown = lines.filter((l) =>
-    [l.requisition_number, l.account_name, l.requester_name, l.department, l.purpose]
-      .filter(Boolean)
-      .some((v) => String(v).toLowerCase().includes(query.toLowerCase()))
-  )
+  const groups: Group[] = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const byReq = new Map<string, Group>()
+    for (const line of lines) {
+      if (
+        q &&
+        ![line.requisition_number, line.account_name, line.requester_name, line.department, line.purpose]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      ) {
+        continue
+      }
+      const existing = byReq.get(line.requisition_id)
+      if (existing) {
+        existing.lines.push(line)
+        existing.total += Number(line.amount) || 0
+      } else {
+        byReq.set(line.requisition_id, {
+          requisitionId: line.requisition_id,
+          number: line.requisition_number,
+          requester: line.requester_name,
+          department: line.department,
+          purpose: line.purpose,
+          requestedAt: line.requested_at,
+          total: Number(line.amount) || 0,
+          lines: [line],
+        })
+      }
+    }
+    return Array.from(byReq.values()).sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
+  }, [lines, query])
 
-  const toggle = (line: SchedulableLine, on: boolean) =>
+  const selectableLines = groups.flatMap((g) => g.lines.filter((l) => l.amount != null))
+  const chosen = lines.filter((l) => picked[lineKey(l)] !== undefined)
+  const total = chosen.reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
+  const allShownTicked = selectableLines.length > 0 && selectableLines.every((l) => picked[lineKey(l)] !== undefined)
+
+  const setLines = (target: SchedulableLine[], on: boolean) =>
     setPicked((prev) => {
       const next = { ...prev }
-      if (on)
-        next[lineKey(line)] = {
-          amount: line.amount != null ? String(line.amount) : "",
-          bank_code: line.bank_code || "",
-        }
-      else delete next[lineKey(line)]
+      for (const l of target) {
+        if (l.amount == null) continue
+        if (on) next[lineKey(l)] = next[lineKey(l)] ?? l.bank_code ?? ""
+        else delete next[lineKey(l)]
+      }
       return next
     })
 
-  const update = (line: SchedulableLine, patch: Partial<Picked>) =>
-    setPicked((prev) => ({ ...prev, [lineKey(line)]: { ...prev[lineKey(line)], ...patch } }))
-
-  const chosen = lines.filter((l) => picked[lineKey(l)])
-  const total = chosen.reduce((sum, l) => sum + (Number(picked[lineKey(l)].amount) || 0), 0)
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const submit = async () => {
     for (const l of chosen) {
-      const p = picked[lineKey(l)]
-      if (!(Number(p.amount) > 0))
-        return toast.error(`Enter the amount for ${l.account_name} (${l.requisition_number})`)
-      if (!p.bank_code) return toast.error(`Pick the bank for ${l.account_name} (${l.requisition_number})`)
+      if (!picked[lineKey(l)]) return toast.error(`Pick the bank for ${l.account_name} (${l.requisition_number})`)
     }
     setBusy(true)
     try {
@@ -103,8 +149,7 @@ export function AddLinesDialog({
           lines: chosen.map((l) => ({
             requisition_id: l.requisition_id,
             beneficiary_index: l.beneficiary_index,
-            amount: Number(picked[lineKey(l)].amount),
-            ...(l.bank_code ? {} : { bank_code: picked[lineKey(l)].bank_code }),
+            ...(l.bank_code ? {} : { bank_code: picked[lineKey(l)] }),
           })),
         }),
       })
@@ -115,6 +160,7 @@ export function AddLinesDialog({
       onAdded()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not add the payments")
+      void refetch()
     } finally {
       setBusy(false)
     }
@@ -126,81 +172,126 @@ export function AddLinesDialog({
         <DialogHeader>
           <DialogTitle>Add payments</DialogTitle>
           <DialogDescription>
-            Verified Payment Requests not yet paid. Each beneficiary is its own line in the bank file.
+            Verified Payment Requests not yet paid, oldest first. Tick a request to take all its payments, or open it to
+            pick one. Amounts are fixed by the request.
           </DialogDescription>
         </DialogHeader>
 
-        <Input
-          placeholder="Search reference, name, department…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="space-y-2">
+          <Input
+            placeholder="Search reference, name, department…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {selectableLines.length ? (
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+              <Checkbox checked={allShownTicked} onCheckedChange={(v) => setLines(selectableLines, v === true)} />
+              Select everything shown ({selectableLines.length} payment{selectableLines.length === 1 ? "" : "s"})
+            </label>
+          ) : null}
+        </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {isLoading ? (
             <RowsSkeleton rows={4} />
           ) : error ? (
             <p className="text-destructive text-sm">{error instanceof Error ? error.message : "Could not load"}</p>
-          ) : shown.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">Nothing is waiting to be scheduled.</p>
+          ) : groups.length === 0 ? (
+            <p className="text-muted-foreground py-6 text-center text-sm">
+              {lines.length ? "Nothing matches your search." : "Nothing is waiting to be scheduled."}
+            </p>
           ) : (
-            shown.map((line) => {
-              const key = lineKey(line)
-              const p = picked[key]
+            groups.map((group) => {
+              const isOpen = expanded.has(group.requisitionId)
+              const selectable = group.lines.filter((l) => l.amount != null)
+              const ticked = selectable.filter((l) => picked[lineKey(l)] !== undefined).length
+              const state: boolean | "indeterminate" =
+                ticked === 0 ? false : ticked === selectable.length ? true : "indeterminate"
               return (
-                <div key={key} className="rounded-md border p-3">
-                  <label className="flex cursor-pointer items-start gap-3">
+                <div key={group.requisitionId} className="rounded-md border">
+                  <div className="flex items-start gap-3 p-3">
                     <Checkbox
-                      checked={Boolean(p)}
-                      onCheckedChange={(v) => toggle(line, v === true)}
+                      checked={state}
+                      disabled={!selectable.length}
+                      onCheckedChange={(v) => setLines(selectable, v === true)}
                       className="mt-0.5"
+                      aria-label={`Select all of ${group.number}`}
                     />
-                    <div className="min-w-0 flex-1 text-sm">
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left text-sm"
+                      onClick={() => toggleExpanded(group.requisitionId)}
+                      aria-expanded={isOpen}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium">{line.account_name}</span>
-                        <span className="font-mono text-xs">
-                          {line.amount != null ? formatNaira(line.amount) : "Amount to enter"}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        {line.bank_name} · {line.account_number} · {line.requisition_number} · {line.department}
-                        {line.requester_name ? ` · ${line.requester_name}` : ""}
-                      </p>
-                      {line.purpose ? <p className="text-muted-foreground truncate text-xs">{line.purpose}</p> : null}
-                      {line.unpaid_before ? (
-                        <p className="text-danger mt-1 flex items-center gap-1 text-xs">
-                          <CircleAlert className="h-3 w-3" /> Came back unpaid before
-                        </p>
-                      ) : null}
-                    </div>
-                  </label>
-                  {p ? (
-                    <div className="mt-3 grid gap-2 pl-7 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <span className="text-muted-foreground text-xs">
-                          Amount (₦) · up to {formatNaira(line.outstanding)}
-                        </span>
-                        <Input
-                          inputMode="decimal"
-                          value={p.amount}
-                          onChange={(e) => update(line, { amount: e.target.value })}
-                          aria-label={`Amount for ${line.account_name}`}
-                        />
-                      </div>
-                      {line.bank_code ? null : (
-                        <div className="space-y-1">
+                        <span className="flex items-center gap-1.5">
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <span className="text-primary font-mono text-xs font-semibold">{group.number}</span>
                           <span className="text-muted-foreground text-xs">
-                            Bank (&ldquo;{line.bank_name}&rdquo; was typed by hand)
+                            {group.lines.length} payment{group.lines.length === 1 ? "" : "s"}
+                            {ticked ? ` · ${ticked} ticked` : ""}
                           </span>
-                          <SearchableSelect
-                            value={p.bank_code}
-                            onValueChange={(v) => update(line, { bank_code: v })}
-                            options={BANK_OPTIONS}
-                            placeholder="Pick the bank"
-                            searchPlaceholder="Search banks"
-                          />
-                        </div>
-                      )}
+                        </span>
+                        <span className="font-mono text-xs">{formatNaira(group.total)}</span>
+                      </div>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        Requested {formatWATDateTime(group.requestedAt)}
+                        {group.requester ? ` · ${group.requester}` : ""} · {group.department}
+                      </p>
+                      {group.purpose ? (
+                        <p className="text-muted-foreground mt-0.5 truncate text-xs">{group.purpose}</p>
+                      ) : null}
+                    </button>
+                  </div>
+
+                  {isOpen ? (
+                    <div className="space-y-px border-t">
+                      {group.lines.map((line) => {
+                        const key = lineKey(line)
+                        const isPicked = picked[key] !== undefined
+                        return (
+                          <div key={key} className={cn("px-3 py-2 pl-10 text-sm", isPicked && "bg-muted/40")}>
+                            <label className="flex cursor-pointer items-start gap-3">
+                              <Checkbox
+                                checked={isPicked}
+                                disabled={line.amount == null}
+                                onCheckedChange={(v) => setLines([line], v === true)}
+                                className="mt-0.5"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium">{line.account_name}</span>
+                                  <span className="font-mono text-xs">
+                                    {line.amount != null ? formatNaira(line.amount) : "Amount not recorded"}
+                                  </span>
+                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                  {line.bank_name} · {line.account_number}
+                                </p>
+                                {line.unpaid_before ? (
+                                  <p className="text-danger mt-1 flex items-center gap-1 text-xs">
+                                    <CircleAlert className="h-3 w-3" /> Came back unpaid before
+                                  </p>
+                                ) : null}
+                              </div>
+                            </label>
+                            {isPicked && !line.bank_code ? (
+                              <div className="mt-2 space-y-1 pl-7">
+                                <span className="text-muted-foreground text-xs">
+                                  Bank (&ldquo;{line.bank_name}&rdquo; was typed by hand)
+                                </span>
+                                <SearchableSelect
+                                  value={picked[key]}
+                                  onValueChange={(v) => setPicked((prev) => ({ ...prev, [key]: v }))}
+                                  options={BANK_OPTIONS}
+                                  placeholder="Pick the bank"
+                                  searchPlaceholder="Search banks"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })}
                     </div>
                   ) : null}
                 </div>

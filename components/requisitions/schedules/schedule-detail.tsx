@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -27,10 +28,12 @@ import { formatNaira } from "@/lib/requisitions/format"
 import type { PaymentSchedule, PaymentScheduleItem } from "@/lib/requisitions/types"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { useConfirm } from "@/providers/confirm-provider"
-import { SCHEDULES_PATH, STAFF_REQUISITIONS_PATH } from "../requisition-paths"
+import { ADMIN_REQUISITIONS_PATH, SCHEDULES_PATH } from "../requisition-paths"
 import { AddLinesDialog } from "./add-lines-dialog"
 import { ApproveScheduleDialog } from "./approve-schedule-dialog"
 import { OutcomesDialog } from "./outcomes-dialog"
+import { ScheduleGuide } from "./schedule-guide"
+import { ScheduleLinePanel } from "./schedule-line-panel"
 import { OutcomeBadge, ScheduleStatusBadge } from "./schedule-status"
 
 interface DetailResponse {
@@ -45,8 +48,10 @@ interface DetailResponse {
  */
 export function ScheduleDetail({ id }: { id: string }) {
   const confirm = useConfirm()
-  const [adding, setAdding] = useState(false)
-  const [recording, setRecording] = useState(false)
+  // A new schedule opens here with the payments list already up, so it is never an empty page.
+  const searchParams = useSearchParams()
+  const [adding, setAdding] = useState(() => searchParams.get("add") === "1")
+  const [recording, setRecording] = useState(() => searchParams.get("record") === "1")
   const [approving, setApproving] = useState(false)
   const [sending, setSending] = useState(false)
   const { data, isLoading, error, refetch } = useQuery({
@@ -66,22 +71,48 @@ export function ScheduleDetail({ id }: { id: string }) {
 
   const send = async () => {
     const ok = await confirm({
-      title: `Send ${schedule?.schedule_number} to the MD?`,
-      description: `${items.length} payments, ${formatNaira(total)}. Its payments can no longer be changed after this. Download the bank file to give him.`,
-      confirmLabel: "Send to MD",
+      title: `Finalize ${schedule?.schedule_number}?`,
+      description: `${items.length} payments, ${formatNaira(total)}. The list is locked and the bank file is emailed to you to check. The MD is not contacted.`,
+      confirmLabel: "Finalize",
     })
     if (!ok) return
     setSending(true)
     try {
       const res = await apiFetch(`/api/requisitions/schedules/${id}/send`, { method: "POST" })
       const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || "Could not send")
-      toast.success("Sent to the MD")
+      if (!res.ok) throw new Error(json?.error || "Could not finalize")
+      toast.success(
+        json?.emailed
+          ? "Finalized. The bank file is in your email."
+          : "Finalized. The email could not be sent: download the bank file here."
+      )
       await refetch()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send")
+      toast.error(err instanceof Error ? err.message : "Could not finalize")
     } finally {
       setSending(false)
+    }
+  }
+
+  const notifyMd = async () => {
+    const ok = await confirm({
+      title: `Tell the MD ${schedule?.schedule_number} is ready?`,
+      description:
+        "He gets a notice and an email with the bank file attached. Only do this once you have checked the sheet.",
+      confirmLabel: "Notify MD",
+    })
+    if (!ok) return
+    try {
+      const res = await apiFetch(`/api/requisitions/schedules/${id}/notify-md`, { method: "POST" })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error || "Could not notify the MD")
+      toast.success(
+        json?.data?.emailed
+          ? "The MD has been told and emailed the bank file."
+          : "The MD has been told in the app. His email could not be sent."
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not notify the MD")
     }
   }
 
@@ -152,7 +183,7 @@ export function ScheduleDetail({ id }: { id: string }) {
       render: (i) => (
         <div className="min-w-0 text-xs">
           <Link
-            href={`${STAFF_REQUISITIONS_PATH}/${i.requisition_id}`}
+            href={`${ADMIN_REQUISITIONS_PATH}/${i.requisition_id}`}
             className="text-primary font-mono font-semibold"
           >
             {i.requisition?.requisition_number}
@@ -218,11 +249,17 @@ export function ScheduleDetail({ id }: { id: string }) {
                   <Plus className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Add payments</span>
                 </Button>
-                <Button size="sm" onClick={send} disabled={sending || !items.length} aria-label="Send to MD">
+                <Button size="sm" onClick={send} disabled={sending || !items.length} aria-label="Finalize">
                   <Send className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Send to MD</span>
+                  <span className="hidden sm:inline">Finalize</span>
                 </Button>
               </>
+            ) : null}
+            {isOfficer && schedule.status === "sent" && pendingCount ? (
+              <Button variant="outline" size="sm" onClick={notifyMd} aria-label="Notify MD">
+                <Send className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Notify MD</span>
+              </Button>
             ) : null}
             {isOfficer && schedule.status === "sent" && pendingCount ? (
               <Button size="sm" onClick={() => setRecording(true)} aria-label="Record what was paid">
@@ -276,6 +313,14 @@ export function ScheduleDetail({ id }: { id: string }) {
         </StatGrid>
       }
     >
+      {schedule ? (
+        <ScheduleGuide
+          status={schedule.status}
+          hasLines={items.length > 0}
+          pendingCount={pendingCount}
+          awaitingApproval={items.some((i) => i.requisition?.status === "awaiting_approval")}
+        />
+      ) : null}
       <DataTable<PaymentScheduleItem>
         data={items}
         columns={columns}
@@ -286,6 +331,7 @@ export function ScheduleDetail({ id }: { id: string }) {
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(q))
         }
+        expandable={{ render: (i) => <ScheduleLinePanel item={i} /> }}
         rowActions={
           isOfficer && isDraft
             ? [{ label: "Remove", icon: Trash2, variant: "destructive", onClick: (i) => void remove(i) }]

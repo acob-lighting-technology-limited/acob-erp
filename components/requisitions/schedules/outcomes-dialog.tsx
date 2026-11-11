@@ -57,7 +57,7 @@ export function OutcomesDialog({
   const pending = items.filter((i) => i.outcome === "pending")
   // The parent mounts this only while open, so each opening starts fresh.
   const [rows, setRows] = useState<Record<string, Row>>(() =>
-    Object.fromEntries(pending.map((i) => [i.id, { choice: "paid" as Choice, reference: "", note: "", receipt: null }]))
+    Object.fromEntries(pending.map((i) => [i.id, { choice: "skip" as Choice, reference: "", note: "", receipt: null }]))
   )
   const [paidOn, setPaidOn] = useState(todayInLagos())
   const [pin, setPin] = useState("")
@@ -116,6 +116,25 @@ export function OutcomesDialog({
             signers are told.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">Nothing is recorded until you mark it.</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() =>
+              setRows((prev) =>
+                Object.fromEntries(
+                  Object.entries(prev).map(([key, row]) => [key, { ...row, choice: "paid" as Choice }])
+                )
+              )
+            }
+          >
+            Mark all {pending.length} as paid
+          </Button>
+        </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {pending.map((item) => {
