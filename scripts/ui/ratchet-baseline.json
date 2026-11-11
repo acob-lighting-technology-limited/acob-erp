@@ -308,7 +308,7 @@
       "app/admin/accounts/payroll/calculator/view.tsx": 1364,
       "app/admin/communications/_components/communications-composer.tsx": 1033,
       "app/admin/dev/login-logs/dev-login-logs-content.tsx": 1263,
-      "app/admin/hr/attendance/_components/attendance-manager-dialog.tsx": 2591,
+      "app/admin/hr/attendance/_components/attendance-manager-dialog.tsx": 2517,
       "app/admin/hr/attendance/view.tsx": 1181,
       "app/admin/hr/employees/admin-employee-content.tsx": 1457,
       "app/admin/hr/lunch/view.tsx": 2693,

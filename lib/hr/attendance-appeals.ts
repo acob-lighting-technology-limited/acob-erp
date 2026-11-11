@@ -837,10 +837,11 @@ export async function stageAttendanceChange(
     /** Bulk callers send one summary notice per person instead. Default true. */
     notify?: boolean
     /**
-     * A period change (open-ended OOS, exemption) applied as a whole on confirmation
-     * instead of writing this one day. Needs the 20261027120000 migration.
+     * A change applied as a whole on confirmation instead of writing this one day: a period
+     * (open-ended OOS, exemption; 20261027120000 migration) or the removal of a manual record
+     * ("record_removal"; 20261111150000 migration).
      */
-    change?: { kind: "oos_period" | "exemption"; payload: unknown; summary: string }
+    change?: { kind: "oos_period" | "exemption" | "record_removal"; payload: unknown; summary: string }
   }
 ): Promise<StageChangeResult> {
   const { data: pending } = await client
