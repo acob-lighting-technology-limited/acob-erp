@@ -240,7 +240,7 @@ export function EmployeeCalendarView() {
                           <span className="hidden sm:inline">{fullLabel}</span>
                         </Badge>
                         {pendingMd && (
-                          <div className="text-muted-foreground mt-0.5 text-[10px] leading-tight">Pending MD</div>
+                          <div className="text-muted-foreground mt-0.5 text-xs leading-tight">Pending MD</div>
                         )}
                         {timeLabel && (
                           <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">

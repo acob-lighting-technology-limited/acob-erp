@@ -5,7 +5,6 @@ import { getLeaveConfirmationState } from "@/lib/hr/leave-confirmation"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { LeaveContent } from "./leave-content"
-import { parseLeaveTab } from "@/lib/hr/leave-links"
 import { toLocalISODate } from "@/lib/utils/date"
 import type { RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
@@ -319,8 +318,7 @@ async function getLeaveData() {
   }
 }
 
-export default async function LeavePage(props: { searchParams: Promise<{ tab?: string | string[] }> }) {
-  const { tab } = await props.searchParams
+export default async function LeavePage() {
   const data = await getLeaveData()
 
   if ("redirect" in data && data.redirect) {
@@ -339,15 +337,12 @@ export default async function LeavePage(props: { searchParams: Promise<{ tab?: s
 
   return (
     <LeaveContent
-      // A second link to this page (clicked while it is open) must switch tab, so remount.
-      key={parseLeaveTab(tab)}
       currentUserId={leaveData.currentUserId}
       initialRequests={leaveData.requests}
       initialBalances={leaveData.balances}
       initialLeaveTypes={leaveData.leaveTypes}
       initialRelieverOptions={leaveData.relieverOptions}
       initialRelieverDebug={leaveData.relieverDebug}
-      initialTab={parseLeaveTab(tab)}
     />
   )
 }
