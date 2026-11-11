@@ -64,6 +64,9 @@ import { ScheduledTaskBadge, useScheduledSeriesRows } from "@/components/tasks/s
 import { isScheduledTask } from "@/lib/tasks/scheduled-rows"
 import { createSeriesFromForm, isRepeating, showSeriesCreated } from "@/lib/tasks/series-client"
 import { RecurringTaskBadge, recurrenceFilter } from "@/components/tasks/recurring-task-badge"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const ADMIN_TASK_TAB_KEYS = ["tasks", "recurring", "user_plan"] as const satisfies readonly TaskTab[]
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -152,7 +155,7 @@ export function AdminTasksContent({
   userProfile,
   initialGoalId = "",
 }: AdminTasksContentProps) {
-  const [activeTab, setActiveTab] = useState<TaskTab>("tasks")
+  const [activeTab, setActiveTab] = useUrlTab(ADMIN_TASK_TAB_KEYS, "tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   // Recurring series whose next task is not created yet; table rows only, never stats or exports.
   const scheduledRows = useScheduledSeriesRows(tasks)

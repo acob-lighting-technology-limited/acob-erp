@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Building2, Contact, Loader2, Pencil, RefreshCw, UserRound } from "lucide-react"
+import { Building2, Contact, Loader2, Pencil, UserRound } from "lucide-react"
 import { DataTable, DataTablePage, type DataTableColumn } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -98,13 +98,6 @@ export function PayeeRegister() {
       icon={Contact}
       backLink={{ href: SCHEDULES_PATH, label: "Back to payment schedules" }}
       spacing="tight"
-      actionsPlacement="inline-always"
-      actions={
-        <Button variant="outline" size="sm" onClick={() => void refetch()} aria-label="Refresh">
-          <RefreshCw className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
-      }
       stats={
         <StatGrid>
           <StatCard

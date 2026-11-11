@@ -58,6 +58,7 @@ import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
+import { useUrlTab } from "@/hooks/use-url-tab"
 import { approvalStageLabel, getApprovalTimeline, resolvePersonName } from "./_components/approval-timeline"
 import { LeaveOverviewDialog } from "./_components/leave-overview-dialog"
 import { CannotCreateNewRequestDialog } from "./_components/cannot-create-new-request-dialog"
@@ -181,13 +182,12 @@ export function LeaveContent({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOverviewOpen, setIsOverviewOpen] = useState(false)
   /**
-   * "My requests" and "Pending reviews" are two different jobs, not two subsets
-   * of one list: one is leave you asked for, the other is decisions you owe other
-   * people, and they want different columns, different actions and different
-   * metrics above them. That is what a tab is for — folding them into one list
-   * behind a filter option hid the queue from the reliever who had to act on it.
+   * "My requests" and "Pending reviews" are two different jobs, not two subsets of one list: one is
+   * leave you asked for, the other is decisions you owe other people, and they want different columns,
+   * actions and metrics above them. That is what a tab is for: folding them into one list behind a
+   * filter option hid the queue from the reliever who had to act on it. `?tab=` opens one directly.
    */
-  const [activeTab, setActiveTab] = useState<"my-requests" | "reviews" | "reviewed">("my-requests")
+  const [activeTab, setActiveTab] = useUrlTab(["my-requests", "reviews", "reviewed"] as const, "my-requests")
   const isReviewTab = activeTab === "reviews"
   const isReviewedTab = activeTab === "reviewed"
   /** Both review tabs list other people's leave. */
@@ -702,7 +702,7 @@ export function LeaveContent({
       icon={CalendarDays}
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={(tab) => setActiveTab(tab === "reviews" || tab === "reviewed" ? tab : "my-requests")}
+      onTabChange={setActiveTab}
       spacing="tight"
       actionsPlacement="inline-always"
       stats={

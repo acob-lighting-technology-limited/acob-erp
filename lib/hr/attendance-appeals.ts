@@ -708,25 +708,29 @@ export function appealStuckReason(
 }
 
 /**
- * Why `reviewer` may not override `appeal`, or null when they may. Override is the
- * way out of a stuck approval, not a second way to approve: super admins and
- * developers only, and only once the approval is stuck. It needs a reason, is
- * recorded as an override, and tells whoever was skipped.
+ * Why `reviewer` may not override `appeal`, or null when they may. It needs a reason,
+ * is recorded as an override, and tells whoever was skipped. It never waits for a
+ * timer (a payroll cut-off does not), and is never allowed on the reviewer's own record.
+ *
+ * - An admin-side change waiting on the lead (`admin_manual`, pending_lead): whoever
+ *   works on the admin side may override the lead. The Admin & HR department gave them
+ *   that access, so the admin side is already filled and the lead is the only step left.
+ * - Any other pending appeal: super admins and developers only.
  */
 export function overrideBlock(
-  reviewer: Pick<AppealReviewer, "role" | "isAdminLike" | "scopeMode">,
-  appeal: ReviewableAppeal,
-  department: string | null,
-  routing: AppealRoutingContext,
-  now: Date
+  reviewer: Pick<AppealReviewer, "role" | "isAdminLike" | "scopeMode"> & { userId?: string },
+  appeal: ReviewableAppeal
 ): string | null {
-  const isSeniorAdmin = reviewer.role === "super_admin" || reviewer.role === "developer"
-  if (!isSeniorAdmin || reviewer.scopeMode === "lead") return "Only a super admin or developer can override."
-  const stuck = appealStuckReason(appeal, department, routing, now)
-  if (!stuck) {
-    return `Override opens once an approval is stuck: ${STUCK_AFTER_WORKING_DAYS} working days with no decision, or the approver on leave with no delegate.`
+  if (reviewer.userId && appeal.user_id === reviewer.userId) {
+    return "You cannot override the approval of your own attendance."
   }
-  return null
+  if (reviewer.scopeMode === "lead") return "Only someone working from the admin side can override."
+  const stage = appeal.stage || "pending_lead"
+  if (appeal.initiated_by_role === "admin_manual" && stage === "pending_lead") {
+    return reviewer.isAdminLike ? null : "Only someone working from the admin side can override the lead."
+  }
+  const isSeniorAdmin = reviewer.role === "super_admin" || reviewer.role === "developer"
+  return isSeniorAdmin ? null : "Only a super admin or developer can override."
 }
 
 /** The Admin & HR Lead(s) plus anyone they have an active delegation to. */

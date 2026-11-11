@@ -53,6 +53,9 @@ import { RiskFormDialog, type StaffOption } from "./risk-form-dialog"
 import { RiskHeatMap } from "./risk-heat-map"
 import { RiskImportDialog } from "./risk-import-dialog"
 import { TimelineText, describeTimeline } from "./risk-timeline"
+import { useUrlTab } from "@/hooks/use-url-tab"
+
+const RISK_TAB_KEYS = ["register", "heat-map"] as const
 
 interface RiskRegisterViewProps {
   departments: Array<{ name: string; code: string | null }>
@@ -95,7 +98,7 @@ export function RiskRegisterView({
   const canEditCs = useCanEdit("scorecard.main")
   const isAdminLike = adminLikeProp && canEditCs
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState("register")
+  const [tab, setTab] = useUrlTab(RISK_TAB_KEYS, "register")
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<RiskRow | null>(null)
   const [deleting, setDeleting] = useState<RiskRow | null>(null)

@@ -98,7 +98,12 @@ function renderStatusBadge(r: AppealRow) {
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
   const staffAvatars = useStaffAvatars()
-  const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
+  const [reviewAppeal, setReviewAppealRow] = useState<AppealRow | null>(null)
+  const [overrideFirst, setOverrideFirst] = useState(false)
+  const setReviewAppeal = (row: AppealRow | null, withOverride = false) => {
+    setOverrideFirst(withOverride)
+    setReviewAppealRow(row)
+  }
   const statusFilter = "all"
 
   const {
@@ -369,11 +374,18 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         emptyTitle="No appeals found"
         emptyDescription="No attendance appeals match your current filters."
         emptyIcon={FileQuestion}
+        inlineRowActions
         rowActions={[
           {
             label: "Review",
             onClick: (row) => setReviewAppeal(row),
             hidden: (row) => row.status !== "pending",
+          },
+          {
+            label: "Override",
+            variant: "destructive",
+            onClick: (row) => setReviewAppeal(row, true),
+            hidden: (row) => row.status !== "pending" || !row.can_override,
           },
           {
             label: "View Details",
@@ -441,6 +453,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
       <AppealReviewDialog
         appeal={reviewAppeal}
         open={reviewAppeal !== null}
+        startWithOverride={overrideFirst}
         onClose={() => setReviewAppeal(null)}
         onSuccess={() => {
           setReviewAppeal(null)

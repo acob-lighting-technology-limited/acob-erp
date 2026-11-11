@@ -484,7 +484,9 @@ serve(async (req) => {
       supabase
         .from("leave_requests")
         .select("user_id")
-        .eq("status", "approved")
+        // Approved, or cleared everyone before the MD and awaiting only the MD. Keep in sync
+        // with LEAVE_COVERS_ATTENDANCE_OR in lib/hr/leave-attendance-filter.ts (Deno cannot import it).
+        .or("status.eq.approved,and(status.eq.pending,current_stage_code.eq.pending_md)")
         .lte("start_date", today)
         .gte("end_date", today)
         .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),

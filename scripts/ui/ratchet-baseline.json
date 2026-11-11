@@ -22,7 +22,7 @@
       "components/approval-signing/signing-setup.tsx": 2,
       "components/onedrive/file-preview.tsx": 1,
       "components/profile/profile-hero.tsx": 1,
-      "components/requisitions/requisition-document.tsx": 2,
+      "components/requisitions/requisition-document.tsx": 1,
       "components/ui/staff-card-dialog.tsx": 1,
       "lib/correspondence/mailer.ts": 1,
       "lib/help-desk/mailer.ts": 1,
@@ -299,7 +299,7 @@
       "app/lunch/_components/lunch-share-view.tsx": 1
     },
     "file-lines": {
-      "app/(app)/hr/attendance/attendance-content.tsx": 1075,
+      "app/(app)/hr/attendance/attendance-content.tsx": 1072,
       "app/(app)/hr/leave/leave-content.tsx": 1112,
       "app/(app)/hr/lunch/lunch-content.tsx": 1120,
       "app/(app)/reports/action-tracker/page-client.tsx": 1095,

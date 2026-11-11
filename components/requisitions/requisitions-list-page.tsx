@@ -1,10 +1,10 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useQueries } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import {
   Clock,
   Download,
@@ -15,7 +15,6 @@ import {
   Inbox,
   PenLine,
   Plus,
-  RefreshCw,
   Wallet,
   CalendarClock,
   CheckCircle2,
@@ -62,7 +61,6 @@ import { RequisitionRowPanel } from "./requisition-row-panel"
 import { ADMIN_REQUISITIONS_PATH, STAFF_REQUISITIONS_PATH } from "./requisition-paths"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
-import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
 type View = "mine" | "action" | "signed" | "payment" | "all" | "department"
@@ -107,7 +105,7 @@ export function RequisitionsListPage({
   surface: RequisitionsSurface
   deptName?: string
   extraTabs?: ExtraTab[]
-  /** Extra buttons in the page header, before Refresh. */
+  /** Extra buttons in the page header, before the schedules and export buttons. */
   headerActions?: ReactNode
   /** Where a requisition's full page lives. A department console passes its own. */
   detailBasePath?: string
@@ -130,9 +128,6 @@ export function RequisitionsListPage({
   }, [surface, viewer.is_payment_processor])
 
   const [tab, setTab] = useState<string>(surface === "dept" ? "department" : surface === "admin" ? "all" : "mine")
-  const [rows, setRows] = useState<Requisition[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [signing, setSigning] = useState<{
@@ -166,28 +161,31 @@ export function RequisitionsListPage({
   const extra = extraTabs.find((t) => t.tab.key === tab)
   const view = (extra ? null : (tab as View)) as View | null
 
-  const fetchRows = useCallback(async () => {
-    if (!view) return
-    setIsLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({ view })
+  // A query, not a hand-rolled fetch: it refetches when the tab regains focus, so the page needs no Refresh button.
+  const {
+    data: list,
+    isLoading,
+    error: listError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.requisitionList(view, view === "department" ? deptName : null),
+    queryFn: () => {
+      const params = new URLSearchParams({ view: view as View })
       if (view === "department" && deptName) params.set("department", deptName)
-      const res = await apiFetch(`/api/requisitions?${params}`)
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || "Could not load requisitions")
-      setRows(json.data || [])
-      if (json.viewer) setViewer(json.viewer)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load requisitions")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [view, deptName])
+      return apiJson<{ data: Requisition[]; viewer?: ViewerFlags }>(`/api/requisitions?${params}`)
+    },
+    enabled: Boolean(view),
+  })
+  const rows = useMemo(() => (view ? (list?.data ?? []) : []), [view, list])
+  const error = listError instanceof Error ? listError.message : null
+  const fetchRows = () => void refetch()
 
-  useEffect(() => {
-    fetchRows()
-  }, [fetchRows])
+  // The viewer flags ride along with the list; keep the last ones while an extra tab (no list) is open.
+  const [seenList, setSeenList] = useState(list)
+  if (list !== seenList) {
+    setSeenList(list)
+    if (list?.viewer) setViewer(list.viewer)
+  }
 
   const basePath = detailBasePath || (surface === "admin" ? ADMIN_REQUISITIONS_PATH : STAFF_REQUISITIONS_PATH)
   const detailHref = (r: Requisition) => `${basePath}/${r.id}`
@@ -383,10 +381,6 @@ export function RequisitionsListPage({
                 </Link>
               </Button>
             ) : null}
-            <Button variant="outline" size="sm" onClick={fetchRows} aria-label="Refresh">
-              <RefreshCw className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -12,6 +12,7 @@ import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadAttendanceStartDate } from "@/lib/hr/attendance-start"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { LEAVE_COVERS_ATTENDANCE_OR } from "@/lib/hr/leave-attendance-filter"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
       .from("leave_requests")
       .select("start_date, end_date, approved_by")
       .eq("user_id", userId)
-      .eq("status", "approved")
+      .or(LEAVE_COVERS_ATTENDANCE_OR)
       .lte("start_date", monthEnd)
       .gte("end_date", monthStart),
     dataClient
@@ -257,6 +258,7 @@ export async function GET(request: NextRequest) {
       date,
       record: rec,
       status,
+      leave_pending_md: status === "on_leave" || status === "lwop" ? ctx.isLeavePendingMd(userId, date) : false,
       manual_by: manualByDate(date) ?? rec?.editor_first_name ?? null,
       early_closure_time: closeTime,
       late_resumption_time: lateRes,

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { LEAVE_COVERS_ATTENDANCE_OR } from "@/lib/hr/leave-attendance-filter"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
   const { data: leaves } = await db
     .from("leave_requests")
     .select("user_id, leave_type:leave_types(name), start_date, end_date")
-    .eq("status", "approved")
+    .or(LEAVE_COVERS_ATTENDANCE_OR)
     .lte("start_date", meetingDate)
     .gte("end_date", meetingDate)
 

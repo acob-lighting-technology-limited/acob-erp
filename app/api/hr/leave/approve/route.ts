@@ -12,7 +12,9 @@ import {
   notifyUsers,
   syncAttendanceForApprovedLeave,
 } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { getRouteStageByOrder, stageCodeForRole } from "@/lib/hr/leave-routing"
+import { MD_PENDING_STAGE } from "@/lib/hr/leave-attendance-filter"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -489,19 +491,25 @@ export async function PATCH(request: NextRequest) {
       return apiError(`Failed to advance leave request: ${transitionError.message}`, ApiErrorCode.DATABASE_ERROR, 500)
     }
 
-    // 1. Notify Requester of endorsement
+    // 1. Notify Requester of endorsement. Once only the MD is left, say plainly that they may
+    // go: the MD signs off after the fact and attendance already records the leave.
+    const awaitingMdOnly = nextStage.stage_code === MD_PENDING_STAGE
     await notifyUsers(supabaseAdmin, {
       userIds: [leaveRequest.user_id],
-      title: `${leaveStageLabel(stageCode)} approved your leave request`,
-      message: `${actorName} endorsed your leave request at the ${leaveStageLabel(stageCode)} stage. Your request has moved to ${leaveStageLabel(nextStage.stage_code)} for review.`,
+      title: awaitingMdOnly ? "You may proceed on leave" : `${leaveStageLabel(stageCode)} approved your leave request`,
+      message: awaitingMdOnly
+        ? `${actorName} approved your ${leaveTypeName} request (${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) at the ${leaveStageLabel(stageCode)} stage. You may proceed on leave. Only the MD's final sign-off is outstanding, and your attendance already shows these days as leave (pending MD).`
+        : `${actorName} endorsed your leave request at the ${leaveStageLabel(stageCode)} stage. Your request has moved to ${leaveStageLabel(nextStage.stage_code)} for review.`,
       actorId: actorProfileId,
       linkUrl: "/hr/leave",
       entityId: leave_request_id,
       emailEvent: "approval_required",
-      emailSubject: `Leave Request Endorsed at ${leaveStageLabel(stageCode)}${refSuffix}`,
-      emailTitle: `Leave Request Endorsed`,
-      badgeText: "Endorsed — In Progress",
-      badgeVariant: "info",
+      emailSubject: awaitingMdOnly
+        ? `You May Proceed on Leave — MD Sign-off Pending${refSuffix}`
+        : `Leave Request Endorsed at ${leaveStageLabel(stageCode)}${refSuffix}`,
+      emailTitle: awaitingMdOnly ? "You May Proceed on Leave" : `Leave Request Endorsed`,
+      badgeText: awaitingMdOnly ? "Cleared to Proceed — MD Sign-off Pending" : "Endorsed — In Progress",
+      badgeVariant: awaitingMdOnly ? "success" : "info",
       detailsTitle: "Workflow Progress",
       details: [
         { label: "Leave Type", value: leaveTypeName },
@@ -520,7 +528,7 @@ export async function PATCH(request: NextRequest) {
       title: "Leave request awaiting your approval",
       message: `${requesterName} has a leave request for ${leaveTypeName} (${typedLeaveRequest.days_count} day(s), ${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) awaiting your endorsement at ${leaveStageLabel(nextStage.stage_code)}.`,
       actorId: actorProfileId,
-      linkUrl: "/hr/leave",
+      linkUrl: LEAVE_REVIEWS_PATH,
       entityId: leave_request_id,
       emailEvent: "approval_required",
       emailSubject: `Action Required: Leave Request Awaiting Your Approval — ${requesterName}${refSuffix}`,

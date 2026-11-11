@@ -108,7 +108,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return { date, record: rec, status }
+    return {
+      date,
+      record: rec,
+      status,
+      leave_pending_md: status === "on_leave" || status === "lwop" ? ctx.isLeavePendingMd(userId, date) : false,
+    }
   })
 
   return NextResponse.json({ data })

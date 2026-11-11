@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { leadFirstBlock, stageAttendanceChange } from "@/lib/hr/attendance-appeals"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { LEAVE_COVERS_ATTENDANCE_OR } from "@/lib/hr/leave-attendance-filter"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
 import { toLocalISODate, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
@@ -301,7 +302,7 @@ export async function GET(request: NextRequest) {
             .from("leave_requests")
             .select("user_id, leave_type:leave_types!leave_requests_leave_type_id_fkey(is_paid)")
             .in("user_id", missingIds)
-            .eq("status", "approved")
+            .or(LEAVE_COVERS_ATTENDANCE_OR)
             .lte("start_date", day)
             .gte("end_date", day)
             .then((r) => r.data ?? []),

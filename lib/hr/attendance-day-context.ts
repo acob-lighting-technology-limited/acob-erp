@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { toLocalISODate } from "@/lib/hr/attendance-utils"
+import { LEAVE_COVERS_ATTENDANCE_OR, isLeavePendingMd } from "@/lib/hr/leave-attendance-filter"
 
 /**
  * Single source for the "what covers this day" context that attendance status
@@ -21,6 +22,12 @@ export interface DayContext {
    * count against the employee rather than being covered like annual or sick leave.
    */
   isOnUnpaidLeave(userId: string, date: string): boolean
+  /**
+   * The leave covering this day has cleared everyone before the MD and awaits only the MD.
+   * It still counts as leave (isOnLeave is true); this only labels it. A day covered by an
+   * approved request as well is not pending.
+   */
+  isLeavePendingMd(userId: string, date: string): boolean
   /** Period-based exemption only — does NOT include the profile.attendance_exempt flag. */
   isExempt(userId: string, date: string): boolean
   /** Whether the user is an NYSC corps member scheduled for Community Development Service (CDS) on this weekday. */
@@ -50,6 +57,7 @@ export async function loadDayContext(
   const holidayDates = new Set<string>()
   const leaveByUser = new Map<string, Set<string>>()
   const unpaidLeaveByUser = new Map<string, Set<string>>()
+  const approvedLeaveByUser = new Map<string, Set<string>>()
   const exemptByUser = new Map<string, Set<string>>()
   const cdsDayByUser = new Map<string, string>()
   const closureByDate = new Map<string, string>()
@@ -102,9 +110,11 @@ export async function loadDayContext(
       client.from("holiday_calendar").select("holiday_date").gte("holiday_date", start).lte("holiday_date", end),
       client
         .from("leave_requests")
-        .select("user_id, start_date, end_date, leave_type:leave_types!leave_requests_leave_type_id_fkey(is_paid)")
+        .select(
+          "user_id, start_date, end_date, status, current_stage_code, leave_type:leave_types!leave_requests_leave_type_id_fkey(is_paid)"
+        )
         .in("user_id", userIds)
-        .eq("status", "approved")
+        .or(LEAVE_COVERS_ATTENDANCE_OR)
         .lte("start_date", end)
         .gte("end_date", start),
       client
@@ -121,11 +131,17 @@ export async function loadDayContext(
       user_id: string
       start_date: string
       end_date: string
+      status?: string | null
+      current_stage_code?: string | null
       leave_type?: { is_paid?: boolean | null } | null
     }
     for (const lr of (leaves ?? []) as unknown as LeaveRow[]) {
       if (!leaveByUser.has(lr.user_id)) leaveByUser.set(lr.user_id, new Set())
       expandInto(leaveByUser.get(lr.user_id)!, lr.start_date, lr.end_date)
+      if (!isLeavePendingMd(lr)) {
+        if (!approvedLeaveByUser.has(lr.user_id)) approvedLeaveByUser.set(lr.user_id, new Set())
+        expandInto(approvedLeaveByUser.get(lr.user_id)!, lr.start_date, lr.end_date)
+      }
 
       // Only an explicit is_paid = false marks leave unpaid; a missing flag stays paid so a
       // data gap can never silently penalise someone.
@@ -147,6 +163,8 @@ export async function loadDayContext(
     isHoliday: (date) => holidayDates.has(date),
     isOnLeave: (userId, date) => leaveByUser.get(userId)?.has(date) ?? false,
     isOnUnpaidLeave: (userId, date) => unpaidLeaveByUser.get(userId)?.has(date) ?? false,
+    isLeavePendingMd: (userId, date) =>
+      (leaveByUser.get(userId)?.has(date) ?? false) && !(approvedLeaveByUser.get(userId)?.has(date) ?? false),
     isExempt: (userId, date) => exemptByUser.get(userId)?.has(date) ?? false,
     isCdsDay: (userId, date) => {
       const scheduledDay = cdsDayByUser.get(userId)

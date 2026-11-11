@@ -13,6 +13,7 @@ import {
   parseISODate,
   resolveProfileByIdentifier,
 } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { getRemainingDays } from "@/lib/hr/leave-entitlement"
 import {
   buildResolvedRouteSnapshot,
@@ -297,7 +298,7 @@ export async function POST(request: NextRequest) {
           : `${requesterName} submitted a leave request for ${leaveType.name} (${effectiveDays} day(s), ${start_date} to ${endDate}) awaiting your endorsement.`,
         actorId: user.id,
         entityId: newRequest.id,
-        linkUrl: "/hr/leave",
+        linkUrl: LEAVE_REVIEWS_PATH,
         emailSubject: isRelieverStage
           ? `Action Required: Leave Relief Confirmation for ${requesterName}${refSuffix}`
           : `Action Required: Leave Request Awaiting Your Approval — ${requesterName}${refSuffix}`,

@@ -61,6 +61,8 @@ export interface UnifiedDay {
   date: string
   record: DayRecord | null
   status: DayStatus
+  /** Leave that has cleared everyone before the MD and awaits only the MD's decision. */
+  leave_pending_md?: boolean
 }
 
 export interface EmployeeOption {
@@ -330,6 +332,9 @@ export function CalendarView({ employees }: CalendarViewProps) {
                         >
                           {ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status}
                         </Badge>
+                        {day.leave_pending_md && (
+                          <div className="text-muted-foreground mt-0.5 text-xs leading-tight">Pending MD</div>
+                        )}
                         {day.record?.clock_in && (
                           <div className="text-muted-foreground mt-0.5 leading-tight" style={{ fontSize: "10px" }}>
                             {formatTime(day.record.clock_in)}

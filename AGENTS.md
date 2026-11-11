@@ -1176,6 +1176,15 @@ Remaining edge functions still email-only and pending parity work: `send-weekly-
 
 For any leave workflow event, always use `notifyUsers` from `lib/hr/leave-workflow.ts`. It handles delivery policy resolution, channel eligibility, and both email and in-app in one call. Pass `emailEvent` so the correct `p_type` is set per the mapping above.
 
+### Links must open the tab where the reader acts — Mandatory
+
+Every link an email or in-app notification carries (`linkUrl`, `link_url`, `p_link_url`, `ctaPath`, `action_url`) must land on the tab where the reader does the thing it asks. A leave email that said "approve this" once opened **My Requests** because the page kept its tab in component state; relievers and leads could not find what they had been sent to do.
+
+- A page with tabs that anything links to must read `?tab=`. Use `useUrlTab(KEYS, fallback)` from `@/hooks/use-url-tab` for client tab state, or pass a server-parsed `initialTab` (see `lib/hr/leave-links.ts`). Never `useState("first-tab")` on a page a notification can reach.
+- A link that asks someone to **act** points at the action tab: `LEAVE_REVIEWS_PATH` (`/hr/leave?tab=reviews`) for relievers and approvers, `?tab=appeals` for attendance appeals, `?tab=pending` for the HR leave queue.
+- A link to a tabbed page with no `?tab=` is only correct when the first tab is the right landing. Say so in `DEFAULT_TAB_IS_RIGHT` in `lib/notifications/__tests__/link-tabs.test.ts`, with the reason.
+- `npm run test:notification-links` enforces all three. It fails when a tabbed destination ignores `?tab=` or a link to one does not state its tab. A new link to a tabbed page cannot merge without that decision.
+
 ## Email Identity, Routing, and Subjects — Single Source of Truth
 
 **One default sender for automated mail.** Routine automated notifications send as

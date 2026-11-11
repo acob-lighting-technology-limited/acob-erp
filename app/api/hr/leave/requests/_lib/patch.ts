@@ -13,6 +13,7 @@ import {
   parseISODate,
   resolveProfileByIdentifier,
 } from "@/lib/hr/leave-workflow"
+import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { getRemainingDays } from "@/lib/hr/leave-entitlement"
 import {
   buildResolvedRouteSnapshot,
@@ -167,7 +168,7 @@ export async function PATCH(request: NextRequest) {
         message: `${reqName} has designated you as reliever for ${ltName} (${existingRequest.days_count} day(s), ${existingRequest.start_date} to ${existingRequest.end_date}). Review the handover note and confirm coverage so the workflow can proceed.`,
         actorId: user.id,
         entityId: existingRequest.id,
-        linkUrl: "/hr/leave",
+        linkUrl: LEAVE_REVIEWS_PATH,
         emailSubject: `Action Required: Leave Relief Reassigned to You — ${reqName}${refSuffix}`,
         emailTitle: "Leave Relief Confirmation Required",
         badgeText: "Relief Required",
@@ -412,7 +413,7 @@ export async function PATCH(request: NextRequest) {
         message: `${reqName} updated their leave request for ${leaveType.name} (${targetDays} day(s), ${targetStartDate} to ${endDate}). Review the updated details and confirm.`,
         actorId: user.id,
         entityId: updatedRequest.id,
-        linkUrl: "/hr/leave",
+        linkUrl: LEAVE_REVIEWS_PATH,
         emailSubject: isRelieverStage
           ? `Action Required: Updated Leave Relief for ${reqName}${refSuffix}`
           : `Action Required: Updated Leave Request — ${reqName}${refSuffix}`,

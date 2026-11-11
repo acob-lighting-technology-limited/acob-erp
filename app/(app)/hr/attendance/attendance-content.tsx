@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
 import { DeviceStatusDialog } from "@/components/hr/device-status-banner"
@@ -48,6 +48,8 @@ import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useUrlTab } from "@/hooks/use-url-tab"
+import { ATTENDANCE_TABS, ATTENDANCE_TAB_KEYS } from "./attendance-tabs"
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -238,15 +240,10 @@ function isCoveredStatus(status: AttendanceRow["normalizedStatus"]) {
   )
 }
 
-const ATTENDANCE_TABS: DataTableTab[] = [
-  { key: "log", label: "Log" },
-  { key: "calendar", label: "Calendar" },
-]
-
 const EMPTY_APPEALS: AppealRecord[] = []
 
 export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: AttendanceContentProps) {
-  const [activeTab, setActiveTab] = useState<"log" | "calendar">("log")
+  const [activeTab, setActiveTab] = useUrlTab(ATTENDANCE_TAB_KEYS, "log")
   // Current month + the two before it, so the log and filter show history.
   const daysQuery = useQuery({
     queryKey: QUERY_KEYS.myAttendanceRecent(),

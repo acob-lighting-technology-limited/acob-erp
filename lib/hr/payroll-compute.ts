@@ -14,6 +14,7 @@ import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadAttendanceStartDates } from "@/lib/hr/attendance-start"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { LEAVE_COVERS_ATTENDANCE_OR } from "@/lib/hr/leave-attendance-filter"
 import {
   calculatePayroll,
   countUnpaidLeaveDays,
@@ -59,7 +60,7 @@ export async function loadUnpaidLeaveDays(
     .from("leave_requests")
     .select("user_id, start_date, end_date, leave_type:leave_types!leave_requests_leave_type_id_fkey(is_paid)")
     .in("user_id", userIds)
-    .eq("status", "approved")
+    .or(LEAVE_COVERS_ATTENDANCE_OR)
     .lte("start_date", period.end_date)
     .gte("end_date", period.start_date)
 
