@@ -19,6 +19,7 @@ export const DEPT_MIRRORED_PATHS: readonly string[] = [
   "/accounts/payments",
   "/accounts/reports",
   "/accounts/requisitions",
+  "/accounts/requisitions/[id]",
   "/assets",
   "/assets/issues",
   "/communications",
