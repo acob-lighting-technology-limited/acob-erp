@@ -111,9 +111,11 @@ export function RequisitionRowPanel({
               <Check className="h-4 w-4" /> Sign
             </Button>
           )}
-          <Button variant="destructive" onClick={() => onSign("reject")} className="gap-2">
-            <X className="h-4 w-4" /> Reject
-          </Button>
+          {r.status === "pending" ? (
+            <Button variant="destructive" onClick={() => onSign("reject")} className="gap-2">
+              <X className="h-4 w-4" /> Reject
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

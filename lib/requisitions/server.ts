@@ -30,7 +30,7 @@ export const REQUISITION_DOCUMENTS_BUCKET = "requisition_documents"
 
 const PERSON = "id, full_name, department, designation"
 
-export const REQUISITION_LIST_SELECT = `
+const REQUISITION_BASE_SELECT = `
   *,
   requester:profiles!requisitions_user_id_fkey(id, full_name, department, designation, company_email),
   stages:requisition_stages(
@@ -41,8 +41,17 @@ export const REQUISITION_LIST_SELECT = `
   )
 `
 
+// List rows also carry who recorded each payment and when, for the route's Payment block.
+export const REQUISITION_LIST_SELECT = `
+  ${REQUISITION_BASE_SELECT},
+  payments:requisition_payments(
+    id, amount, paid_on, recorded_by, created_at,
+    recorder:profiles!requisition_payments_recorded_by_fkey(${PERSON})
+  )
+`
+
 const REQUISITION_DETAIL_SELECT = `
-  ${REQUISITION_LIST_SELECT},
+  ${REQUISITION_BASE_SELECT},
   amount_changes:requisition_amount_changes(
     id, stage_id, changed_by, old_amount, new_amount, old_line_items, new_line_items, reason, created_at,
     changer:profiles!requisition_amount_changes_changed_by_fkey(${PERSON})
@@ -232,11 +241,25 @@ export async function withSignedUrls(admin: SupabaseClient, req: Requisition): P
   return { ...req, attachments, stages, payments, payment_officers, requester_signature_url: requesterSignatureUrl }
 }
 
+/**
+ * Whether a stage can be signed in the requisition's current status. A Payment
+ * Request's Approved stage (the MD) waits until it has been paid; while it is in
+ * approval, everything else can be. Mirrors requisition_sign.
+ */
+export function isStageOpen(
+  req: Pick<Requisition, "form_type" | "status">,
+  stage: Pick<RequisitionStage, "stage_code">
+) {
+  if (req.form_type !== "payment_request") return req.status === "pending"
+  if (req.status === "awaiting_approval") return stage.stage_code === "approved"
+  return req.status === "pending" && stage.stage_code !== "approved"
+}
+
 /** The stage a person would sign now, and what signing it would bypass. Mirrors requisition_sign. */
 export function findSignableStage(req: Requisition, userId: string) {
-  if (req.status !== "pending" || req.user_id === userId) return null
+  if ((req.status !== "pending" && req.status !== "awaiting_approval") || req.user_id === userId) return null
   const stages = [...(req.stages || [])].sort((a, b) => a.position - b.position)
-  const stage = stages.find((s) => s.state === "pending" && s.assignee_id === userId)
+  const stage = stages.find((s) => s.state === "pending" && s.assignee_id === userId && isStageOpen(req, s))
   if (!stage) return null
   const bypassed = stages.filter((s) => s.state === "pending" && s.position < stage.position)
   return { stage, bypassed }
@@ -248,7 +271,9 @@ export async function getViewerActions(
   viewer: ViewerContext
 ): Promise<RequisitionViewerActions> {
   const signable = findSignableStage(req, viewer.userId)
+  // Payment Requests are paid through payment schedules, not one at a time.
   const canPay =
+    req.form_type === "petty_cash" &&
     viewer.paymentFormTypes.includes(req.form_type) &&
     req.user_id !== viewer.userId &&
     (req.status === "awaiting_payment" || req.status === "partly_paid")
@@ -256,12 +281,18 @@ export async function getViewerActions(
     sign_stage_id: signable?.stage.id ?? null,
     would_bypass_stage_ids: signable?.bypassed.map((s) => s.id) ?? [],
     can_record_payment: canPay,
+    // Once a Payment Request is paid the MD only signs it off; there is nothing left to reject.
+    can_reject: Boolean(signable) && req.status === "pending",
     signing_setup_missing: signable || canPay ? await getMissingSetup(admin, viewer.userId) : [],
   }
 }
 
 /** The pending stage a requisition is waiting on (null when nothing is pending). */
 export function currentStage(req: Requisition): RequisitionStage | null {
-  if (req.status !== "pending") return null
-  return [...(req.stages || [])].sort((a, b) => a.position - b.position).find((s) => s.state === "pending") || null
+  if (req.status !== "pending" && req.status !== "awaiting_approval") return null
+  return (
+    [...(req.stages || [])]
+      .sort((a, b) => a.position - b.position)
+      .find((s) => s.state === "pending" && isStageOpen(req, s)) || null
+  )
 }

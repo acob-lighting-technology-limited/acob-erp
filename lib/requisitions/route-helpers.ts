@@ -8,6 +8,8 @@ import { SigningError } from "@/lib/approval-signing/server"
 import { signingErrorResponse } from "@/lib/approval-signing/route"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { canAccessAdminSection, isAdminLikeRole } from "@/lib/admin/rbac"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { getViewerContext } from "./server"
 
 const log = logger("requisitions-api")
 
@@ -40,6 +42,18 @@ const RPC_ERRORS: Record<string, [number, string]> = {
   not_a_payment_processor: [403, "You are not set up to record payments."],
   payment_amount_invalid: [400, "Enter an amount greater than zero."],
   payment_exceeds_outstanding: [400, "That is more than is still owed on this requisition."],
+  amount_locked_after_payment: [409, "This has been paid, so its amount can no longer change."],
+  schedule_payment_requests_only: [409, "Payment Requests are paid through a payment schedule."],
+  schedule_not_found: [404, "Payment schedule not found."],
+  schedule_not_draft: [409, "This schedule has been sent, so its lines can no longer change."],
+  schedule_not_sent: [409, "Send the schedule to the MD before recording what was paid."],
+  schedule_empty: [400, "Add at least one payment to the schedule first."],
+  schedule_line_invalid: [400, "That beneficiary line does not exist on the requisition."],
+  schedule_line_already_scheduled: [409, "That line is already on a schedule or already paid."],
+  schedule_line_not_pending: [409, "That line already has an outcome. Refresh to see it."],
+  schedule_outcomes_required: [400, "Mark at least one line as paid or not paid."],
+  schedule_outcome_invalid: [400, "Mark each line as paid or not paid."],
+  payee_not_found: [404, "Payee not found."],
 }
 
 export function requisitionErrorResponse(err: unknown, context: string) {
@@ -75,4 +89,10 @@ export async function canManageRequisitionSettings(): Promise<boolean> {
   const scope = await getRequestScope()
   if (!scope) return false
   return isAdminLikeRole(scope.role) && canAccessAdminSection(scope, "finance")
+}
+
+/** Payment Request officers and finance admins keep the payee register. */
+export async function canManagePayees(userId: string, admin: SupabaseClient): Promise<boolean> {
+  const viewer = await getViewerContext(admin, userId)
+  return viewer.paymentFormTypes.includes("payment_request") || (await canManageRequisitionSettings())
 }

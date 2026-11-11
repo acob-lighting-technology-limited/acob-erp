@@ -18,6 +18,7 @@ import { RequisitionAttachments } from "./requisition-attachments"
 import { RequisitionDocument } from "./requisition-document"
 import { RequisitionStageList, when } from "./requisition-stage-list"
 import { PaymentDialog } from "./payment-dialog"
+import { UnpaidNotice } from "./unpaid-tag"
 import { SignDialog, type SignMode } from "./sign-dialog"
 
 import { LinesSkeleton } from "@/components/skeletons"
@@ -32,8 +33,12 @@ export function statusBadgeClass(status: Requisition["status"]) {
       return "border-success/30 bg-success/15 text-success"
     case "awaiting_payment":
       return "border-info/30 bg-info/15 text-info"
-    case "partly_paid":
+    case "scheduled":
       return "border-primary/30 bg-primary/15 text-primary"
+    case "partly_paid":
+      return "border-info/40 bg-transparent text-info"
+    case "awaiting_approval":
+      return "border-success/40 bg-transparent text-success"
     default:
       return "border-warning/30 bg-warning/15 text-warning"
   }
@@ -133,6 +138,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
             <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
           ) : null}
         </div>
+        <UnpaidNotice requisition={requisition} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -162,9 +168,11 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
                     ) : (
                       <Button onClick={() => setSignMode("sign")}>Sign</Button>
                     )}
-                    <Button variant="outline" onClick={() => setSignMode("reject")}>
-                      Reject
-                    </Button>
+                    {viewer.can_reject ? (
+                      <Button variant="outline" onClick={() => setSignMode("reject")}>
+                        Reject
+                      </Button>
+                    ) : null}
                   </>
                 ) : null}
                 {viewer.can_record_payment ? (

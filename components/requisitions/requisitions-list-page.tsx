@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Wallet,
+  CalendarClock,
   CheckCircle2,
   XCircle,
 } from "lucide-react"
@@ -56,6 +57,8 @@ import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeClass } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
+import { SCHEDULES_PATH } from "./requisition-paths"
+import { UnpaidTag } from "./unpaid-tag"
 import { RequisitionRowPanel } from "./requisition-row-panel"
 import { ADMIN_REQUISITIONS_PATH, STAFF_REQUISITIONS_PATH } from "./requisition-paths"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -68,6 +71,7 @@ type View = "mine" | "action" | "signed" | "payment" | "all" | "department"
 interface ViewerFlags {
   is_admin: boolean
   is_payment_processor: boolean
+  can_view_schedules?: boolean
 }
 
 export interface ExtraTab {
@@ -255,7 +259,8 @@ export function RequisitionsListPage({
           <Badge variant="outline" className={cn(statusBadgeClass(r.status), "w-fit text-xs")}>
             {STATUS_LABELS[r.status]}
           </Badge>
-          {r.status === "pending" || r.status === "partly_paid" ? (
+          {r.unpaid_at ? <UnpaidTag requisition={r} /> : null}
+          {r.status === "pending" || r.status === "partly_paid" || r.status === "awaiting_approval" ? (
             <span className="text-muted-foreground truncate text-xs" title={progressLabel(r)}>
               {progressLabel(r)}
             </span>
@@ -351,7 +356,7 @@ export function RequisitionsListPage({
             <StatCard
               variant="compact"
               title="Awaiting payment"
-              value={count("awaiting_payment") + count("partly_paid")}
+              value={count("awaiting_payment") + count("scheduled") + count("partly_paid")}
               icon={Wallet}
               iconBgColor="bg-blue-500/10"
               iconColor="text-blue-500"
@@ -359,7 +364,7 @@ export function RequisitionsListPage({
             <StatCard
               variant="compact"
               title="Paid"
-              value={count("paid")}
+              value={count("paid") + count("awaiting_approval")}
               icon={CheckCircle2}
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
@@ -381,6 +386,14 @@ export function RequisitionsListPage({
         ) : (
           <div className="flex items-center gap-2">
             {headerActions}
+            {viewer.can_view_schedules ? (
+              <Button asChild variant="outline" size="sm" aria-label="Payment schedules">
+                <Link href={SCHEDULES_PATH}>
+                  <CalendarClock className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Payment schedules</span>
+                </Link>
+              </Button>
+            ) : null}
             <Button variant="outline" size="sm" onClick={fetchRows} aria-label="Refresh">
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>
@@ -452,7 +465,8 @@ export function RequisitionsListPage({
               icon: XCircle,
               variant: "destructive",
               onClick: (r) => void openSign(r, "reject"),
-              hidden: (r) => !r.sign_stage_id,
+              // A paid Payment Request is only signed off, never rejected.
+              hidden: (r) => !r.sign_stage_id || r.status !== "pending",
             },
             {
               label: "Record payment",

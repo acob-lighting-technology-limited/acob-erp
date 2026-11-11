@@ -17,6 +17,7 @@ import {
   loadRequisition,
   loadRoutingLeads,
 } from "@/lib/requisitions/server"
+import { scheduleAccess } from "@/lib/requisitions/schedules"
 import { isOwnUploadPath, requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
 import type { Requisition } from "@/lib/requisitions/types"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -47,7 +48,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const viewer = await getViewerContext(admin, user.id)
-    const viewerFlags = { is_admin: viewer.isAdminLike, is_payment_processor: viewer.paymentFormTypes.length > 0 }
+    const access = await scheduleAccess(admin, viewer)
+    const viewerFlags = {
+      is_admin: viewer.isAdminLike,
+      is_payment_processor: viewer.paymentFormTypes.length > 0,
+      can_view_schedules: access.canView,
+    }
     const empty = () => NextResponse.json({ data: [], viewer: viewerFlags })
     let query = admin.from("requisitions").select(REQUISITION_LIST_SELECT).order("created_at", { ascending: false })
 
@@ -62,7 +68,8 @@ export async function GET(request: NextRequest) {
       if (error) throw error
       const ids = Array.from(new Set((stages || []).map((s) => s.requisition_id as string)))
       if (!ids.length) return empty()
-      query = query.in("id", ids).eq("status", "pending").neq("user_id", user.id)
+      // In approval, or (Payment Requests) paid and waiting for the MD's Approved signature.
+      query = query.in("id", ids).in("status", ["pending", "awaiting_approval"]).neq("user_id", user.id)
     } else if (view === "signed") {
       const [{ data: acted, error: actedError }, { data: paid, error: paidError }] = await Promise.all([
         admin.from("requisition_stages").select("requisition_id").eq("acted_by", user.id),
@@ -77,7 +84,7 @@ export async function GET(request: NextRequest) {
       // Each officer's queue holds only the forms they were chosen for.
       if (!viewer.paymentFormTypes.length) return empty()
       query = query
-        .in("status", ["awaiting_payment", "partly_paid"])
+        .in("status", ["awaiting_payment", "scheduled", "partly_paid"])
         .in("form_type", viewer.paymentFormTypes)
         .neq("user_id", user.id)
     } else if (view === "all") {
@@ -100,14 +107,18 @@ export async function GET(request: NextRequest) {
     const rows = (data || []).map((req) => ({
       ...req,
       payment_officers: officers[req.form_type] ?? [],
+      // Payment Requests are paid through payment schedules.
       can_pay:
+        req.form_type === "petty_cash" &&
         viewer.paymentFormTypes.includes(req.form_type) &&
         req.user_id !== user.id &&
         (req.status === "awaiting_payment" || req.status === "partly_paid"),
       stages: [...(req.stages || [])].sort((a, b) => a.position - b.position),
       sign_stage_id: findSignableStage(req, user.id)?.stage.id ?? null,
     }))
-    return NextResponse.json({ data: rows, viewer: viewerFlags })
+    // "Needs my signature" lists only what the viewer can sign now.
+    const visible = view === "action" ? rows.filter((r) => r.sign_stage_id) : rows
+    return NextResponse.json({ data: visible, viewer: viewerFlags })
   } catch (err) {
     return requisitionErrorResponse(err, "Failed to list requisitions")
   }

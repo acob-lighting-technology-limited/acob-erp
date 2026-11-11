@@ -10,7 +10,9 @@ export function formatNaira(value: number | string | null | undefined): string {
 export const STATUS_LABELS: Record<RequisitionStatus, string> = {
   pending: "In approval",
   awaiting_payment: "Awaiting payment",
+  scheduled: "Scheduled for payment",
   partly_paid: "Partly paid",
+  awaiting_approval: "Paid · awaiting approval",
   paid: "Paid",
   rejected: "Rejected",
 }
@@ -22,6 +24,10 @@ export function stageTitle(stage: Pick<RequisitionStage, "stage_code" | "role_la
 
 /** One line saying where a requisition is: the stage it waits on, or its status. */
 export function progressLabel(req: Requisition): string {
+  if (req.status === "awaiting_approval") {
+    const md = (req.stages || []).find((s) => s.stage_code === "approved" && s.state === "pending")
+    return `Paid · to approve: ${md?.assignee?.full_name || "MD"}`
+  }
   if (req.status !== "pending") {
     if (req.status === "partly_paid")
       return `Partly paid: ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)}`

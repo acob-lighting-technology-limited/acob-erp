@@ -280,6 +280,11 @@ export const QUERY_KEYS = {
 
   // Requisitions
   requisition: (id: string) => ["requisition", id],
+  requisitionSchedules: () => ["requisition-schedules"],
+  requisitionSchedule: (id: string) => ["requisition-schedule", id],
+  requisitionSchedulePool: () => ["requisition-schedule-pool"],
+  requisitionPayees: () => ["requisition-payees"],
+  requisitionSavedPayees: () => ["requisition-saved-payees"],
 
   // Payroll
   payrollPeriods: () => ["payroll-periods"],
