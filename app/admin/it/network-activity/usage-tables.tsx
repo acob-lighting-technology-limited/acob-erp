@@ -52,7 +52,7 @@ export function UsageByPersonTable({
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{r.staffName ?? r.username}</span>
             {isSharedLogin(r.username) && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Shared login
               </Badge>
             )}
