@@ -34,6 +34,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailSheet } from "./_components/leave-detail-sheet"
 import { LeaveTypeBadge } from "./_components/leave-type-badge"
+import { formatLeavePeriod } from "./_components/leave-period"
 import {
   LeaveApprovalStages,
   LeaveAttachments,
@@ -487,10 +488,8 @@ export function LeaveApprovePage({
         label: "Period",
         accessor: (r) => `${r.start_date} to ${r.end_date}`,
         render: (r) => (
-          <div className="flex flex-col text-xs">
-            <span>
-              {r.start_date} to {r.end_date}
-            </span>
+          <div className="flex flex-col text-xs whitespace-nowrap">
+            <span>{formatLeavePeriod(r.start_date, r.end_date)}</span>
             <span className="text-muted-foreground">{r.days_count} day(s)</span>
           </div>
         ),
