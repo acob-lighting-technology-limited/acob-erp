@@ -16,6 +16,8 @@ export type RequisitionStatus =
   | "awaiting_approval"
   | "paid"
   | "rejected"
+  /** Replaced by a new requisition with the other form type, before anyone signed. */
+  | "cancelled"
 
 export type RequisitionStageCode = "reviewed" | "authorized" | "verified" | "approved"
 

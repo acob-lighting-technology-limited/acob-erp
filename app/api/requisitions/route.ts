@@ -15,6 +15,7 @@ import {
   getViewerContext,
   loadPaymentOfficers,
   loadRequisition,
+  isUntouched,
   loadRoutingLeads,
 } from "@/lib/requisitions/server"
 import { scheduleAccess } from "@/lib/requisitions/schedules"
@@ -108,7 +109,8 @@ export async function GET(request: NextRequest) {
       ...req,
       payment_officers: officers[req.form_type] ?? [],
       // The requester can update a rejected form: edit it and resubmit, or convert it.
-      can_update: req.user_id === user.id && req.status === "rejected",
+      can_update:
+        req.user_id === user.id && (req.status === "rejected" || (req.status === "pending" && isUntouched(req))),
       // Payment Requests are paid through payment schedules.
       can_pay:
         req.form_type === "petty_cash" &&
@@ -181,14 +183,15 @@ export async function POST(request: NextRequest) {
       project = data
     }
 
-    // Converting a rejected requisition: it must be the requester's, rejected, and changed to the other form type.
+    // Converting or switching: the source must be the requester's, rejected or still untouched, and changed to the other form type.
     if (input.converted_from_id) {
       const source = await loadRequisition(admin, input.converted_from_id)
       if (!source || source.user_id !== user.id) {
         return apiError("That requisition was not found", ApiErrorCode.NOT_FOUND, 404)
       }
-      if (source.status !== "rejected") {
-        return apiError("Only a rejected requisition can be converted", ApiErrorCode.VALIDATION_ERROR, 409)
+      const switchable = source.status === "pending" && isUntouched(source)
+      if (source.status !== "rejected" && !switchable) {
+        return apiError("Only a rejected or unsigned requisition can be converted", ApiErrorCode.VALIDATION_ERROR, 409)
       }
       if (source.form_type === input.form_type) {
         return apiError("Pick the other form type to convert it", ApiErrorCode.VALIDATION_ERROR, 400)
@@ -235,6 +238,17 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     const id = (created as { id: string }).id
+
+    // A switched unsigned requisition is cancelled by its replacement. A rejected one stays rejected.
+    if (input.converted_from_id) {
+      const { error: cancelError } = await admin
+        .from("requisitions")
+        .update({ status: "cancelled" })
+        .eq("id", input.converted_from_id)
+        .eq("status", "pending")
+      if (cancelError) throw cancelError
+    }
+
     const req = await loadRequisition(admin, id)
     if (req) {
       await notifyRequisitionEvent(admin, { kind: "submitted", req })
