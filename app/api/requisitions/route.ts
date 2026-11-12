@@ -239,13 +239,13 @@ export async function POST(request: NextRequest) {
 
     const id = (created as { id: string }).id
 
-    // A switched unsigned requisition is cancelled by its replacement. A rejected one stays rejected.
+    // The replacement cancels the original: an unsigned one, or a rejected one that is converted.
     if (input.converted_from_id) {
       const { error: cancelError } = await admin
         .from("requisitions")
         .update({ status: "cancelled" })
         .eq("id", input.converted_from_id)
-        .eq("status", "pending")
+        .in("status", ["pending", "rejected"])
       if (cancelError) throw cancelError
     }
 

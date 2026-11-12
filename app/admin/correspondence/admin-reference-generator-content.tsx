@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { DetailList, SectionHeading } from "@/components/ui/detail-list"
 import { Button } from "@/components/ui/button"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import {
@@ -570,32 +571,26 @@ export function AdminReferenceGeneratorContent({
         ]}
         expandable={{
           render: (r) => (
-            <div className="grid gap-3 md:grid-cols-2">
-              <p className="text-sm md:col-span-2">
-                <span className="text-muted-foreground">Subject:</span> {r.subject}
-              </p>
-              <p className="text-sm">
-                <span className="text-muted-foreground">Department:</span>{" "}
-                {r.department_name || r.assigned_department_name || "-"}
-              </p>
-              <p className="text-sm">
-                <span className="text-muted-foreground">Recipient:</span> {r.recipient_name || "-"}
-                {r.recipient_code ? ` (${r.recipient_code})` : ""}
-              </p>
-              <p className="text-sm">
-                <span className="text-muted-foreground">Requested by:</span> {r.sender_name || "-"}
-              </p>
-              {r.created_by_name && r.created_by_name !== r.sender_name && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Created by:</span> {r.created_by_name}
-                </p>
-              )}
-              <p className="text-sm">
-                <span className="text-muted-foreground">Due Date:</span> {r.due_date || "-"}
-              </p>
-              <p className="text-sm">
-                <span className="text-muted-foreground">Action Required:</span> {r.action_required ? "Yes" : "No"}
-              </p>
+            <div className="space-y-3">
+              <SectionHeading title="Correspondence" />
+              <DetailList
+                items={[
+                  { label: "Subject", value: r.subject, wide: true },
+                  { label: "Department", value: r.department_name || r.assigned_department_name || null },
+                  {
+                    label: "Recipient",
+                    value: r.recipient_name
+                      ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
+                      : null,
+                  },
+                  { label: "Requested by", value: r.sender_name || null },
+                  ...(r.created_by_name && r.created_by_name !== r.sender_name
+                    ? [{ label: "Created by", value: r.created_by_name }]
+                    : []),
+                  { label: "Due date", value: r.due_date || null },
+                  { label: "Action required", value: r.action_required ? "Yes" : "No" },
+                ]}
+              />
             </div>
           ),
         }}
