@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { PETTY_CASH_MAX, lineItemsTotal } from "@/lib/requisitions/limits"
+import { amountOutOfRangeMessage, lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { verifyActionPin } from "@/lib/approval-signing/server"
@@ -226,9 +226,8 @@ export async function POST(request: NextRequest) {
         beneficiary_details: confirmed.beneficiaries,
         requester_signature_path: requesterSignaturePath,
         attachments: input.attachments || [],
-        // Only a petty cash voucher above the cap carries an exception reason.
-        exception_reason:
-          input.form_type === "petty_cash" && amount > PETTY_CASH_MAX ? (input.exception_reason ?? null) : null,
+        // Only an amount outside its form's range carries an exception reason.
+        exception_reason: amountOutOfRangeMessage(input.form_type, amount) ? (input.exception_reason ?? null) : null,
         converted_from_id: input.converted_from_id ?? null,
       },
       p_stages: stages,

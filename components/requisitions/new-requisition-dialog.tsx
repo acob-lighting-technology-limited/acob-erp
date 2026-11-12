@@ -152,7 +152,16 @@ export function NewRequisitionDialog({
     if (!open) return
     // Editing starts from the form as it is; converting starts from the rejected one, in the form type picked next.
     const from = editing ?? convertFrom ?? null
-    setFormType(editing ? editing.form_type : null)
+    // Converting goes straight to the other form type; the user only changes it with Back.
+    setFormType(
+      editing
+        ? editing.form_type
+        : convertFrom
+          ? convertFrom.form_type === "petty_cash"
+            ? "payment_request"
+            : "petty_cash"
+          : null
+    )
     setCostCategory(from?.project_name ? "admin" : "operational")
     setSelectedProjectId("")
     setCustomProjectName("")
@@ -270,7 +279,8 @@ export function NewRequisitionDialog({
     [formType, lines, amount]
   )
   const rangeProblem = formType && total > 0 ? amountOutOfRangeMessage(formType, total) : null
-  const isException = formType === "petty_cash" && total > PETTY_CASH_MAX
+  // Outside the form's usual range (petty cash above the cap, or a Payment Request below the minimum): an exception.
+  const isException = rangeProblem !== null
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
   const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
   const showSplit = beneficiaries.length > 1
@@ -461,6 +471,7 @@ export function NewRequisitionDialog({
             project_name: resolvedProjectName,
             purpose: purpose.trim(),
             amount: parseNaira(amount),
+            ...(isException && exceptionOn ? { exception_reason: exceptionReason.trim() } : {}),
             ...common,
           }
 
@@ -654,7 +665,7 @@ export function NewRequisitionDialog({
                       checked={exceptionOn}
                       onChange={(e) => setExceptionOn(e.target.checked)}
                     />
-                    <span>This is an exception: it is above the petty cash limit</span>
+                    <span>This is an exception: the amount is outside this form&rsquo;s usual range</span>
                   </label>
                   {exceptionOn ? (
                     <div className="space-y-1.5">

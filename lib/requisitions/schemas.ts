@@ -121,11 +121,19 @@ export const PaymentRequestSchema = z
     project_name: z.string().trim().min(1, "Project is required").max(200),
     purpose: z.string().trim().min(3, "Purpose must be at least 3 characters").max(2000),
     amount: money,
+    /** Required when the amount is under the Payment Request minimum: the requester ticks "exception" and says why. */
+    exception_reason: z.string().trim().max(500, "Keep the exception reason under 500 characters").optional(),
     ...CommonFields,
   })
   .superRefine((value, ctx) => {
     const range = amountOutOfRangeMessage("payment_request", value.amount)
-    if (range) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["amount"], message: range })
+    if (range && (value.exception_reason?.length ?? 0) < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: `${range} Or tick exception and say why (at least 10 characters).`,
+      })
+    }
     if (value.beneficiary_details.length > MAX_BENEFICIARIES.payment_request) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
