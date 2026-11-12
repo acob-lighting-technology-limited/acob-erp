@@ -13,6 +13,7 @@ import {
   FileCheck2,
   History,
   Inbox,
+  Pencil,
   PenLine,
   Plus,
   Wallet,
@@ -34,7 +35,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { apiJson } from "@/lib/api-client"
 import { toast } from "sonner"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDateTime } from "@/lib/utils/date"
 import { exportRequisitionsToExcel, exportRequisitionsToPDF } from "@/lib/requisitions/export"
 import {
   STATUS_LABELS,
@@ -52,6 +53,7 @@ import type {
   RequisitionViewerActions,
 } from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
+import { UpdateRejectedDialog } from "./update-rejected-dialog"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeClass } from "./requisition-detail"
@@ -129,6 +131,9 @@ export function RequisitionsListPage({
 
   const [tab, setTab] = useState<string>(surface === "dept" ? "department" : surface === "admin" ? "all" : "mine")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  // A rejected row: first choose edit-and-resubmit or convert, then the form opens.
+  const [updateRow, setUpdateRow] = useState<Requisition | null>(null)
+  const [updateChoice, setUpdateChoice] = useState<"edit" | "convert" | null>(null)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [signing, setSigning] = useState<{
     requisition: Requisition
@@ -262,9 +267,9 @@ export function RequisitionsListPage({
       sortable: true,
       accessor: (r) => r.created_at,
       render: (r) => (
-        <span className="text-muted-foreground text-xs whitespace-nowrap">{formatWATDate(r.created_at)}</span>
+        <span className="text-muted-foreground text-xs whitespace-nowrap">{formatWATDateTime(r.created_at)}</span>
       ),
-      initialWidth: 120,
+      initialWidth: 170,
       hideOnMobile: true,
     },
   ]
@@ -467,6 +472,13 @@ export function RequisitionsListPage({
               hidden: (r) =>
                 r.form_type !== "payment_request" || r.status !== "awaiting_payment" || !viewer.is_payment_processor,
             },
+            {
+              label: "Update",
+              icon: Pencil,
+              primary: true,
+              onClick: (r) => setUpdateRow(r),
+              hidden: (r) => !r.can_update,
+            },
             { label: "Preview", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
           ]}
           inlineRowActions={tab === "payment"}
@@ -572,6 +584,39 @@ export function RequisitionsListPage({
       <NewRequisitionDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
+        onSuccess={(r) => router.push(detailHref(r))}
+      />
+      <UpdateRejectedDialog
+        requisition={updateChoice ? null : updateRow}
+        onOpenChange={(open) => {
+          if (!open) setUpdateRow(null)
+        }}
+        onChoose={setUpdateChoice}
+      />
+      <NewRequisitionDialog
+        open={updateChoice === "edit"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUpdateChoice(null)
+            setUpdateRow(null)
+          }
+        }}
+        editing={updateRow}
+        onSuccess={() => {
+          setUpdateChoice(null)
+          setUpdateRow(null)
+          fetchRows()
+        }}
+      />
+      <NewRequisitionDialog
+        open={updateChoice === "convert"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUpdateChoice(null)
+            setUpdateRow(null)
+          }
+        }}
+        convertFrom={updateRow}
         onSuccess={(r) => router.push(detailHref(r))}
       />
       <ExportOptionsDialog
