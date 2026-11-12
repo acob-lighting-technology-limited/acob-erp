@@ -488,7 +488,7 @@ export function NewRequisitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {editing && formType
@@ -593,7 +593,7 @@ export function NewRequisitionDialog({
                 {lines.map((line, i) => (
                   <div
                     key={`row-${i}`}
-                    className="grid grid-cols-[1.5rem_1fr_7rem_2rem] items-center gap-2 sm:grid-cols-[1.5rem_1fr_9rem_2rem]"
+                    className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_7rem_2rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_9rem_2rem]"
                   >
                     <span className="text-muted-foreground text-right text-sm">{i + 1}</span>
                     <Input
@@ -716,7 +716,7 @@ export function NewRequisitionDialog({
                         }
                       />
                     )}
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="grid min-w-0 gap-2 *:min-w-0 sm:grid-cols-3">
                       {isCash ? null : (
                         <Input
                           aria-label={`Beneficiary ${i + 1} account number`}

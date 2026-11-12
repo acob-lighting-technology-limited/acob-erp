@@ -481,7 +481,7 @@ export function RequisitionsListPage({
             },
             { label: "Preview", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
           ]}
-          inlineRowActions={tab === "payment"}
+          inlineRowActions={tab === "payment" || tab === "mine"}
           isLoading={isLoading}
           error={error}
           onRetry={fetchRows}
