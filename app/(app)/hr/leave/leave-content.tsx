@@ -56,6 +56,8 @@ import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { LeavePeriodCell } from "@/components/leave/leave-period-cell"
+import { LeaveTypeBadge } from "@/components/leave/leave-type-badge"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { useUrlTab } from "@/hooks/use-url-tab"
@@ -319,7 +321,11 @@ export function LeaveContent({
         render: (r) => (
           <div className="space-y-0.5">
             <span className="block font-medium">
-              {showsEmployee ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
+              {showsEmployee ? (
+                r.user?.full_name || "Employee"
+              ) : (
+                <LeaveTypeBadge name={leaveTypeMap.get(r.leave_type_id)?.name} />
+              )}
             </span>
             {showsEmployee && (
               <span className="text-muted-foreground block text-xs">
@@ -335,9 +341,7 @@ export function LeaveContent({
         accessor: (r) => `${r.start_date} to ${r.end_date}`,
         render: (r) => (
           <div className="space-y-1">
-            <span className="font-mono text-xs whitespace-nowrap">
-              {r.start_date} to {r.end_date} <span className="text-muted-foreground">({r.days_count}d)</span>
-            </span>
+            <LeavePeriodCell start={r.start_date} end={r.end_date} days={r.days_count} />
             {r.department_overlaps && r.department_overlaps.length > 0 && (
               <Badge
                 variant="outline"
