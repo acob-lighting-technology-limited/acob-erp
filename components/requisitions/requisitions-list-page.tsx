@@ -15,6 +15,7 @@ import {
   Inbox,
   Pencil,
   PenLine,
+  Share2,
   Plus,
   Wallet,
   CalendarClock,
@@ -54,6 +55,7 @@ import type {
 } from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { UpdateRejectedDialog } from "./update-rejected-dialog"
+import { shareRequisition } from "./share-requisition"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeClass } from "./requisition-detail"
@@ -480,6 +482,11 @@ export function RequisitionsListPage({
               hidden: (r) => !r.can_update,
             },
             { label: "Preview", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
+            {
+              label: "Share",
+              icon: Share2,
+              onClick: (r) => void shareRequisition(r.requisition_number, detailHref(r)),
+            },
           ]}
           inlineRowActions={tab === "payment" || tab === "mine"}
           isLoading={isLoading}
