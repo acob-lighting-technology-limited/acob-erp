@@ -195,7 +195,10 @@ export function RequisitionsListPage({
   const basePath = detailBasePath || (surface === "admin" ? ADMIN_REQUISITIONS_PATH : STAFF_REQUISITIONS_PATH)
   const detailHref = (r: Requisition) => `${basePath}/${r.id}`
   const count = (status: RequisitionStatus) => rows.filter((r) => r.status === status).length
-  const totalAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  // Rejected and cancelled requisitions are shown in the list but are not money committed, so they are left out of the total.
+  const totalAmount = rows
+    .filter((r) => r.status !== "rejected" && r.status !== "cancelled")
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 
   const columns: DataTableColumn<Requisition>[] = [
     {
