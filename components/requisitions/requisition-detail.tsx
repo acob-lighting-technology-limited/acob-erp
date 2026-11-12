@@ -43,6 +43,8 @@ export function statusBadgeClass(status: Requisition["status"]) {
   switch (status) {
     case "rejected":
       return "border-danger/30 bg-danger/15 text-danger"
+    case "cancelled":
+      return "border-muted-foreground/30 bg-muted text-muted-foreground"
     case "paid":
       return "border-success/30 bg-success/15 text-success"
     case "awaiting_payment":
