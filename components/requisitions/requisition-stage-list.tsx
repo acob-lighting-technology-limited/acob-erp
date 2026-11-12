@@ -250,7 +250,10 @@ function StageRow({
       <div className="min-w-0 flex-1 text-xs">
         <div className="flex min-h-5 flex-wrap items-center justify-between gap-1.5">
           <span className={cn("font-medium", v.node === "idle" ? "text-muted-foreground" : "text-foreground")}>
-            {STAGE_LABELS[stage.stage_code]} — {stage.role_label}
+            {/* A skipped stage names no one: its role would suggest a signature that is not needed. */}
+            {stage.state === "not_required" && !isRaisedByHolder(stage)
+              ? STAGE_LABELS[stage.stage_code]
+              : `${STAGE_LABELS[stage.stage_code]} — ${stage.role_label}`}
           </span>
           {v.badge.tone === "muted" ? (
             <span className="text-muted-foreground text-xs">{v.badge.text}</span>
