@@ -11,6 +11,7 @@ import {
 } from "@/lib/hr/attendance-ssot"
 import { DEFAULT_ATTENDANCE_POLICY, type AttendancePolicy } from "@/lib/org-config"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { yearBounds, monthBounds, quarterBounds, ATTENDANCE_TRACKING_START } from "@/lib/hr/attendance-utils"
 
 /**
  * The agreed penalty table is the contract for payroll, HR reports, the staff
@@ -364,5 +365,18 @@ describe("weekend clock-in handling", () => {
     assert.equal(result.lateBracket, 0)
     assert.equal(result.earlyBracket, 0)
     assert.equal(result.breakdown, "Weekend — non-working day")
+  })
+
+  it("yearBounds respects tracking start for first year and full year bounds for subsequent", () => {
+    const [startYearStr] = ATTENDANCE_TRACKING_START.split("-")
+    const startYear = Number(startYearStr)
+    const boundsStart = yearBounds(startYear)
+    assert.equal(boundsStart.start, ATTENDANCE_TRACKING_START)
+    assert.equal(boundsStart.end, `${startYear}-12-31`)
+
+    const nextYear = startYear + 1
+    const boundsNext = yearBounds(nextYear)
+    assert.equal(boundsNext.start, `${nextYear}-01-01`)
+    assert.equal(boundsNext.end, `${nextYear}-12-31`)
   })
 })

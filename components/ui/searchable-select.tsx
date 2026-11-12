@@ -11,7 +11,7 @@ interface SearchableSelectProps {
   value: string
   onValueChange: (value: string) => void
   placeholder?: string
-  options: { value: string; label: string; icon?: React.ReactNode }[]
+  options: { value: string; label: string; icon?: React.ReactNode; disabled?: boolean }[]
   searchPlaceholder?: string
   icon?: React.ReactNode
   className?: string
@@ -115,6 +115,7 @@ export function SearchableSelect({
             const itemButton = (
               <button
                 type="button"
+                disabled={option.disabled}
                 onClick={() => {
                   onValueChange(option.value)
                   setSearchQuery("")
@@ -123,6 +124,7 @@ export function SearchableSelect({
                 className={cn(
                   "focus:bg-accent focus:text-accent-foreground relative flex w-full items-center rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none",
                   "hover:bg-accent hover:text-accent-foreground",
+                  "disabled:pointer-events-none disabled:opacity-50",
                   isSelected && "bg-accent/50"
                 )}
               >

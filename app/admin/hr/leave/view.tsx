@@ -33,6 +33,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailSheet } from "./_components/leave-detail-sheet"
+import { LeaveTypeBadge } from "@/components/leave/leave-display"
+import { formatLeavePeriod } from "@/components/leave/leave-period"
 import {
   LeaveApprovalStages,
   LeaveAttachments,
@@ -479,17 +481,15 @@ export function LeaveApprovePage({
         resizable: true,
         initialWidth: 150,
         accessor: (r) => r.leave_type?.name || "—",
-        render: (r) => <span className="text-sm font-medium whitespace-nowrap">{r.leave_type?.name || "—"}</span>,
+        render: (r) => <LeaveTypeBadge name={r.leave_type?.name} />,
       },
       {
         key: "period",
         label: "Period",
         accessor: (r) => `${r.start_date} to ${r.end_date}`,
         render: (r) => (
-          <div className="flex flex-col text-xs">
-            <span>
-              {r.start_date} to {r.end_date}
-            </span>
+          <div className="flex flex-col text-xs whitespace-nowrap">
+            <span>{formatLeavePeriod(r.start_date, r.end_date)}</span>
             <span className="text-muted-foreground">{r.days_count} day(s)</span>
           </div>
         ),

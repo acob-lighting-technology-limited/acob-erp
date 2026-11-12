@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
 import { formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
+import { EmployeeExpandedPanel } from "./_components/employee-expanded-panel"
 import {
   Users,
   UserCheck,
@@ -1139,73 +1140,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
         filters={filters}
         expandable={{
-          render: (r) => (
-            <div className="animate-in fade-in slide-in-from-top-2 grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
-              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-blue-600 uppercase">
-                  <IdCard className="h-4 w-4" /> Identity
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Emp. No.</span>
-                    <span className="font-mono">{r.employee_number || "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Employment Date</span>
-                    <span>{r.employment_date ? formatDDMMYYYY(r.employment_date) : "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Confirmed</span>
-                    <span>{r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : "—"}</span>
-                  </div>
-                  {r.separation_date && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Exit Date</span>
-                      <span>{formatDDMMYYYY(r.separation_date)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">DOB</span>
-                    <span>{formatDateOfBirth(r.date_of_birth, r.birthday) ?? "—"}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-emerald-600 uppercase">
-                  <Building2 className="h-4 w-4" /> Work info
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Designation</span>
-                    <span>{r.designation || "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Office</span>
-                    <span>{r.office_location || "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Address</span>
-                    <span className="max-w-[150px] truncate">{r.residential_address || "—"}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-amber-600 uppercase">
-                  <Calendar className="h-4 w-4" /> Contact
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Phone className="text-muted-foreground h-3.5 w-3.5" />
-                    <span>{r.phone_number || "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="text-muted-foreground h-3.5 w-3.5" />
-                    <span className="truncate">{r.additional_email || "—"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ),
+          render: (r) => <EmployeeExpandedPanel r={r} />,
         }}
         viewToggle
         contactsView

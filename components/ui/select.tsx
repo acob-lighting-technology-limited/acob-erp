@@ -14,6 +14,7 @@ type SelectChildProps = {
   className?: string
   value?: string
   textValue?: string
+  disabled?: boolean
 }
 type SelectLikeElement = React.ReactElement<SelectChildProps>
 type DisplayNameType = { displayName?: string }
@@ -121,6 +122,7 @@ const Select = ({
     return {
       value: item.props.value as string,
       label: labelText || String(item.props.value),
+      disabled: Boolean(item.props.disabled),
     }
   })
 

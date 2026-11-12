@@ -166,6 +166,11 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
   const departmentLeadApproverName = resolvePersonName(stageAuditMap.get("department_lead")?.approver)
   const advancedPastReliever = ["department_lead", "admin_hr_lead", "hcs", "md"].includes(currentStageKey)
   const recordedStages = stageOrder.filter((stageKey) => stageAuditMap.has(stageKey)).length
+  // Earlier stages that nobody signed and that were not simply not needed: a stage signed past them is an override.
+  const skippedBefore = (idx: number) =>
+    stageOrder
+      .slice(0, idx)
+      .filter((k) => !stageAuditMap.has(k) && !(k === "reliever" && (!hasRelieverAssignee || relieverHandledByLead)))
 
   return (
     <section className="space-y-3">
@@ -276,17 +281,30 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                     </span>
 
                     {item ? (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs font-medium capitalize",
-                          isStageRejected
-                            ? "border-danger/30 bg-danger/15 text-danger"
-                            : "border-success/30 bg-success/15 text-success"
-                        )}
-                      >
-                        {item.status || "Approved"}
-                      </Badge>
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs font-medium capitalize",
+                            isStageRejected
+                              ? "border-danger/30 bg-danger/15 text-danger"
+                              : "border-success/30 bg-success/15 text-success"
+                          )}
+                        >
+                          {item.status || "Approved"}
+                        </Badge>
+                        {!isStageRejected && skippedBefore(idx).length > 0 ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-600"
+                            title={`Signed ahead of ${skippedBefore(idx)
+                              .map((k) => STAGE_NAME[k])
+                              .join(", ")}`}
+                          >
+                            Overridden
+                          </Badge>
+                        ) : null}
+                      </span>
                     ) : isCurrent && isOpen ? (
                       <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning text-xs">
                         Awaiting action

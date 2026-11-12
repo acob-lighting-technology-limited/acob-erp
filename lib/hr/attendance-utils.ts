@@ -104,6 +104,14 @@ export function quarterBounds(year: number, quarter: Quarter): { start: string; 
   return { start, end }
 }
 
+/** Returns first and last date of a calendar year as YYYY-MM-DD strings. */
+export function yearBounds(year: number): { start: string; end: string } {
+  const [startYear] = ATTENDANCE_TRACKING_START.split("-").map(Number)
+  const start = year <= startYear ? ATTENDANCE_TRACKING_START : `${year}-01-01`
+  const end = `${year}-12-31`
+  return { start, end }
+}
+
 /**
  * Returns month options { value: "YYYY-MM", label: "Month YYYY" }, newest first,
  * down to tracking start - or to `startDate` (YYYY-MM-DD) when a view's history
