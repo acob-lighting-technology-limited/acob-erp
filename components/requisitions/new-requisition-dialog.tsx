@@ -166,7 +166,10 @@ export function NewRequisitionDialog({
     setSelectedProjectId("")
     setCustomProjectName("")
     setProjectName(from?.project_name ?? "")
-    setPurpose(from?.purpose ?? "")
+    // A petty cash voucher has items, not a purpose: converting joins the item descriptions into the purpose.
+    setPurpose(
+      from?.purpose ?? (from?.line_items?.length ? from.line_items.map((l) => l.description.trim()).join(" and ") : "")
+    )
     setAmount(from?.amount != null ? String(from.amount) : "")
     setLines(
       from?.line_items?.length
