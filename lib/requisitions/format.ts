@@ -15,6 +15,7 @@ export const STATUS_LABELS: Record<RequisitionStatus, string> = {
   awaiting_approval: "Paid · awaiting approval",
   paid: "Paid",
   rejected: "Rejected",
+  cancelled: "Cancelled",
 }
 
 /** "Authorized — Technical Lead" */

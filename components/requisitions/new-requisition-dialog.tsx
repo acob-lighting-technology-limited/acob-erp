@@ -152,12 +152,24 @@ export function NewRequisitionDialog({
     if (!open) return
     // Editing starts from the form as it is; converting starts from the rejected one, in the form type picked next.
     const from = editing ?? convertFrom ?? null
-    setFormType(editing ? editing.form_type : null)
+    // Converting goes straight to the other form type; the user only changes it with Back.
+    setFormType(
+      editing
+        ? editing.form_type
+        : convertFrom
+          ? convertFrom.form_type === "petty_cash"
+            ? "payment_request"
+            : "petty_cash"
+          : null
+    )
     setCostCategory(from?.project_name ? "admin" : "operational")
     setSelectedProjectId("")
     setCustomProjectName("")
     setProjectName(from?.project_name ?? "")
-    setPurpose(from?.purpose ?? "")
+    // A petty cash voucher has items, not a purpose: converting joins the item descriptions into the purpose.
+    setPurpose(
+      from?.purpose ?? (from?.line_items?.length ? from.line_items.map((l) => l.description.trim()).join(" and ") : "")
+    )
     setAmount(from?.amount != null ? String(from.amount) : "")
     setLines(
       from?.line_items?.length
@@ -270,7 +282,8 @@ export function NewRequisitionDialog({
     [formType, lines, amount]
   )
   const rangeProblem = formType && total > 0 ? amountOutOfRangeMessage(formType, total) : null
-  const isException = formType === "petty_cash" && total > PETTY_CASH_MAX
+  // Outside the form's usual range (petty cash above the cap, or a Payment Request below the minimum): an exception.
+  const isException = rangeProblem !== null
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
   const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
   const showSplit = beneficiaries.length > 1
@@ -461,6 +474,7 @@ export function NewRequisitionDialog({
             project_name: resolvedProjectName,
             purpose: purpose.trim(),
             amount: parseNaira(amount),
+            ...(isException && exceptionOn ? { exception_reason: exceptionReason.trim() } : {}),
             ...common,
           }
 
@@ -488,7 +502,7 @@ export function NewRequisitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {editing && formType
@@ -593,7 +607,7 @@ export function NewRequisitionDialog({
                 {lines.map((line, i) => (
                   <div
                     key={`row-${i}`}
-                    className="grid grid-cols-[1.5rem_1fr_7rem_2rem] items-center gap-2 sm:grid-cols-[1.5rem_1fr_9rem_2rem]"
+                    className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_7rem_2rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_9rem_2rem]"
                   >
                     <span className="text-muted-foreground text-right text-sm">{i + 1}</span>
                     <Input
@@ -654,7 +668,7 @@ export function NewRequisitionDialog({
                       checked={exceptionOn}
                       onChange={(e) => setExceptionOn(e.target.checked)}
                     />
-                    <span>This is an exception: it is above the petty cash limit</span>
+                    <span>This is an exception: the amount is outside this form&rsquo;s usual range</span>
                   </label>
                   {exceptionOn ? (
                     <div className="space-y-1.5">
@@ -716,7 +730,7 @@ export function NewRequisitionDialog({
                         }
                       />
                     )}
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="grid min-w-0 gap-2 *:min-w-0 sm:grid-cols-3">
                       {isCash ? null : (
                         <Input
                           aria-label={`Beneficiary ${i + 1} account number`}

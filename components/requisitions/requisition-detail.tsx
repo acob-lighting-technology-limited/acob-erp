@@ -128,7 +128,8 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
               {viewer.can_convert ? (
                 <Button variant="outline" size="sm" onClick={() => setConverting(true)}>
                   <ArrowRightLeft className="mr-2 h-4 w-4" />
-                  Convert to {requisition.form_type === "petty_cash" ? "Payment Request" : "Petty Cash"}
+                  {requisition.status === "rejected" ? "Convert to" : "Switch to"}{" "}
+                  {requisition.form_type === "petty_cash" ? "Payment Request" : "Petty Cash"}
                 </Button>
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPickingDownload(true)}>

@@ -256,6 +256,11 @@ export function isStageOpen(
 }
 
 /** The stage a person would sign now, and what signing it would bypass. Mirrors requisition_sign. */
+/** Nobody has signed, overridden or rejected past the start: the requester may still change the form. */
+export function isUntouched(req: Pick<Requisition, "stages">) {
+  return (req.stages || []).every((s) => s.state !== "signed" && s.state !== "bypassed" && s.state !== "rejected")
+}
+
 export function findSignableStage(req: Requisition, userId: string) {
   if ((req.status !== "pending" && req.status !== "awaiting_approval") || req.user_id === userId) return null
   const stages = [...(req.stages || [])].sort((a, b) => a.position - b.position)
@@ -279,14 +284,12 @@ export async function getViewerActions(
     (req.status === "awaiting_payment" || req.status === "partly_paid")
   const isRequester = req.user_id === viewer.userId
   // The requester may change the form until anyone has signed past them.
-  const untouched = (req.stages || []).every(
-    (s) => s.state !== "signed" && s.state !== "bypassed" && s.state !== "rejected"
-  )
+  const untouched = isUntouched(req)
   return {
     sign_stage_id: signable?.stage.id ?? null,
     would_bypass_stage_ids: signable?.bypassed.map((s) => s.id) ?? [],
     can_edit: isRequester && (req.status === "rejected" || (req.status === "pending" && untouched)),
-    can_convert: isRequester && req.status === "rejected",
+    can_convert: isRequester && (req.status === "rejected" || (req.status === "pending" && untouched)),
     can_record_payment: canPay,
     // Once a Payment Request is paid the MD only signs it off; there is nothing left to reject.
     can_reject: Boolean(signable) && req.status === "pending",

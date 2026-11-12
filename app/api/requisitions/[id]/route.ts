@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { verifyActionPin } from "@/lib/approval-signing/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { PETTY_CASH_MAX, lineItemsTotal } from "@/lib/requisitions/limits"
+import { amountOutOfRangeMessage, lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { confirmBeneficiaries } from "@/lib/requisitions/paystack"
@@ -123,8 +123,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!confirmed.ok) return apiError(confirmed.message, ApiErrorCode.VALIDATION_ERROR, 400)
 
     const amount = input.form_type === "petty_cash" ? lineItemsTotal(input.line_items) : input.amount
-    const exceptionReason =
-      input.form_type === "petty_cash" && amount > PETTY_CASH_MAX ? (input.exception_reason ?? null) : null
+    const exceptionReason = amountOutOfRangeMessage(input.form_type, amount) ? (input.exception_reason ?? null) : null
 
     // A resubmitted form starts approval again: its stages are routed afresh from the requester's current profile.
     if (resubmitting) {
