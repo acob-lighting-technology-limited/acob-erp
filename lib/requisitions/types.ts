@@ -121,6 +121,8 @@ export interface RequisitionPayment {
 export interface Requisition {
   /** Set on list rows: the pending stage the signed-in user can sign now, else null. */
   sign_stage_id?: string | null
+  /** Set on list rows: the requester may update this rejected form (edit and resubmit, or convert). */
+  can_update?: boolean
   /** Set on list rows: the viewer may record a payment on this one now. */
   can_pay?: boolean
   /** Payment officers for this form, so the route can show who pays next. */

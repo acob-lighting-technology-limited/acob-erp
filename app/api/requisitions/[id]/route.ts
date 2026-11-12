@@ -4,16 +4,20 @@ import { verifyActionPin } from "@/lib/approval-signing/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { PETTY_CASH_MAX, lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
+import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { confirmBeneficiaries } from "@/lib/requisitions/paystack"
+import { resolveRequisitionStages } from "@/lib/requisitions/routing"
 import { PaymentRequestSchema, PettyCashSchema } from "@/lib/requisitions/schemas"
 import {
   canViewRequisition,
   getViewerActions,
   getViewerContext,
   loadRequisition,
+  loadRoutingLeads,
   withSignedUrls,
 } from "@/lib/requisitions/server"
 import { isOwnUploadPath, requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 /** GET /api/requisitions/[id] — the requisition, its history, and what the viewer may do. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -70,15 +74,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const req = await loadRequisition(admin, id)
     if (!req || req.user_id !== user.id) return apiError("Requisition not found", ApiErrorCode.NOT_FOUND, 404)
-    if (req.status !== "pending") {
-      return apiError("This has moved on, so it can no longer be changed.", ApiErrorCode.VALIDATION_ERROR, 409)
-    }
-    if ((req.stages || []).some((s) => s.state === "signed" || s.state === "bypassed" || s.state === "rejected")) {
-      return apiError(
-        "Someone has already signed this, so it can no longer be changed.",
-        ApiErrorCode.VALIDATION_ERROR,
-        409
-      )
+    // A rejected form goes back into approval under the same number; a pending one is changed in place.
+    const resubmitting = req.status === "rejected"
+    if (!resubmitting) {
+      if (req.status !== "pending") {
+        return apiError("This has moved on, so it can no longer be changed.", ApiErrorCode.VALIDATION_ERROR, 409)
+      }
+      if ((req.stages || []).some((s) => s.state === "signed" || s.state === "bypassed")) {
+        return apiError(
+          "Someone has already signed this, so it can no longer be changed.",
+          ApiErrorCode.VALIDATION_ERROR,
+          409
+        )
+      }
     }
     if (input.form_type !== req.form_type) {
       return apiError(
@@ -118,10 +126,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const exceptionReason =
       input.form_type === "petty_cash" && amount > PETTY_CASH_MAX ? (input.exception_reason ?? null) : null
 
-    // Only while still pending: the status is checked again in the same write.
+    // A resubmitted form starts approval again: its stages are routed afresh from the requester's current profile.
+    if (resubmitting) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("id, department, is_department_lead, lead_departments")
+        .eq("id", user.id)
+        .maybeSingle()
+      const department = normalizeDepartmentName(profile?.department)
+      if (!profile || !department) {
+        return apiError(
+          "Your profile has no department, so the requisition cannot be routed.",
+          ApiErrorCode.VALIDATION_ERROR,
+          400
+        )
+      }
+      const stages = resolveRequisitionStages(req.form_type, { ...profile, department }, await loadRoutingLeads(admin))
+      const { error: deleteError } = await admin.from("requisition_stages").delete().eq("requisition_id", id)
+      if (deleteError) throw deleteError
+      const { error: insertError } = await admin.from("requisition_stages").insert(
+        stages.map((s) => ({
+          requisition_id: id,
+          position: s.position,
+          stage_code: s.stage_code,
+          role_key: s.role_key,
+          role_label: s.role_label,
+          assignee_id: s.assignee_id,
+          state: s.state,
+          state_note: s.state_note,
+        }))
+      )
+      if (insertError) throw insertError
+    }
+
+    // Only while the status is unchanged: the same write checks it.
     const { data: updated, error } = await admin
       .from("requisitions")
       .update({
+        ...(resubmitting ? { status: "pending", rejected_by: null, rejected_at: null, rejection_reason: null } : {}),
         amount,
         original_amount: req.original_amount ?? req.amount,
         amount_in_words: numberToNairaWords(amount),
@@ -135,12 +177,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         exception_reason: exceptionReason,
       })
       .eq("id", id)
-      .eq("status", "pending")
+      .eq("status", req.status)
       .select("id")
       .maybeSingle()
     if (error) throw error
     if (!updated) {
       return apiError("This has moved on, so it can no longer be changed.", ApiErrorCode.VALIDATION_ERROR, 409)
+    }
+    if (resubmitting) {
+      const submitted = await loadRequisition(admin, id)
+      if (submitted) await notifyRequisitionEvent(admin, { kind: "submitted", req: submitted })
     }
 
     await writeAuditLog(

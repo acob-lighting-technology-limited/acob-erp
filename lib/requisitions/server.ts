@@ -285,7 +285,7 @@ export async function getViewerActions(
   return {
     sign_stage_id: signable?.stage.id ?? null,
     would_bypass_stage_ids: signable?.bypassed.map((s) => s.id) ?? [],
-    can_edit: isRequester && req.status === "pending" && untouched,
+    can_edit: isRequester && (req.status === "rejected" || (req.status === "pending" && untouched)),
     can_convert: isRequester && req.status === "rejected",
     can_record_payment: canPay,
     // Once a Payment Request is paid the MD only signs it off; there is nothing left to reject.

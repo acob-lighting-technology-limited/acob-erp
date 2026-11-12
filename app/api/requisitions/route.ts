@@ -107,6 +107,8 @@ export async function GET(request: NextRequest) {
     const rows = (data || []).map((req) => ({
       ...req,
       payment_officers: officers[req.form_type] ?? [],
+      // The requester can update a rejected form: edit it and resubmit, or convert it.
+      can_update: req.user_id === user.id && req.status === "rejected",
       // Payment Requests are paid through payment schedules.
       can_pay:
         req.form_type === "petty_cash" &&
