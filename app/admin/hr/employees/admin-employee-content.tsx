@@ -1141,24 +1141,26 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         filters={filters}
         expandable={{
           render: (r) => (
-            <div className="animate-in fade-in slide-in-from-top-2 grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
-              <section className="bg-card space-y-4 rounded-xl border p-4">
-                <SectionHeading title="Identity" aside={<IdCard className="text-muted-foreground h-4 w-4" />} />
+            <div className="animate-in fade-in slide-in-from-top-2 bg-muted/15 grid gap-0 border-y md:grid-cols-3 md:divide-x">
+              <section className="space-y-3 p-4">
+                <SectionHeading title="Employment" aside={<Briefcase className="text-muted-foreground h-4 w-4" />} />
                 <DetailList
-                  className="grid-cols-1 sm:grid-cols-1"
+                  className="grid-cols-1"
                   items={[
-                    { label: "Employee number", value: r.employee_number },
-                    { label: "Employment date", value: r.employment_date ? formatDDMMYYYY(r.employment_date) : null },
-                    { label: "Confirmed", value: r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : null },
+                    { label: "Staff ID", value: r.employee_number },
+                    { label: "Started", value: r.employment_date ? formatDDMMYYYY(r.employment_date) : null },
+                    {
+                      label: "Confirmed",
+                      value: r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : "Pending",
+                    },
                     ...(r.separation_date ? [{ label: "Exit date", value: formatDDMMYYYY(r.separation_date) }] : []),
-                    { label: "Date of birth", value: formatDateOfBirth(r.date_of_birth, r.birthday) ?? null },
                   ]}
                 />
               </section>
-              <section className="bg-card space-y-4 rounded-xl border p-4">
-                <SectionHeading title="Work" aside={<Building2 className="text-muted-foreground h-4 w-4" />} />
+              <section className="space-y-3 border-t p-4 md:border-t-0">
+                <SectionHeading title="Workplace" aside={<Building2 className="text-muted-foreground h-4 w-4" />} />
                 <DetailList
-                  className="grid-cols-1 sm:grid-cols-1"
+                  className="grid-cols-1"
                   items={[
                     { label: "Designation", value: r.designation || null },
                     { label: "Office", value: r.office_location || null },
@@ -1166,30 +1168,33 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   ]}
                 />
               </section>
-              <section className="bg-card space-y-4 rounded-xl border p-4">
-                <SectionHeading title="Contact" aside={<Calendar className="text-muted-foreground h-4 w-4" />} />
-                <ul className="space-y-3 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Phone className="text-muted-foreground h-4 w-4 shrink-0" />
-                    {r.phone_number ? (
-                      <a href={`tel:${r.phone_number}`} className="hover:underline">
-                        {r.phone_number}
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </li>
-                  <li className="flex items-center gap-2 break-all">
-                    <Mail className="text-muted-foreground h-4 w-4 shrink-0" />
-                    {r.additional_email ? (
-                      <a href={`mailto:${r.additional_email}`} className="hover:underline">
-                        {r.additional_email}
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </li>
-                </ul>
+              <section className="space-y-3 border-t p-4 md:border-t-0">
+                <SectionHeading title="Contact" aside={<Phone className="text-muted-foreground h-4 w-4" />} />
+                <DetailList
+                  className="grid-cols-1"
+                  items={[
+                    { label: "Date of birth", value: formatDateOfBirth(r.date_of_birth, r.birthday) ?? null },
+                    {
+                      label: "Phone",
+                      value: r.phone_number ? (
+                        <a href={`tel:${r.phone_number}`} className="hover:text-foreground hover:underline">
+                          {r.phone_number}
+                        </a>
+                      ) : null,
+                    },
+                    {
+                      label: "Personal email",
+                      value: r.additional_email ? (
+                        <a
+                          href={`mailto:${r.additional_email}`}
+                          className="hover:text-foreground break-all hover:underline"
+                        >
+                          {r.additional_email}
+                        </a>
+                      ) : null,
+                    },
+                  ]}
+                />
               </section>
             </div>
           ),
