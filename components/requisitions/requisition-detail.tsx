@@ -13,6 +13,7 @@ import {
   FileText,
   Loader2,
   Pencil,
+  Share2,
   Wallet,
   XCircle,
 } from "lucide-react"
@@ -29,6 +30,7 @@ import { RequisitionDocument } from "./requisition-document"
 import { RequisitionStageList, when } from "./requisition-stage-list"
 import { PaymentDialog } from "./payment-dialog"
 import { RequisitionDownloadDialog } from "./requisition-download-dialog"
+import { shareRequisition } from "./share-requisition"
 import { UnpaidNotice } from "./unpaid-tag"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
@@ -135,6 +137,14 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
               <Button variant="outline" size="sm" onClick={() => setPickingDownload(true)}>
                 <Download className="mr-2 h-4 w-4" />
                 Download
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void shareRequisition(requisition.requisition_number, window.location.pathname)}
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                Share
               </Button>
             </div>
           }
