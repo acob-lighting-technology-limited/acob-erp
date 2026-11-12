@@ -33,7 +33,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailSheet } from "./_components/leave-detail-sheet"
-import { LeaveTypeBadge } from "@/components/leave/leave-type-badge"
+import { LeaveTypeBadge } from "@/components/leave/leave-display"
 import { formatLeavePeriod } from "@/components/leave/leave-period"
 import {
   LeaveApprovalStages,

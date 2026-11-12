@@ -56,8 +56,7 @@ import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { LeavePeriodCell } from "@/components/leave/leave-period-cell"
-import { LeaveTypeBadge } from "@/components/leave/leave-type-badge"
+import { LeavePeriodCell, LeaveTypeBadge } from "@/components/leave/leave-display"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { useUrlTab } from "@/hooks/use-url-tab"
@@ -324,7 +323,7 @@ export function LeaveContent({
               {showsEmployee ? (
                 r.user?.full_name || "Employee"
               ) : (
-                <LeaveTypeBadge name={leaveTypeMap.get(r.leave_type_id)?.name} />
+                <LeaveTypeBadge id={r.leave_type_id} types={leaveTypeMap} />
               )}
             </span>
             {showsEmployee && (
