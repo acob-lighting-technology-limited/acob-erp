@@ -165,17 +165,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: [], departments: [] })
     }
 
-    // Fetch attendance records for allowed employees in date range
-    let attendanceQuery = dataClient
-      .from("attendance_records")
-      .select("user_id, date, status, total_hours, clock_in, clock_out, waived")
-      .in("user_id", allowedProfileIds)
-    if (startDate) attendanceQuery = attendanceQuery.gte("date", startDate)
-    if (endDate) attendanceQuery = attendanceQuery.lte("date", endDate)
+    // Fetch attendance records for allowed employees in date range.
+    // Batched in pages of 1,000 to prevent Supabase's default row limit from silently truncating multi-month queries.
+    const CHUNK_SIZE = 1000
+    const MAX_CHUNKS = 50
+    const attendanceRows: AttendanceRow[] = []
+    let from = 0
 
-    const { data: attendanceRows, error: attendanceError } = await attendanceQuery.returns<AttendanceRow[]>()
-    if (attendanceError) {
-      return serverError(log, attendanceError)
+    for (let chunkIdx = 0; chunkIdx < MAX_CHUNKS; chunkIdx++) {
+      let chunkQuery = dataClient
+        .from("attendance_records")
+        .select("user_id, date, status, total_hours, clock_in, clock_out, waived")
+        .in("user_id", allowedProfileIds)
+      if (startDate) chunkQuery = chunkQuery.gte("date", startDate)
+      if (endDate) chunkQuery = chunkQuery.lte("date", endDate)
+
+      const { data: chunk, error: attendanceError } = await chunkQuery
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + CHUNK_SIZE - 1)
+        .returns<AttendanceRow[]>()
+
+      if (attendanceError) {
+        return serverError(log, attendanceError)
+      }
+
+      if (!chunk || chunk.length === 0) break
+      attendanceRows.push(...chunk)
+      if (chunk.length < CHUNK_SIZE) break
+      from += CHUNK_SIZE
     }
 
     // Each employee's first clock-in or manual edit establishes their scorable start date.

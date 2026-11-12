@@ -8,11 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
-  ATTENDANCE_TRACKING_START,
   getAttendanceMonthOptions,
   getAttendanceYearOptions,
   monthBounds,
   quarterBounds,
+  yearBounds,
   toLocalISODate,
   toLocalYearMonth,
   type Quarter,
@@ -252,9 +252,10 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
 
 export function LeaderboardView({ departments, lockedDepartment }: LeaderboardViewProps) {
   const [yearMonth, setYearMonth] = useState(toLocalYearMonth)
-  const [periodMode, setPeriodMode] = useState<"month" | "quarter" | "all">("month")
+  const [periodMode, setPeriodMode] = useState<"month" | "quarter" | "year">("month")
   const [quarter, setQuarter] = useState<Quarter>("Q1")
   const [quarterYear, setQuarterYear] = useState(new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [department, setDepartment] = useState(lockedDepartment || "all")
   const [viewScope, setViewScope] = useState<"individual" | "department" | "combined">("individual")
 
@@ -264,6 +265,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
       yearMonth,
       quarterYear,
       quarter,
+      selectedYear,
       department: lockedDepartment || department,
     }),
     queryFn: async () => {
@@ -272,7 +274,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           ? monthBounds(yearMonth)
           : periodMode === "quarter"
             ? quarterBounds(quarterYear, quarter)
-            : { start: ATTENDANCE_TRACKING_START, end: toLocalISODate() }
+            : yearBounds(selectedYear)
       const params = new URLSearchParams({
         start_date: start,
         end_date: end,
@@ -423,14 +425,14 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "all")}>
+          <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "year")}>
             <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Monthly</SelectItem>
               <SelectItem value="quarter">Quarterly</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="year">Yearly</SelectItem>
             </SelectContent>
           </Select>
 
@@ -477,8 +479,23 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
             </>
           )}
 
+          {periodMode === "year" && (
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v) || selectedYear)}>
+              <SelectTrigger className="h-9 w-full sm:w-[120px]" aria-label="Year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {!lockedDepartment && (
-            <div className={cn(periodMode === "month" && "col-span-2 sm:col-span-1")}>
+            <div className={cn((periodMode === "month" || periodMode === "year") && "col-span-2 sm:col-span-1")}>
               <Select value={department} onValueChange={setDepartment}>
                 <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
