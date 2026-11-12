@@ -51,6 +51,8 @@ import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import type { Requisition, RequisitionAttachment, RequisitionFormType } from "@/lib/requisitions/types"
 import { uploadRequisitionFiles } from "@/lib/requisitions/upload"
 import { SavedBeneficiaryPicker } from "./saved-beneficiary-picker"
+import { AccountCheck, type AccountLookup } from "./account-check"
+import { FormChoice } from "./form-choice"
 
 type CostCategory = "admin" | "operational"
 
@@ -96,134 +98,7 @@ const emptyBeneficiary = (): BeneficiaryDraft => ({
 
 const OTHER_BANK = "__other__"
 
-/** What the bank said about one account number at one bank. */
-type AccountLookup =
-  | { status: "loading" }
-  | { status: "found"; accountName: string }
-  | { status: "not_found" }
-  | { status: "unavailable" }
-
 const lookupKey = (bankCode: string, accountNumber: string) => `${bankCode}:${accountNumber}`
-
-/**
- * One line under a beneficiary: first the check digit (instant, catches
- * typos), then whether the bank confirmed the account and gave its name.
- */
-function AccountCheck({
-  nuban,
-  lookup,
-  otherBank,
-  onPickBank,
-}: {
-  nuban: NubanResult | null
-  lookup: AccountLookup | undefined
-  otherBank: boolean
-  onPickBank: (code: string) => void
-}) {
-  if (otherBank) {
-    return (
-      <p className="text-muted-foreground text-xs">
-        This bank cannot be checked. Type the account name exactly as the bank has it.
-      </p>
-    )
-  }
-  if (nuban?.status === "invalid") {
-    return (
-      <div className="text-danger space-y-1 text-xs" role="alert">
-        <p className="flex items-start gap-1.5">
-          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-          This is not a valid {nuban.bank.name} account number. Check the digits, or the bank.
-        </p>
-        {nuban.fits.length ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-1 pl-5">
-            It fits:
-            {nuban.fits.slice(0, 4).map((bank) => (
-              <button
-                key={bank.code}
-                type="button"
-                onClick={() => onPickBank(bank.code)}
-                className="text-foreground hover:bg-muted rounded border px-1.5 py-0.5"
-              >
-                {bank.name}
-              </button>
-            ))}
-          </p>
-        ) : null}
-      </div>
-    )
-  }
-  if (!lookup) {
-    return (
-      <p className="text-muted-foreground text-xs">
-        Enter the account number and pick the bank; the account name comes from the bank.
-      </p>
-    )
-  }
-  if (lookup.status === "loading") {
-    return (
-      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> Checking the account with the bank…
-      </p>
-    )
-  }
-  if (lookup.status === "not_found") {
-    return (
-      <p className="text-danger flex items-start gap-1.5 text-xs" role="alert">
-        <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-        The bank has no account with this number. Check the number and the bank.
-      </p>
-    )
-  }
-  if (lookup.status === "unavailable") {
-    return (
-      <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
-        <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-        Could not reach the bank. Type the account name; signers will see it was not confirmed.
-      </p>
-    )
-  }
-  return (
-    <p className="text-success flex items-center gap-1.5 text-xs">
-      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Account name confirmed by the bank.
-    </p>
-  )
-}
-
-function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void }) {
-  const choices: { type: RequisitionFormType; icon: typeof Wallet; title: string; text: string }[] = [
-    {
-      type: "payment_request",
-      icon: FileText,
-      title: FORM_LABELS.payment_request,
-      text: `${formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and above. For project expenses, vendor invoices, contracts, and major purchases.`,
-    },
-    {
-      type: "petty_cash",
-      icon: Receipt,
-      title: FORM_LABELS.petty_cash,
-      text: `Up to ${formatNaira(PETTY_CASH_MAX).replace(".00", "")}. For minor office expenses, urgent supplies, and daily running costs.`,
-    },
-  ]
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {choices.map(({ type, icon: Icon, title, text }) => (
-        <button
-          key={type}
-          type="button"
-          onClick={() => onPick(type)}
-          className="hover:border-primary hover:bg-primary/5 focus-visible:ring-ring rounded-lg border p-4 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <Icon className="text-primary mb-2 h-6 w-6" aria-hidden />
-          <p className="font-semibold">{title}</p>
-          <p className="text-muted-foreground mt-1 text-sm">{text}</p>
-        </button>
-      ))}
-      <p className="text-muted-foreground text-xs sm:col-span-2">
-        Expenses under ₦50,000 must use Petty Cash. For exactly ₦50,000, either form can be used.
-      </p>
-    </div>
-  )
-}
 
 /**
  * Raise a Payment Request or a Petty Cash voucher. When opened from a help

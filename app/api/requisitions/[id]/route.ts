@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { PETTY_CASH_MAX, lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { confirmBeneficiaries } from "@/lib/requisitions/paystack"
-import { parseCreateRequisition } from "@/lib/requisitions/schemas"
+import { PaymentRequestSchema, PettyCashSchema } from "@/lib/requisitions/schemas"
 import {
   canViewRequisition,
   getViewerActions,
@@ -52,7 +52,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { user, admin, supabase } = auth
   const { id } = await params
 
-  const parsed = parseCreateRequisition(await request.json().catch(() => null))
+  // Same validation as a new requisition, picked by form type (the form type is never changed here).
+  const body = await request.json().catch(() => null)
+  const schema =
+    (body as { form_type?: unknown } | null)?.form_type === "petty_cash" ? PettyCashSchema : PaymentRequestSchema
+  const parsed = schema.safeParse(body)
   if (!parsed.success) {
     return apiError(
       parsed.error.issues[0]?.message || "Check the form and try again",
