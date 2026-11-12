@@ -3,11 +3,25 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
-import { Archive, CalendarDays, Download, ExternalLink, HardDrive, ShieldCheck } from "lucide-react"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Archive,
+  CalendarDays,
+  Download,
+  ExternalLink,
+  Gauge,
+  HardDrive,
+  ShieldCheck,
+  Upload,
+  Wifi,
+} from "lucide-react"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { formatNumber } from "@/lib/format"
+import { formatBytes, formatNumber } from "@/lib/format"
+import { toLocalISODate } from "@/lib/utils/date"
+import { shiftIsoDay, type UsageReport } from "@/lib/security/network-usage-report"
+import { UsageByDayTable, UsageByPersonTable } from "./usage-tables"
 
 import { apiFetch } from "@/lib/api-client"
 interface ArchivedDay {
@@ -22,14 +36,28 @@ interface ArchiveResponse {
   retentionMonths: number
 }
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
-  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+interface UsageResponse extends UsageReport {
+  range: { from: string; to: string }
+  trackingSince: string | null
 }
+
+type TabKey = "logs" | "usage" | "days"
+
+const TABS: DataTableTab[] = [
+  { key: "logs", label: "Activity logs", icon: Archive },
+  { key: "usage", label: "Data usage", icon: Gauge },
+  { key: "days", label: "Daily totals", icon: CalendarDays },
+]
+
+const RANGES = [
+  { key: "today", label: "Today", daysBack: 0, lastDaysBack: 0 },
+  { key: "yesterday", label: "Yesterday", daysBack: 1, lastDaysBack: 1 },
+  { key: "7d", label: "Last 7 days", daysBack: 6, lastDaysBack: 0 },
+  { key: "30d", label: "Last 30 days", daysBack: 29, lastDaysBack: 0 },
+] as const
+type RangeKey = (typeof RANGES)[number]["key"]
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 function formatDay(date: string): string {
   const [year, month, day] = date.split("-").map(Number)
@@ -49,6 +77,15 @@ async function fetchArchive(): Promise<ArchiveResponse> {
   return body.data as ArchiveResponse
 }
 
+async function fetchUsage(range: { from: string; to: string }): Promise<UsageResponse> {
+  const res = await apiFetch(`/api/admin/security/network-activity/usage?from=${range.from}&to=${range.to}`, {
+    cache: "no-store",
+  })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(body?.error ?? "Failed to load data usage")
+  return body.data as UsageResponse
+}
+
 async function downloadDay(date: string) {
   const res = await apiFetch(`/api/admin/security/network-activity/download?date=${date}`, { cache: "no-store" })
   if (!res.ok) {
@@ -64,11 +101,29 @@ async function downloadDay(date: string) {
 }
 
 export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHref?: string } = {}) {
+  const [tab, setTab] = useState<TabKey>("logs")
+  const [rangeKey, setRangeKey] = useState<RangeKey>("7d")
+  const usageActive = tab !== "logs"
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.adminSecurityNetworkActivity(),
     queryFn: fetchArchive,
   })
   const [downloading, setDownloading] = useState<string | null>(null)
+
+  const range = useMemo(() => {
+    const today = toLocalISODate()
+    const option = RANGES.find((r) => r.key === rangeKey) ?? RANGES[2]
+    return { from: shiftIsoDay(today, -option.daysBack), to: shiftIsoDay(today, -option.lastDaysBack) }
+  }, [rangeKey])
+
+  const usage = useQuery({
+    queryKey: QUERY_KEYS.adminSecurityNetworkUsage(range),
+    queryFn: () => fetchUsage(range),
+    enabled: usageActive,
+    refetchInterval: usageActive ? 5 * 60 * 1000 : false,
+  })
+  const usageError = usage.error instanceof Error ? usage.error.message : null
 
   const days = useMemo(() => data?.days ?? [], [data])
   const totalBytes = days.reduce((sum, d) => sum + d.bytes, 0)
@@ -132,38 +187,107 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
     },
   ]
 
+  const totals = usage.data?.totals
+  const usageBadges = totals
+    ? [
+        { label: `${formatBytes(totals.downloadBytes)} downloaded`, icon: Download },
+        { label: `${formatBytes(totals.uploadBytes)} uploaded`, icon: Upload },
+        {
+          label:
+            totals.officeDownloadBytes > 0
+              ? `${formatBytes(totals.officeDownloadBytes)} on the office line`
+              : "office line not recorded yet",
+          icon: Wifi,
+        },
+        {
+          label: usage.data?.trackingSince
+            ? `tracking since ${formatDay(usage.data.trackingSince)}`
+            : "tracking not started",
+          icon: CalendarDays,
+        },
+      ]
+    : []
+
+  const description =
+    tab === "logs"
+      ? `Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`
+      : tab === "usage"
+        ? "How much each login downloaded and uploaded, from the router's hotspot counters. Updated every 5 minutes."
+        : "Each day's counted usage next to what came in on the office line, to compare with the Starlink portal."
+
   return (
     <DataTablePage
       title="Network Activity"
-      description={`Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`}
+      description={description}
       icon={ShieldCheck}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={(next) => setTab(next as TabKey)}
+      actions={
+        usageActive ? (
+          <Select value={rangeKey} onValueChange={(value) => setRangeKey(value as RangeKey)}>
+            <SelectTrigger className="w-[150px]" aria-label="Date range">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RANGES.map((r) => (
+                <SelectItem key={r.key} value={r.key}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : undefined
+      }
       statBadgeStyle="line"
-      statBadges={[
-        { label: `${days.length} days archived`, icon: CalendarDays },
-        { label: `${formatBytes(totalBytes)} stored`, icon: HardDrive },
-        { label: oldest ? `since ${formatDay(oldest)}` : "no archive yet", icon: Archive },
-      ]}
+      statBadges={
+        usageActive
+          ? usageBadges
+          : [
+              { label: `${days.length} days archived`, icon: CalendarDays },
+              { label: `${formatBytes(totalBytes)} stored`, icon: HardDrive },
+              { label: oldest ? `since ${formatDay(oldest)}` : "no archive yet", icon: Archive },
+            ]
+      }
     >
-      <DataTable<ArchivedDay>
-        data={days}
-        columns={columns}
-        getRowId={(r) => r.date}
-        searchPlaceholder="Search a date, e.g. 2026-10-01…"
-        searchFn={(row, q) => row.date.includes(q) || formatDay(row.date).toLowerCase().includes(q)}
-        filters={filters}
-        isLoading={isLoading}
-        error={error instanceof Error ? error.message : null}
-        onRetry={() => void refetch()}
-        pagination={{ pageSize: 50 }}
-        rowActions={[
-          { label: "Download CSV", icon: Download, onClick: (row) => void handleDownload(row) },
-          {
-            label: "Open in SharePoint",
-            icon: ExternalLink,
-            onClick: (row) => window.open(row.webUrl, "_blank", "noopener"),
-          },
-        ]}
-      />
+      {tab === "logs" && (
+        <DataTable<ArchivedDay>
+          data={days}
+          columns={columns}
+          getRowId={(r) => r.date}
+          searchPlaceholder="Search a date, e.g. 2026-10-01…"
+          searchFn={(row, q) => row.date.includes(q) || formatDay(row.date).toLowerCase().includes(q)}
+          filters={filters}
+          isLoading={isLoading}
+          error={error instanceof Error ? error.message : null}
+          onRetry={() => void refetch()}
+          pagination={{ pageSize: 50 }}
+          rowActions={[
+            { label: "Download CSV", icon: Download, onClick: (row) => void handleDownload(row) },
+            {
+              label: "Open in SharePoint",
+              icon: ExternalLink,
+              onClick: (row) => window.open(row.webUrl, "_blank", "noopener"),
+            },
+          ]}
+        />
+      )}
+      {tab === "usage" && (
+        <UsageByPersonTable
+          users={usage.data?.users ?? []}
+          isLoading={usage.isLoading}
+          error={usageError}
+          onRetry={() => void usage.refetch()}
+        />
+      )}
+      {tab === "days" && (
+        <UsageByDayTable
+          days={usage.data?.days ?? []}
+          isLoading={usage.isLoading}
+          error={usageError}
+          onRetry={() => void usage.refetch()}
+        />
+      )}
     </DataTablePage>
   )
 }

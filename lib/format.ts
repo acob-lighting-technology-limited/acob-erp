@@ -83,6 +83,15 @@ export function formatNumber(value: number | null | undefined, fallback = "—")
   return value == null || Number.isNaN(value) ? fallback : numberFormatter.format(value)
 }
 
+/** 1536 → "1.5 KB", 3.2e9 → "2.98 GB". Binary units (1 GB = 1024³ bytes). */
+export function formatBytes(bytes: number | null | undefined, fallback = "—"): string {
+  if (bytes == null || Number.isNaN(bytes)) return fallback
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+}
+
 /** 0.873 → "87%" (ratio input) or 87.3 → "87%" with `{ ratio: false }`. */
 export function formatPercent(
   value: number | null | undefined,
