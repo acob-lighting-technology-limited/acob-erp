@@ -56,7 +56,7 @@ import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { LeavePeriodCell, LeaveTypeBadge } from "@/components/leave/leave-display"
+import { LeaveTypeCell, LeavePeriodCell } from "@/components/leave/leave-display"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { useUrlTab } from "@/hooks/use-url-tab"
@@ -317,22 +317,7 @@ export function LeaveContent({
         sortable: true,
         accessor: (r) =>
           showsEmployee ? r.user?.full_name || "Employee" : leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
-        render: (r) => (
-          <div className="space-y-0.5">
-            <span className="block font-medium">
-              {showsEmployee ? (
-                r.user?.full_name || "Employee"
-              ) : (
-                <LeaveTypeBadge id={r.leave_type_id} types={leaveTypeMap} />
-              )}
-            </span>
-            {showsEmployee && (
-              <span className="text-muted-foreground block text-xs">
-                {r.user?.department || leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
-              </span>
-            )}
-          </div>
-        ),
+        render: (r) => <LeaveTypeCell row={r} showsEmployee={showsEmployee} types={leaveTypeMap} />,
       },
       {
         key: "period",

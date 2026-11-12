@@ -30,6 +30,35 @@ export function LeaveTypeBadge({
   )
 }
 
+interface LeaveTypeRow {
+  leave_type_id: string
+  user?: { full_name?: string | null; department?: string | null } | null
+}
+
+/** The staff leave list's Employee / Leave Type cell: a name, with the type as a badge on other tabs. */
+export function LeaveTypeCell({
+  row,
+  showsEmployee,
+  types,
+}: {
+  row: LeaveTypeRow
+  showsEmployee: boolean
+  types: Map<string, { name: string }>
+}) {
+  return (
+    <div className="space-y-0.5">
+      <span className="block font-medium">
+        {showsEmployee ? row.user?.full_name || "Employee" : <LeaveTypeBadge id={row.leave_type_id} types={types} />}
+      </span>
+      {showsEmployee && (
+        <span className="text-muted-foreground block text-xs">
+          {row.user?.department || types.get(row.leave_type_id)?.name || "Leave"}
+        </span>
+      )}
+    </div>
+  )
+}
+
 /** The period and its length, two short lines: "7 – 7 Oct 2026" then "1 day". */
 export function LeavePeriodCell({ start, end, days }: { start: string; end: string; days: number | string }) {
   return (
