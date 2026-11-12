@@ -73,6 +73,8 @@ interface BeneficiaryDraft {
   /** What this account is paid for; optional, on top of the main purpose. */
   purpose: string
   amount: string
+  /** Bank transfer to an account, or cash handed over (no account, bank or schedule line). */
+  method: "transfer" | "cash"
 }
 
 interface LineDraft {
@@ -89,6 +91,7 @@ const emptyBeneficiary = (): BeneficiaryDraft => ({
   name_from_bank: false,
   purpose: "",
   amount: "",
+  method: "transfer",
 })
 
 const OTHER_BANK = "__other__"
@@ -230,10 +233,16 @@ export function NewRequisitionDialog({
   open,
   onOpenChange,
   onSuccess,
+  editing = null,
+  convertFrom = null,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: (requisition: Requisition) => void
+  /** Change a pending requisition the requester raised. The form type stays the same. */
+  editing?: Requisition | null
+  /** Convert a rejected requisition: the form starts from it, in the form type picked next. */
+  convertFrom?: Requisition | null
 }) {
   const [formType, setFormType] = useState<RequisitionFormType | null>(null)
   const [costCategory, setCostCategory] = useState<CostCategory>("operational")
@@ -245,6 +254,9 @@ export function NewRequisitionDialog({
   const [purpose, setPurpose] = useState("")
   const [amount, setAmount] = useState("")
   const [lines, setLines] = useState<LineDraft[]>([{ description: "", amount: "" }])
+  // Petty cash above the cap goes through only as an exception, with the reason written down.
+  const [exceptionOn, setExceptionOn] = useState(false)
+  const [exceptionReason, setExceptionReason] = useState("")
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDraft[]>([emptyBeneficiary()])
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
   const [uploading, setUploading] = useState(false)
@@ -263,16 +275,41 @@ export function NewRequisitionDialog({
 
   useEffect(() => {
     if (!open) return
-    setFormType(null)
-    setCostCategory("operational")
+    // Editing starts from the form as it is; converting starts from the rejected one, in the form type picked next.
+    const from = editing ?? convertFrom ?? null
+    setFormType(editing ? editing.form_type : null)
+    setCostCategory(from?.project_name ? "admin" : "operational")
     setSelectedProjectId("")
     setCustomProjectName("")
-    setProjectName("")
-    setPurpose("")
-    setAmount("")
-    setLines([{ description: "", amount: "" }])
-    setBeneficiaries([emptyBeneficiary()])
-    setAttachments([])
+    setProjectName(from?.project_name ?? "")
+    setPurpose(from?.purpose ?? "")
+    setAmount(from?.amount != null ? String(from.amount) : "")
+    setLines(
+      from?.line_items?.length
+        ? from.line_items.map((l) => ({ description: l.description, amount: String(l.amount) }))
+        : [{ description: "", amount: "" }]
+    )
+    setBeneficiaries(
+      from?.beneficiary_details?.length
+        ? from.beneficiary_details.map((b) => {
+            const cash = b.payment_method === "cash"
+            return {
+              account_name: b.account_name,
+              account_number: cash ? "" : b.account_number,
+              bank_name: cash ? "" : b.bank_name,
+              bank_code: cash ? "" : (b.bank_code ?? ""),
+              other_bank: !cash && !b.bank_code,
+              name_from_bank: !cash && Boolean(b.verified_account_name),
+              purpose: b.purpose ?? "",
+              amount: b.amount != null ? String(b.amount) : "",
+              method: cash ? "cash" : "transfer",
+            }
+          })
+        : [emptyBeneficiary()]
+    )
+    setAttachments(from?.attachments ?? [])
+    setExceptionOn(Boolean(from?.exception_reason))
+    setExceptionReason(from?.exception_reason ?? "")
     setLookups({})
     setPinOpen(false)
     setAttempted(false)
@@ -310,7 +347,7 @@ export function NewRequisitionDialog({
     ]).finally(() => {
       setLoadingProjects(false)
     })
-  }, [open])
+  }, [open, editing, convertFrom])
 
   const resolvedProjectName =
     costCategory === "operational"
@@ -358,6 +395,7 @@ export function NewRequisitionDialog({
     [formType, lines, amount]
   )
   const rangeProblem = formType && total > 0 ? amountOutOfRangeMessage(formType, total) : null
+  const isException = formType === "petty_cash" && total > PETTY_CASH_MAX
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
   const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
   const showSplit = beneficiaries.length > 1
@@ -397,7 +435,11 @@ export function NewRequisitionDialog({
   )
   // Ask the bank for the name once the number is complete and passes the check digit.
   const lookupKeys = beneficiaries.map((b, i) =>
-    !b.other_bank && b.bank_code && b.account_number.length === 10 && nubanResults[i]?.status !== "invalid"
+    b.method === "transfer" &&
+    !b.other_bank &&
+    b.bank_code &&
+    b.account_number.length === 10 &&
+    nubanResults[i]?.status !== "invalid"
       ? lookupKey(b.bank_code, b.account_number)
       : null
   )
@@ -475,10 +517,16 @@ export function NewRequisitionDialog({
       if (lines.some((l) => !l.description.trim())) found.push("Describe every item.")
       if (total <= 0) found.push("Give each item an amount.")
     }
-    if (rangeProblem) found.push(rangeProblem)
+    if (isException && !exceptionOn)
+      found.push(rangeProblem || "Over the petty cash limit: tick exception and give the reason.")
+    if (isException && exceptionOn && exceptionReason.trim().length < 10)
+      found.push("Give the reason for the exception (at least 10 characters).")
+    if (rangeProblem && !isException) found.push(rangeProblem)
     beneficiaries.forEach((b, i) => {
       const who = `Beneficiary ${i + 1}`
-      if (b.account_number.length !== 10) found.push(`${who}: enter the 10-digit account number.`)
+      if (b.method === "cash") {
+        if (!b.account_name.trim()) found.push(`${who}: enter who receives the cash.`)
+      } else if (b.account_number.length !== 10) found.push(`${who}: enter the 10-digit account number.`)
       else if (!b.bank_name.trim()) found.push(`${who}: pick the bank.`)
       else if (
         nubanResults[i]?.status === "invalid" ||
@@ -511,10 +559,11 @@ export function NewRequisitionDialog({
   const confirmSubmit = async (pin: string): Promise<{ ok: true } | { ok: false; error: string }> => {
     if (!formType) return { ok: false, error: "Pick a form first." }
     const beneficiaryPayload = beneficiaries.map((b) => ({
+      payment_method: b.method,
       account_name: b.account_name,
-      account_number: b.account_number.replace(/\s/g, ""),
-      bank_name: b.bank_name,
-      ...(b.bank_code && !b.other_bank ? { bank_code: b.bank_code } : {}),
+      account_number: b.method === "cash" ? "" : b.account_number.replace(/\s/g, ""),
+      bank_name: b.method === "cash" ? "" : b.bank_name,
+      ...(b.bank_code && !b.other_bank && b.method === "transfer" ? { bank_code: b.bank_code } : {}),
       ...(b.purpose.trim() ? { purpose: b.purpose.trim() } : {}),
       ...(showSplit && b.amount ? { amount: parseNaira(b.amount) } : {}),
     }))
@@ -528,6 +577,7 @@ export function NewRequisitionDialog({
         ? {
             form_type: formType,
             line_items: lines.map((l) => ({ description: l.description, amount: parseNaira(l.amount) })),
+            ...(isException && exceptionOn ? { exception_reason: exceptionReason.trim() } : {}),
             ...common,
           }
         : {
@@ -541,10 +591,11 @@ export function NewRequisitionDialog({
 
     setSubmitting(true)
     try {
-      const res = await apiFetch("/api/requisitions", {
-        method: "POST",
+      const finalBody = convertFrom && !editing ? { ...body, converted_from_id: convertFrom.id } : body
+      const res = await apiFetch(editing ? `/api/requisitions/${editing.id}` : "/api/requisitions", {
+        method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(finalBody),
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) return { ok: false, error: json?.error || "Could not submit the requisition" }
@@ -564,7 +615,15 @@ export function NewRequisitionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{formType ? `New ${FORM_LABELS[formType]}` : "New requisition"}</DialogTitle>
+          <DialogTitle>
+            {editing && formType
+              ? `Edit ${editing.requisition_number}`
+              : convertFrom
+                ? `Convert ${convertFrom.requisition_number}`
+                : formType
+                  ? `New ${FORM_LABELS[formType]}`
+                  : "New requisition"}
+          </DialogTitle>
           <DialogDescription>
             {formType
               ? "It goes to the first signer as soon as you submit."
@@ -711,6 +770,30 @@ export function NewRequisitionDialog({
                   </Button>
                 </div>
               ) : null}
+              {isException ? (
+                <div className="space-y-2 pt-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={exceptionOn}
+                      onChange={(e) => setExceptionOn(e.target.checked)}
+                    />
+                    <span>This is an exception: it is above the petty cash limit</span>
+                  </label>
+                  {exceptionOn ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="req-exception-reason">Reason for the exception</Label>
+                      <Textarea
+                        id="req-exception-reason"
+                        rows={2}
+                        value={exceptionReason}
+                        onChange={(e) => setExceptionReason(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -718,30 +801,58 @@ export function NewRequisitionDialog({
               {beneficiaries.map((b, i) => {
                 const lookup = lookupKeys[i] ? lookups[lookupKeys[i]!] : undefined
                 // Typed only when the bank cannot give it: a bank outside the list, or Paystack unreachable.
-                const nameEditable = b.other_bank || lookup?.status === "unavailable"
+                const isCash = b.method === "cash"
+                const nameEditable = isCash || b.other_bank || lookup?.status === "unavailable"
                 return (
                   <div key={`row-${i}`} className="space-y-2 rounded-md border p-3">
-                    <SavedBeneficiaryPicker
-                      index={i}
-                      onPick={(saved) =>
-                        updateBeneficiary(i, {
-                          account_number: saved.account_number,
-                          bank_code: saved.bank_code,
-                          bank_name: saved.bank_name,
-                          other_bank: false,
-                        })
-                      }
-                    />
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <Input
-                        aria-label={`Beneficiary ${i + 1} account number`}
-                        placeholder="Account no (10 digits)"
-                        inputMode="numeric"
-                        maxLength={10}
-                        value={b.account_number}
-                        onChange={(e) => updateBeneficiary(i, { account_number: e.target.value.replace(/\D/g, "") })}
+                    <div
+                      className="flex flex-wrap gap-2"
+                      role="group"
+                      aria-label={`Beneficiary ${i + 1} payment method`}
+                    >
+                      {(
+                        [
+                          ["transfer", "Bank transfer"],
+                          ["cash", "Cash"],
+                        ] as const
+                      ).map(([method, label]) => (
+                        <Button
+                          key={method}
+                          type="button"
+                          size="sm"
+                          variant={b.method === method ? "default" : "outline"}
+                          aria-pressed={b.method === method}
+                          onClick={() => updateBeneficiary(i, { method })}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                    {isCash ? null : (
+                      <SavedBeneficiaryPicker
+                        index={i}
+                        onPick={(saved) =>
+                          updateBeneficiary(i, {
+                            account_number: saved.account_number,
+                            bank_code: saved.bank_code,
+                            bank_name: saved.bank_name,
+                            other_bank: false,
+                          })
+                        }
                       />
-                      {b.other_bank ? (
+                    )}
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {isCash ? null : (
+                        <Input
+                          aria-label={`Beneficiary ${i + 1} account number`}
+                          placeholder="Account no (10 digits)"
+                          inputMode="numeric"
+                          maxLength={10}
+                          value={b.account_number}
+                          onChange={(e) => updateBeneficiary(i, { account_number: e.target.value.replace(/\D/g, "") })}
+                        />
+                      )}
+                      {isCash ? null : b.other_bank ? (
                         <div className="flex gap-1">
                           <Input
                             aria-label={`Beneficiary ${i + 1} bank`}
@@ -770,7 +881,9 @@ export function NewRequisitionDialog({
                       )}
                       <Input
                         aria-label={`Beneficiary ${i + 1} account name`}
-                        placeholder={nameEditable ? "Account name" : "Filled in by the bank"}
+                        placeholder={
+                          isCash ? "Who receives the cash" : nameEditable ? "Account name" : "Filled in by the bank"
+                        }
                         readOnly={!nameEditable}
                         tabIndex={nameEditable ? undefined : -1}
                         className={nameEditable ? undefined : "bg-muted/50 font-medium"}
@@ -778,12 +891,14 @@ export function NewRequisitionDialog({
                         onChange={(e) => updateBeneficiary(i, { account_name: e.target.value, name_from_bank: false })}
                       />
                     </div>
-                    <AccountCheck
-                      nuban={nubanResults[i]}
-                      lookup={lookup}
-                      otherBank={b.other_bank}
-                      onPickBank={(code) => pickBank(i, code)}
-                    />
+                    {isCash ? null : (
+                      <AccountCheck
+                        nuban={nubanResults[i]}
+                        lookup={lookup}
+                        otherBank={b.other_bank}
+                        onPickBank={(code) => pickBank(i, code)}
+                      />
+                    )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <Input
                         aria-label={`Beneficiary ${i + 1} purpose`}

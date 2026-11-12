@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { lineItemsTotal } from "@/lib/requisitions/limits"
+import { PETTY_CASH_MAX, lineItemsTotal } from "@/lib/requisitions/limits"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { verifyActionPin } from "@/lib/approval-signing/server"
@@ -179,6 +179,27 @@ export async function POST(request: NextRequest) {
       project = data
     }
 
+    // Converting a rejected requisition: it must be the requester's, rejected, and changed to the other form type.
+    if (input.converted_from_id) {
+      const source = await loadRequisition(admin, input.converted_from_id)
+      if (!source || source.user_id !== user.id) {
+        return apiError("That requisition was not found", ApiErrorCode.NOT_FOUND, 404)
+      }
+      if (source.status !== "rejected") {
+        return apiError("Only a rejected requisition can be converted", ApiErrorCode.VALIDATION_ERROR, 409)
+      }
+      if (source.form_type === input.form_type) {
+        return apiError("Pick the other form type to convert it", ApiErrorCode.VALIDATION_ERROR, 400)
+      }
+      const { count } = await admin
+        .from("requisitions")
+        .select("id", { count: "exact", head: true })
+        .eq("converted_from_id", source.id)
+      if ((count ?? 0) > 0) {
+        return apiError("This requisition has already been converted", ApiErrorCode.VALIDATION_ERROR, 409)
+      }
+    }
+
     const confirmed = await confirmBeneficiaries(input.beneficiary_details)
     if (!confirmed.ok) return apiError(confirmed.message, ApiErrorCode.VALIDATION_ERROR, 400)
 
@@ -203,6 +224,10 @@ export async function POST(request: NextRequest) {
         beneficiary_details: confirmed.beneficiaries,
         requester_signature_path: requesterSignaturePath,
         attachments: input.attachments || [],
+        // Only a petty cash voucher above the cap carries an exception reason.
+        exception_reason:
+          input.form_type === "petty_cash" && amount > PETTY_CASH_MAX ? (input.exception_reason ?? null) : null,
+        converted_from_id: input.converted_from_id ?? null,
       },
       p_stages: stages,
     })

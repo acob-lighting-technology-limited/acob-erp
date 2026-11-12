@@ -179,7 +179,7 @@ function pettyCashStages(requester: RoutingProfile, h: Holders): Slot[] {
 
   let approved: Slot
   if (h.hcs && h.hcs === requester.id) {
-    approved = role("md", h.md, "Moved to the MD: raised by HCS")
+    approved = notRequired("hcs", ROLE_LABELS.hcs, "Not required: raised by HCS")
   } else if (h.departmentLead && h.departmentLead === requester.id) {
     approved = role("hcs", h.hcs, "Moved to HCS: raised by the department lead")
   } else if (department === DEPT_ADMIN_HR) {
@@ -190,9 +190,14 @@ function pettyCashStages(requester: RoutingProfile, h: Holders): Slot[] {
     approved = departmentLeadRole(department, h.departmentLead)
   }
 
-  // One person never signs both stages of a voucher.
+  // One person never signs both stages of a voucher, and petty cash never goes to
+  // the MD: when the approver would be the authorizer, the approval is not required.
   if (approved.assignee_id && approved.assignee_id === authorized.assignee_id) {
-    approved = role("md", h.md, "Moved to the MD: the same person would sign both stages")
+    approved = notRequired(
+      approved.role_key,
+      approved.role_label,
+      "Not required: the same person would sign both stages"
+    )
   }
 
   return [authorized, approved]

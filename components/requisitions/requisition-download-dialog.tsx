@@ -67,25 +67,25 @@ export function RequisitionDownloadDialog({
   const row = (key: string, icon: typeof FileText, title: string, detail: string | null, action: React.ReactNode) => {
     const Icon = icon
     return (
-      <li key={key} className="flex items-center gap-3 rounded-md border p-3">
+      <li key={key} className="flex min-w-0 items-center gap-3 rounded-md border p-3">
         <Icon className="text-muted-foreground h-5 w-5 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{title}</p>
           {detail ? <p className="text-muted-foreground truncate text-xs">{detail}</p> : null}
         </div>
-        {action}
+        <div className="shrink-0">{action}</div>
       </li>
     )
   }
 
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Download · {requisition.requisition_number}</DialogTitle>
           <DialogDescription>Pick the document you want.</DialogDescription>
         </DialogHeader>
-        <ul className="space-y-2">
+        <ul className="min-w-0 space-y-2">
           {row(
             "form",
             FileText,

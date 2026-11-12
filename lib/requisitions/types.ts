@@ -27,6 +27,8 @@ export type RequisitionRoleKey = "hr_lead" | "hcs" | "accounts_lead" | "md" | "d
 export type RequisitionPaymentMethod = "transfer" | "cash"
 
 export interface BeneficiaryDetail {
+  /** Absent on older rows, which were all bank transfers. Cash has no account, bank or schedule line. */
+  payment_method?: RequisitionPaymentMethod
   account_name: string
   account_number: string
   bank_name: string
@@ -156,6 +158,10 @@ export interface Requisition {
   unpaid_count?: number
 
   rejection_reason?: string | null
+  /** Petty cash above the cap: the reason the requester gave for the exception. */
+  exception_reason?: string | null
+  /** Set on a requisition converted from a rejected one: the rejected requisition's id. */
+  converted_from_id?: string | null
   rejected_by?: string | null
   rejected_at?: string | null
 
@@ -177,6 +183,10 @@ export interface RequisitionViewerActions {
   sign_stage_id: string | null
   /** Stage ids that signing now would bypass. */
   would_bypass_stage_ids: string[]
+  /** The requester may change this form: it is pending and nobody has signed past them. */
+  can_edit: boolean
+  /** The requester may convert this rejected form into the other form type. */
+  can_convert: boolean
   can_record_payment: boolean
   /** False once a Payment Request is paid: the MD signs it off but cannot reject. */
   can_reject: boolean
