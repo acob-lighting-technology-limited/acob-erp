@@ -15,22 +15,37 @@ const money = z
   .max(999_999_999.99, "That amount is too large")
   .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, { message: "Use at most two decimal places" })
 
-export const BeneficiarySchema = z.object({
-  account_name: z.string().trim().min(1, "Account name is required").max(200),
-  account_number: z
-    .string()
-    .trim()
-    .regex(/^\d{10}$/, "Account number must be 10 digits"),
-  bank_name: z.string().trim().min(1, "Bank name is required").max(120),
-  /** Paystack bank code, when picked from the list. Lets the server confirm the account name. */
-  bank_code: z
-    .string()
-    .regex(/^\d{3,6}$/)
-    .optional(),
-  /** What this account is being paid for, on top of the requisition's main purpose. */
-  purpose: z.string().trim().max(300, "Keep each beneficiary's purpose under 300 characters").optional(),
-  amount: money.optional(),
-})
+export const BeneficiarySchema = z
+  .object({
+    /** Bank transfer to an account, or cash handed over (no account). */
+    payment_method: z.enum(["transfer", "cash"]).default("transfer"),
+    account_name: z.string().trim().min(1, "Name is required").max(200),
+    account_number: z
+      .string()
+      .trim()
+      .regex(/^(\d{10})?$/, "Account number must be 10 digits")
+      .default(""),
+    bank_name: z.string().trim().max(120).default(""),
+    /** Paystack bank code, when picked from the list. Lets the server confirm the account name. */
+    bank_code: z
+      .string()
+      .regex(/^\d{3,6}$/)
+      .optional(),
+    /** What this account is being paid for, on top of the requisition's main purpose. */
+    purpose: z.string().trim().max(300, "Keep each beneficiary's purpose under 300 characters").optional(),
+    amount: money.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.payment_method !== "transfer") return
+    if (!/^\d{10}$/.test(value.account_number))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["account_number"],
+        message: "Account number must be 10 digits",
+      })
+    if (!value.bank_name.trim())
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bank_name"], message: "Bank name is required" })
+  })
 
 export const LineItemSchema = z.object({
   description: z.string().trim().min(1, "Describe the item").max(300),
@@ -82,6 +97,8 @@ function checkBeneficiarySplit(
 const CommonFields = {
   /** The requester's approval PIN: submitting signs "Requested by". Checked by the server, never stored. */
   pin: PIN,
+  /** Set when this form converts a rejected requisition into the other form type. */
+  converted_from_id: z.string().uuid().optional(),
   beneficiary_details: z.array(BeneficiarySchema).min(1, "Add at least one beneficiary"),
   // Supporting documents are optional — up to 20 files, max 20 MB combined.
   attachments: z
@@ -123,15 +140,19 @@ export const PettyCashSchema = z
   .object({
     form_type: z.literal("petty_cash"),
     line_items: z.array(LineItemSchema).min(1, "Add at least one item").max(30),
+    /** Required when the total is above the petty cash cap: the requester ticks "exception" and says why. */
+    exception_reason: z.string().trim().max(500, "Keep the exception reason under 500 characters").optional(),
     ...CommonFields,
   })
   .superRefine((value, ctx) => {
     const total = lineItemsTotal(value.line_items)
-    if (total > PETTY_CASH_MAX) {
+    if (total > PETTY_CASH_MAX && (value.exception_reason?.length ?? 0) < 10) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["line_items"],
-        message: amountOutOfRangeMessage("petty_cash", total) || "Over the petty cash limit",
+        path: ["exception_reason"],
+        message:
+          amountOutOfRangeMessage("petty_cash", total) ||
+          "Over the petty cash limit: tick exception and say why (at least 10 characters)",
       })
     }
     if (value.beneficiary_details.length > MAX_BENEFICIARIES.petty_cash) {

@@ -277,9 +277,16 @@ export async function getViewerActions(
     viewer.paymentFormTypes.includes(req.form_type) &&
     req.user_id !== viewer.userId &&
     (req.status === "awaiting_payment" || req.status === "partly_paid")
+  const isRequester = req.user_id === viewer.userId
+  // The requester may change the form until anyone has signed past them.
+  const untouched = (req.stages || []).every(
+    (s) => s.state !== "signed" && s.state !== "bypassed" && s.state !== "rejected"
+  )
   return {
     sign_stage_id: signable?.stage.id ?? null,
     would_bypass_stage_ids: signable?.bypassed.map((s) => s.id) ?? [],
+    can_edit: isRequester && req.status === "pending" && untouched,
+    can_convert: isRequester && req.status === "rejected",
     can_record_payment: canPay,
     // Once a Payment Request is paid the MD only signs it off; there is nothing left to reject.
     can_reject: Boolean(signable) && req.status === "pending",

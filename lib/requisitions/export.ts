@@ -25,7 +25,11 @@ export function buildRequisitionExportRows(rows: Requisition[]): RequisitionExpo
     Status: STATUS_LABELS[r.status],
     "Where it is": progressLabel(r),
     Beneficiaries: r.beneficiary_details
-      .map((b) => `${b.account_name} (${b.bank_name} ${b.account_number})${b.purpose ? ` for ${b.purpose}` : ""}`)
+      .map((b) =>
+        b.payment_method === "cash"
+          ? `${b.account_name} (cash)${b.purpose ? ` for ${b.purpose}` : ""}`
+          : `${b.account_name} (${b.bank_name} ${b.account_number})${b.purpose ? ` for ${b.purpose}` : ""}`
+      )
       .join("; "),
   }))
 }

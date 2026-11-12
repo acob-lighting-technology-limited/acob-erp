@@ -75,12 +75,22 @@ export function RequisitionBeneficiaryTable({ beneficiaries }: { beneficiaries: 
                 <CopyableCell value={b.account_name} label="account name" />
                 <BankConfirmation beneficiary={b} />
               </td>
-              <td className="p-2 font-mono">
-                <CopyableCell value={b.account_number} label="account number" />
-              </td>
-              <td className="p-2">
-                <CopyableCell value={b.bank_name} label="bank name" />
-              </td>
+              {b.payment_method === "cash" ? (
+                <>
+                  <td className="text-muted-foreground p-2 italic" colSpan={2}>
+                    Paid in cash: no account
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td className="p-2 font-mono">
+                    <CopyableCell value={b.account_number} label="account number" />
+                  </td>
+                  <td className="p-2">
+                    <CopyableCell value={b.bank_name} label="bank name" />
+                  </td>
+                </>
+              )}
               {showPurpose ? <td className="p-2">{b.purpose || "—"}</td> : null}
               {showAmounts ? (
                 <td className="p-2 text-right font-mono">

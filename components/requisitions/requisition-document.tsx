@@ -146,8 +146,16 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
             {req.beneficiary_details.map((b, i) => (
               <tr key={`row-${i}`}>
                 <td className="border border-slate-500 p-1.5">{b.account_name}</td>
-                <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
-                <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
+                {b.payment_method === "cash" ? (
+                  <td className="border border-slate-500 p-1.5 italic" colSpan={2}>
+                    Cash: no account
+                  </td>
+                ) : (
+                  <>
+                    <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
+                    <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
+                  </>
+                )}
                 {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}
                 {showAmounts && (
                   <td className="border border-slate-500 p-1.5 text-right">

@@ -2,8 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { AlertCircle, ArrowLeft, Download, FastForward, FileText, Loader2, Wallet, XCircle } from "lucide-react"
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRightLeft,
+  Download,
+  FastForward,
+  FileText,
+  Loader2,
+  Pencil,
+  Wallet,
+  XCircle,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -19,6 +31,7 @@ import { PaymentDialog } from "./payment-dialog"
 import { RequisitionDownloadDialog } from "./requisition-download-dialog"
 import { UnpaidNotice } from "./unpaid-tag"
 import { SignDialog, type SignMode } from "./sign-dialog"
+import { NewRequisitionDialog } from "./new-requisition-dialog"
 
 import { LinesSkeleton } from "@/components/skeletons"
 export type Viewer = RequisitionViewerActions & { is_admin: boolean }
@@ -51,6 +64,9 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   const [signMode, setSignMode] = useState<SignMode | null>(null)
   const [paying, setPaying] = useState(false)
   const [pickingDownload, setPickingDownload] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [converting, setConverting] = useState(false)
+  const router = useRouter()
   const sheetRef = useRef<HTMLElement>(null)
 
   const load = useCallback(async () => {
@@ -102,11 +118,43 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
           title={`${FORM_LABELS[requisition.form_type]} ${requisition.requisition_number}`}
           backLink={{ href: backHref, label: "Back to requisitions" }}
           actions={
-            <Button variant="outline" size="sm" onClick={() => setPickingDownload(true)}>
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {viewer.can_edit ? (
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              ) : null}
+              {viewer.can_convert ? (
+                <Button variant="outline" size="sm" onClick={() => setConverting(true)}>
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  Convert to {requisition.form_type === "petty_cash" ? "Payment Request" : "Petty Cash"}
+                </Button>
+              ) : null}
+              <Button variant="outline" size="sm" onClick={() => setPickingDownload(true)}>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            </div>
           }
+        />
+        <NewRequisitionDialog
+          open={editing}
+          onOpenChange={setEditing}
+          editing={requisition}
+          onSuccess={() => {
+            setEditing(false)
+            load()
+          }}
+        />
+        <NewRequisitionDialog
+          open={converting}
+          onOpenChange={setConverting}
+          convertFrom={requisition}
+          onSuccess={() => {
+            setConverting(false)
+            router.push(backHref)
+          }}
         />
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className={statusBadgeClass(requisition.status)}>

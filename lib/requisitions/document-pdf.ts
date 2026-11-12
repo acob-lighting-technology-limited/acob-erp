@@ -34,6 +34,20 @@ const CAPTION_HEIGHT_PT = 26
 /** Longest side of an attached picture, so a phone photo does not make a huge file. */
 const MAX_IMAGE_SIDE_PX = 2400
 
+/**
+ * How far the form's real content reaches, from the top of the sheet. Measured
+ * from the content rather than the sheet's box, so trailing margins and borders
+ * do not push a form that fits on one page onto a second.
+ */
+function contentHeight(sheet: HTMLElement) {
+  const top = sheet.getBoundingClientRect().top
+  let bottom = 0
+  for (const el of Array.from(sheet.querySelectorAll<HTMLElement>("*"))) {
+    bottom = Math.max(bottom, el.getBoundingClientRect().bottom - top)
+  }
+  return bottom
+}
+
 async function imagesReady(root: HTMLElement) {
   await Promise.all(
     Array.from(root.querySelectorAll("img")).map((img) =>
@@ -173,7 +187,7 @@ export async function downloadRequisitionPdf(sheet: HTMLElement, fileName: strin
   try {
     await imagesReady(clone)
     // A whole number of pages: the signatures stay at the foot of the last one.
-    const pages = Math.max(1, Math.ceil((clone.offsetHeight - 2) / PAGE_HEIGHT_PX))
+    const pages = Math.max(1, Math.ceil((contentHeight(clone) + SHEET_PADDING_PX) / PAGE_HEIGHT_PX))
     clone.style.minHeight = `${pages * PAGE_HEIGHT_PX}px`
     const dataUrl = await toPng(clone, { pixelRatio: PIXEL_RATIO, backgroundColor: "#ffffff", cacheBust: true })
 

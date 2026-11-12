@@ -138,6 +138,8 @@ export async function loadSchedulableLines(admin: SupabaseClient): Promise<Sched
     const outstanding = Math.round((Number(req.amount) - Number(req.amount_paid) - pendingTotal) * 100) / 100
     if (outstanding <= 0) continue
     req.beneficiary_details.forEach((b, index) => {
+      // Cash is handed over, not transferred: it never goes on a bank schedule.
+      if (b.payment_method === "cash") return
       const live = own.some((i) => i.beneficiary_index === index && i.outcome !== "unpaid")
       if (live) return
       const single = req.beneficiary_details.length === 1

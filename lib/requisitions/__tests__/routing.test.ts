@@ -103,15 +103,21 @@ test("petty cash: self-signing moves up a level", () => {
   assert.deepEqual(route("petty_cash", lead("qa", "Quality Assurance")), ["authorized:hr", "approved:hcs"])
   // Admin & HR staff → HCS approves (HR Lead would sign twice).
   assert.deepEqual(route("petty_cash", staff("u", "Admin and HR")), ["authorized:hr", "approved:hcs"])
-  // HR Lead → HCS authorizes; approval would also be HCS, so the MD approves.
-  assert.deepEqual(route("petty_cash", lead("hr", "Admin and HR")), ["authorized:hcs", "approved:md"])
-  // HCS → MD approves.
+  // HR Lead → HCS authorizes; approval would also be HCS, so no approval is required.
+  assert.deepEqual(route("petty_cash", lead("hr", "Admin and HR")), ["authorized:hcs", "approved:—"])
+  // HCS → HR Lead authorizes; no approval is required.
   assert.deepEqual(route("petty_cash", lead("hcs", "Corporate Services", ["IT and Communications"])), [
     "authorized:hr",
-    "approved:md",
+    "approved:—",
   ])
   // MD → their lead is themselves, so HCS approves.
   assert.deepEqual(route("petty_cash", lead("md", "Executive Management")), ["authorized:hr", "approved:hcs"])
+})
+
+test("petty cash: never routes to the MD", () => {
+  for (const requester of [lead("hr", "Admin and HR"), lead("hcs", "Corporate Services"), staff("u", "Admin and HR")]) {
+    assert.ok(!route("petty_cash", requester).some((stage) => stage.endsWith(":md")))
+  }
 })
 
 test("petty cash: a department with no lead goes to HCS", () => {
