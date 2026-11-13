@@ -571,26 +571,44 @@ export function AdminReferenceGeneratorContent({
         ]}
         expandable={{
           render: (r) => (
-            <div className="space-y-3">
-              <SectionHeading title="Correspondence" />
-              <DetailList
-                items={[
-                  { label: "Subject", value: r.subject, wide: true },
-                  { label: "Department", value: r.department_name || r.assigned_department_name || null },
-                  {
-                    label: "Recipient",
-                    value: r.recipient_name
-                      ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
-                      : null,
-                  },
-                  { label: "Requested by", value: r.sender_name || null },
-                  ...(r.created_by_name && r.created_by_name !== r.sender_name
-                    ? [{ label: "Created by", value: r.created_by_name }]
-                    : []),
-                  { label: "Due date", value: r.due_date || null },
-                  { label: "Action required", value: r.action_required ? "Yes" : "No" },
-                ]}
-              />
+            <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+              <div className="space-y-3">
+                <SectionHeading title="Correspondence overview" />
+                <div>
+                  <Badge className={cn("text-xs", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
+                </div>
+                <DetailList
+                  items={[
+                    { label: "Subject", value: r.subject, wide: true },
+                    { label: "Department", value: r.department_name || r.assigned_department_name || null },
+                    {
+                      label: "Recipient",
+                      value: r.recipient_name
+                        ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
+                        : null,
+                    },
+                    { label: "Requested by", value: r.sender_name || null },
+                    ...(r.created_by_name && r.created_by_name !== r.sender_name
+                      ? [{ label: "Created by", value: r.created_by_name }]
+                      : []),
+                    { label: "Due date", value: r.due_date || null },
+                    { label: "Action required", value: r.action_required ? "Yes" : "No" },
+                  ]}
+                />
+              </div>
+              <div className="space-y-3">
+                <SectionHeading title="Timeline" />
+                <DetailList
+                  items={[
+                    { label: "Created", value: r.created_at ? formatWATDate(r.created_at) : null },
+                    { label: "Submitted", value: r.submitted_at ? formatWATDate(r.submitted_at) : null },
+                    { label: "Approved", value: r.approved_at ? formatWATDate(r.approved_at) : null },
+                    { label: "Sent", value: r.sent_at ? formatWATDate(r.sent_at) : null },
+                    { label: "Received", value: r.received_at ? formatWATDate(r.received_at) : null },
+                    { label: "Version", value: `v${r.current_version}` },
+                  ]}
+                />
+              </div>
             </div>
           ),
         }}
