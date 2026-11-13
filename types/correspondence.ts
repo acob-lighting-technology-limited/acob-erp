@@ -62,6 +62,8 @@ export interface CorrespondenceApproval {
   correspondence_id: string
   approval_stage: string
   approver_id: string | null
+  /** Added by the record API from the staff directory; not a column. */
+  approver_name?: string | null
   status: ApprovalStatus
   comments: string | null
   requested_at: string
