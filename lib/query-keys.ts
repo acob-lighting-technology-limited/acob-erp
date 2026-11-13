@@ -275,6 +275,7 @@ export const QUERY_KEYS = {
   adminSecurityEmployees: () => ["admin-security-employees"],
   adminSecurityNetworkActivity: (filters?: Record<string, unknown>) =>
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
+  adminSecurityNetworkUsage: (range: { from: string; to: string }) => ["admin-security-network-usage", range],
 
   // Dev / maintenance
   devUserAuditLogs: (userId: string) => ["dev-user-audit-logs", userId],

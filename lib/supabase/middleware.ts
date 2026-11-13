@@ -403,6 +403,7 @@ export async function updateSession(request: NextRequest) {
     !pathname.startsWith("/api/devices") &&
     pathname !== "/api/telemetry/errors" &&
     !pathname.startsWith("/api/ingest/network-activity") &&
+    !pathname.startsWith("/api/ingest/network-usage") &&
     !isCronRoute(pathname)
   ) {
     const url = request.nextUrl.clone()

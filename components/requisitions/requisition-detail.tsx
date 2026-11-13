@@ -44,6 +44,8 @@ export function statusBadgeClass(status: Requisition["status"]) {
   switch (status) {
     case "rejected":
       return TONE_CLASSES.danger
+    case "cancelled":
+      return TONE_CLASSES.neutral
     case "paid":
       return TONE_CLASSES.success
     case "awaiting_payment":

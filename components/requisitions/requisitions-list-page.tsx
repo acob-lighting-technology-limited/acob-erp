@@ -15,7 +15,6 @@ import {
   Inbox,
   Pencil,
   PenLine,
-  Share2,
   Plus,
   Wallet,
   CalendarClock,
@@ -55,7 +54,6 @@ import type {
 } from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { UpdateRejectedDialog } from "./update-rejected-dialog"
-import { shareRequisition } from "./share-requisition"
 import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeClass } from "./requisition-detail"
@@ -197,7 +195,10 @@ export function RequisitionsListPage({
   const basePath = detailBasePath || (surface === "admin" ? ADMIN_REQUISITIONS_PATH : STAFF_REQUISITIONS_PATH)
   const detailHref = (r: Requisition) => `${basePath}/${r.id}`
   const count = (status: RequisitionStatus) => rows.filter((r) => r.status === status).length
-  const totalAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  // Rejected and cancelled requisitions are shown in the list but are not money committed, so they are left out of the total.
+  const totalAmount = rows
+    .filter((r) => r.status !== "rejected" && r.status !== "cancelled")
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 
   const columns: DataTableColumn<Requisition>[] = [
     {
@@ -482,11 +483,6 @@ export function RequisitionsListPage({
               hidden: (r) => !r.can_update,
             },
             { label: "Preview", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
-            {
-              label: "Share",
-              icon: Share2,
-              onClick: (r) => void shareRequisition(r.requisition_number, detailHref(r)),
-            },
           ]}
           inlineRowActions={tab === "payment" || tab === "mine"}
           isLoading={isLoading}
