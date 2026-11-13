@@ -34,6 +34,7 @@ import { AssetFormDialog } from "@/components/assets/AssetFormDialog"
 import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
 import { AssetRowPanel } from "@/components/assets/asset-row-panel"
 import { AssetHistoryView, type AssetHistoryViewHandle } from "./_components/asset-history-view"
+import { AssetReportsView } from "./_components/asset-reports-view"
 import { AssetIssuesSheet } from "@/components/assets/asset-issues-sheet"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
@@ -88,11 +89,12 @@ async function fetchAssetTypes(): Promise<{ label: string; code: string; require
 
 const currentYear = new Date().getFullYear()
 
-type AssetsTab = "assets" | "history"
+type AssetsTab = "assets" | "history" | "reports"
 
 const ASSETS_TABS: DataTableTab[] = [
   { key: "assets", label: "Assets" },
   { key: "history", label: "History" },
+  { key: "reports", label: "Staff reports" },
 ]
 
 interface AdminAssetsContentProps {
@@ -117,8 +119,11 @@ export function AdminAssetsContent({
   const router = useRouter()
   // Links can open a tab directly (e.g. ?tab=history).
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<AssetsTab>(searchParams.get("tab") === "history" ? "history" : "assets")
+  const [activeTab, setActiveTab] = useState<AssetsTab>(
+    ASSETS_TABS.some((t) => t.key === searchParams.get("tab")) ? (searchParams.get("tab") as AssetsTab) : "assets"
+  )
   const isHistoryTab = activeTab === "history"
+  const isReportsTab = activeTab === "reports"
   // Export follows the open tab: on History it exports the history, not the asset list.
   const historyRef = useRef<AssetHistoryViewHandle>(null)
   const [historyCount, setHistoryCount] = useState(0)
@@ -1198,7 +1203,9 @@ export function AdminAssetsContent({
       description={
         isHistoryTab
           ? "Everything that has happened to each asset: added, assigned, returned, status changes, issues and archiving."
-          : "Manage asset inventory, assignments, history, and issue tracking."
+          : isReportsTab
+            ? "Problems staff reported about assets assigned to them: not received, not with them, already returned, wrong details."
+            : "Manage asset inventory, assignments, history, and issue tracking."
       }
       tabs={ASSETS_TABS}
       activeTab={activeTab}
@@ -1207,17 +1214,19 @@ export function AdminAssetsContent({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <HeaderMoreMenu items={[{ label: "Asset issues", icon: AlertCircle, href: issuesHref }]} />
-          <Button
-            variant="outline"
-            onClick={() => (isHistoryTab ? historyRef.current?.exportToExcel() : setExportOptionsOpen(true))}
-            disabled={isHistoryTab && historyCount === 0}
-            className="gap-2"
-            size="sm"
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-          {!userProfile?.is_department_lead && !isHistoryTab && (
+          {!isReportsTab && (
+            <Button
+              variant="outline"
+              onClick={() => (isHistoryTab ? historyRef.current?.exportToExcel() : setExportOptionsOpen(true))}
+              disabled={isHistoryTab && historyCount === 0}
+              className="gap-2"
+              size="sm"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          )}
+          {!userProfile?.is_department_lead && !isHistoryTab && !isReportsTab && (
             <Button onClick={() => void handleOpenAssetDialog()} className="gap-2" size="sm">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Asset</span>
@@ -1227,7 +1236,7 @@ export function AdminAssetsContent({
         </div>
       }
       stats={
-        isHistoryTab ? undefined : (
+        isHistoryTab || isReportsTab ? undefined : (
           <StatGrid>
             <StatCard
               variant="compact"
@@ -1273,7 +1282,9 @@ export function AdminAssetsContent({
         )
       }
     >
-      {isHistoryTab ? (
+      {isReportsTab ? (
+        <AssetReportsView assetIds={scopedAssetIds} onAssetsChanged={() => void loadData()} />
+      ) : isHistoryTab ? (
         <AssetHistoryView ref={historyRef} assetIds={scopedAssetIds} onVisibleCountChange={setHistoryCount} />
       ) : (
         <DataTable<Asset>

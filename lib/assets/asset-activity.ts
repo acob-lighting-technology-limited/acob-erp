@@ -1,10 +1,12 @@
 import { formatName } from "@/lib/utils"
 
+import type { AcceptanceStatus } from "@/lib/assets/acceptance"
+import { ASSET_REPORT_KIND_LABELS, type AssetRecordReportKind } from "@/lib/assets/asset-reports"
+
 /**
- * An asset's history as one list of events: added, assigned, returned, status changes, issues and
- * archiving. The assets page builds it in three places: the expanded row's timeline, the History
- * sheet and the History tab. They all go through `buildAssetActivities`, so the same event never
- * reads differently in two places.
+ * An asset's history as one list of events: added, assigned, accepted, returned, status changes,
+ * issues, staff reports and archiving. The expanded row's timeline and the History tab both go
+ * through `buildAssetActivities`, so the same event never reads differently in two places.
  */
 
 export type AssetActivityType =
@@ -15,6 +17,9 @@ export type AssetActivityType =
   | "issue_reported"
   | "issue_resolved"
   | "archived"
+  | "accepted"
+  | "report_raised"
+  | "report_closed"
 
 export interface AssetActivity {
   id: string
@@ -45,6 +50,9 @@ export const ASSET_ACTIVITY_LABELS: Record<AssetActivityType, string> = {
   issue_reported: "Issue reported",
   issue_resolved: "Issue resolved",
   archived: "Archived",
+  accepted: "Accepted",
+  report_raised: "Staff report",
+  report_closed: "Report decided",
 }
 
 // ─── Raw rows, as the history API returns them ─────────────────────────────────
@@ -73,6 +81,22 @@ export interface AssetHistoryAssignmentRow {
   department: string | null
   office_location: string | null
   assignment_type: string | null
+  acceptance_status: AcceptanceStatus
+  accepted_at: string | null
+}
+
+export interface AssetHistoryReportRow {
+  id: string
+  asset_id: string
+  reported_by: string
+  kind: AssetRecordReportKind
+  note: string | null
+  status: "open" | "resolved" | "rejected"
+  resolution_note: string | null
+  released: boolean
+  resolved_by: string | null
+  resolved_at: string | null
+  created_at: string
 }
 
 export interface AssetHistoryIssueRow {
@@ -100,6 +124,7 @@ export interface AssetHistoryPayload {
   assignments: AssetHistoryAssignmentRow[]
   issues: AssetHistoryIssueRow[]
   statusChanges: AssetHistoryStatusRow[]
+  reports: AssetHistoryReportRow[]
   users: { id: string; first_name: string | null; last_name: string | null }[]
 }
 
@@ -182,6 +207,50 @@ export function buildAssetActivities(payload: AssetHistoryPayload): AssetActivit
           assignment_type: a.assignment_type ?? undefined,
           held_days: held >= 0 ? Math.max(1, Math.round(held / DAY_MS)) : undefined,
         },
+      })
+    }
+  }
+
+  for (const a of payload.assignments) {
+    if (!a.accepted_at || (a.acceptance_status !== "accepted" && a.acceptance_status !== "auto_accepted")) continue
+    const auto = a.acceptance_status === "auto_accepted"
+    const holder = holderName(a)
+    activities.push({
+      id: `${a.id}-accepted`,
+      asset_id: a.asset_id,
+      timestamp: a.accepted_at,
+      type: "accepted",
+      title: auto ? "Accepted automatically" : `Receipt confirmed by ${holder}`,
+      description: auto ? `${holder} did not respond within three working days.` : undefined,
+      user_name: holder,
+      performed_by_name: auto ? undefined : (personName(a.assigned_to) ?? undefined),
+    })
+  }
+
+  for (const r of payload.reports ?? []) {
+    const what = ASSET_REPORT_KIND_LABELS[r.kind]?.label ?? "Problem"
+    const reporter = personName(r.reported_by) ?? undefined
+    activities.push({
+      id: `${r.id}-report`,
+      asset_id: r.asset_id,
+      timestamp: r.created_at,
+      type: "report_raised",
+      title: `${reporter ?? "Holder"} reported: ${what}`,
+      description: r.note ?? undefined,
+      performed_by_name: reporter,
+    })
+    if (r.status !== "open" && r.resolved_at) {
+      activities.push({
+        id: `${r.id}-decided`,
+        asset_id: r.asset_id,
+        timestamp: r.resolved_at,
+        type: "report_closed",
+        title:
+          r.status === "rejected"
+            ? `Report rejected: ${what}`
+            : `Report resolved${r.released ? ", asset released" : ""}: ${what}`,
+        description: r.resolution_note ?? undefined,
+        performed_by_name: personName(r.resolved_by) ?? undefined,
       })
     }
   }

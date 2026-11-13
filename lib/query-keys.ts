@@ -233,6 +233,7 @@ export const QUERY_KEYS = {
   /** One asset's timeline; with no id, the prefix that also covers the History tab. */
   adminAssetHistory: (assetId?: string) => (assetId ? ["admin-asset-history", assetId] : ["admin-asset-history"]),
   adminAssetHistoryAll: () => ["admin-asset-history", "all"],
+  adminAssetReports: () => ["admin-asset-reports"],
 
   // Admin projects
   adminProjectDetail: (id: string) => ["admin-project-detail", id],

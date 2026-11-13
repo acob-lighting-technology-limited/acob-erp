@@ -6,9 +6,12 @@ import {
   Archive,
   ArrowRight,
   CheckCircle2,
+  MessageSquareWarning,
+  PackageCheck,
   type LucideIcon,
   Plus,
   RefreshCw,
+  ShieldCheck,
   UserMinus,
   UserPlus,
 } from "lucide-react"
@@ -34,6 +37,13 @@ export const ASSET_ACTIVITY_STYLE: Record<AssetActivityType, { icon: LucideIcon;
     node: "border-muted-foreground bg-muted-foreground text-white",
     badge: "bg-muted text-muted-foreground",
   },
+  accepted: { icon: PackageCheck, node: "border-success bg-success text-white", badge: "bg-success/15 text-success" },
+  report_raised: {
+    icon: MessageSquareWarning,
+    node: "border-warning bg-warning text-white",
+    badge: "bg-warning/15 text-warning",
+  },
+  report_closed: { icon: ShieldCheck, node: "border-info bg-info text-white", badge: "bg-info/15 text-info" },
 }
 
 export function heldFor(days: number): string {

@@ -32,9 +32,12 @@ function payload(overrides: Partial<AssetHistoryPayload> = {}): AssetHistoryPayl
         department: null,
         office_location: null,
         assignment_type: "individual",
+        acceptance_status: "not_required",
+        accepted_at: null,
       },
     ],
     issues: [],
+    reports: [],
     statusChanges: [
       // Echo of the assignment two minutes later: hidden.
       {
@@ -89,6 +92,44 @@ test("names the holder and who did it", () => {
   assert.equal(returned.title, "Returned by Ada Obi")
   assert.equal(returned.details?.held_days, 30)
   assert.equal(created.performed_by_name, "Farouk Mustapha")
+})
+
+test("acceptance, an automatic acceptance and a staff report each become an event", () => {
+  const base = payload()
+  const activities = buildAssetActivities({
+    ...base,
+    assignments: [
+      { ...base.assignments[0], acceptance_status: "accepted", accepted_at: "2025-10-04T09:00:00+00:00" },
+      {
+        ...base.assignments[0],
+        id: "as2",
+        assigned_at: "2025-12-02T10:00:00+00:00",
+        handed_over_at: null,
+        acceptance_status: "auto_accepted",
+        accepted_at: "2025-12-08T07:20:00+00:00",
+      },
+    ],
+    reports: [
+      {
+        id: "r1",
+        asset_id: ASSET,
+        reported_by: "u-farouk",
+        kind: "already_returned",
+        note: "Handed to IT on 3 Nov",
+        status: "resolved",
+        resolution_note: "Confirmed",
+        released: true,
+        resolved_by: "u-admin",
+        resolved_at: "2025-12-10T10:00:00+00:00",
+        created_at: "2025-12-09T10:00:00+00:00",
+      },
+    ],
+  })
+  const titles = activities.map((a) => a.title)
+  assert.ok(titles.includes("Receipt confirmed by Ada Obi"))
+  assert.ok(titles.includes("Accepted automatically"))
+  assert.ok(titles.includes("Ada Obi reported: I already returned it"))
+  assert.ok(titles.includes("Report resolved, asset released: I already returned it"))
 })
 
 test("a status change to assigned with no assignment nearby is kept", () => {

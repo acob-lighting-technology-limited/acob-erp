@@ -4,6 +4,12 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AssetsContent } from "./assets-content"
 
 import { logger } from "@/lib/logger"
+import { acceptanceRespondBy, type AcceptanceStatus } from "@/lib/assets/acceptance"
+import type { AssetRecordReportKind } from "@/lib/assets/asset-reports"
+import { loadApprovedLeaveDates, loadHolidays } from "@/lib/hr/non-working-days"
+import { addIsoDays } from "@/lib/hr/leave-days"
+import { nonWorkingDaysFor } from "@/lib/tasks/overdue"
+import { toLocalISODate } from "@/lib/utils/date"
 
 import type { Metadata } from "next"
 
@@ -35,6 +41,11 @@ export interface AssetAssignment {
     last_name: string
   }
   department?: string
+  acceptance_status: AcceptanceStatus
+  /** While acceptance is pending: the last day to respond before it counts as received. */
+  respond_by: string | null
+  /** A record problem this person reported and an admin has not decided yet. */
+  open_report_kind: AssetRecordReportKind | null
 }
 
 type AssetsPageClient = Awaited<ReturnType<typeof createClient>>
@@ -46,6 +57,8 @@ type IndividualAssignmentRow = {
   assigned_by?: string | null
   asset_id: string
   department?: string | null
+  acceptance_status: AcceptanceStatus
+  created_at: string
 }
 
 const isDefined = <T,>(value: T | null | undefined): value is T => value != null
@@ -75,7 +88,9 @@ async function getAssetsData() {
       assignment_notes,
       assigned_by,
       asset_id,
-      department
+      department,
+      acceptance_status,
+      created_at
     `
     )
     .eq("assigned_to", user.id)
@@ -112,6 +127,35 @@ async function getAssetsData() {
     })
   )
 
+  // Open reports, so a row shows "report sent" instead of inviting a second one.
+  const { data: openReports } = await dataClient
+    .from("asset_reports")
+    .select("assignment_id, kind")
+    .eq("reported_by", user.id)
+    .eq("status", "open")
+  const openReportByAssignment = new Map(
+    ((openReports || []) as { assignment_id: string | null; kind: AssetRecordReportKind }[])
+      .filter((report) => report.assignment_id)
+      .map((report) => [report.assignment_id as string, report.kind])
+  )
+
+  // The respond-by date skips weekends, holidays and this person's own leave, as the daily job does.
+  const pendingEntered = assignmentsList
+    .filter((a) => a.acceptance_status === "pending")
+    .map((a) => toLocalISODate(new Date(a.created_at)))
+    .sort()
+  let respondByFor = (_enteredIso: string): string | null => null
+  if (pendingEntered.length > 0) {
+    const start = pendingEntered[0]
+    const end = addIsoDays(toLocalISODate(), 60)
+    const [holidays, leave] = await Promise.all([
+      loadHolidays(dataClient, start, end),
+      loadApprovedLeaveDates(dataClient, [user.id], start, end),
+    ])
+    const excluded = nonWorkingDaysFor(holidays, leave.get(user.id) ?? [])
+    respondByFor = (enteredIso) => acceptanceRespondBy(enteredIso, excluded)
+  }
+
   const assignments = assignmentsWithDetails
     .map((entry): AssetAssignment | null => {
       if (!entry.asset) return null
@@ -124,6 +168,10 @@ async function getAssetsData() {
         asset: entry.asset,
         assigner: entry.assigner || undefined,
         department: entry.department || undefined,
+        acceptance_status: entry.acceptance_status,
+        respond_by:
+          entry.acceptance_status === "pending" ? respondByFor(toLocalISODate(new Date(entry.created_at))) : null,
+        open_report_kind: openReportByAssignment.get(entry.id) ?? null,
       }
     })
     .filter(isDefined)

@@ -4,6 +4,7 @@ import type {
   AssetHistoryAssignmentRow,
   AssetHistoryIssueRow,
   AssetHistoryPayload,
+  AssetHistoryReportRow,
   AssetHistoryStatusRow,
 } from "@/lib/assets/asset-activity"
 
@@ -18,7 +19,10 @@ export async function fetchAssetHistory(
   assetIds: string[] | null
 ): Promise<{ data: AssetHistoryPayload; error: null } | { data: null; error: unknown }> {
   if (assetIds && assetIds.length === 0) {
-    return { data: { assets: [], assignments: [], issues: [], statusChanges: [], users: [] }, error: null }
+    return {
+      data: { assets: [], assignments: [], issues: [], statusChanges: [], reports: [], users: [] },
+      error: null,
+    }
   }
 
   let assetsQuery = db
@@ -27,7 +31,7 @@ export async function fetchAssetHistory(
   let assignmentsQuery = db
     .from("asset_assignments")
     .select(
-      "id, asset_id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_by, assigned_to, department, office_location, assignment_type"
+      "id, asset_id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_by, assigned_to, department, office_location, assignment_type, acceptance_status, accepted_at"
     )
   let issuesQuery = db
     .from("asset_issues")
@@ -41,20 +45,28 @@ export async function fetchAssetHistory(
     .eq("table_name", "assets")
     .eq("operation", "UPDATE")
 
+  let reportsQuery = db
+    .from("asset_reports")
+    .select(
+      "id, asset_id, reported_by, kind, note, status, resolution_note, released, resolved_by, resolved_at, created_at"
+    )
+
   if (assetIds) {
+    reportsQuery = reportsQuery.in("asset_id", assetIds)
     assetsQuery = assetsQuery.in("id", assetIds)
     assignmentsQuery = assignmentsQuery.in("asset_id", assetIds)
     issuesQuery = issuesQuery.in("asset_id", assetIds)
     statusQuery = statusQuery.in("record_id", assetIds)
   }
 
-  const [assetsRes, assignmentsRes, issuesRes, statusRes] = await Promise.all([
+  const [assetsRes, assignmentsRes, issuesRes, statusRes, reportsRes] = await Promise.all([
     assetsQuery,
     assignmentsQuery,
     issuesQuery,
     statusQuery,
+    reportsQuery,
   ])
-  const failed = assetsRes.error || assignmentsRes.error || issuesRes.error || statusRes.error
+  const failed = assetsRes.error || assignmentsRes.error || issuesRes.error || statusRes.error || reportsRes.error
   if (failed) return { data: null, error: failed }
 
   const assets = (assetsRes.data ?? []) as AssetHistoryAssetRow[]
@@ -81,6 +93,11 @@ export async function fetchAssetHistory(
     add(i.resolved_by)
   })
   statusChanges.forEach((s) => add(s.user_id))
+  const reports = (reportsRes.data ?? []) as AssetHistoryReportRow[]
+  reports.forEach((r) => {
+    add(r.reported_by)
+    add(r.resolved_by)
+  })
 
   let users: AssetHistoryPayload["users"] = []
   if (userIds.size > 0) {
@@ -89,5 +106,5 @@ export async function fetchAssetHistory(
     users = (data ?? []) as AssetHistoryPayload["users"]
   }
 
-  return { data: { assets, assignments, issues, statusChanges, users }, error: null }
+  return { data: { assets, assignments, issues, statusChanges, reports, users }, error: null }
 }

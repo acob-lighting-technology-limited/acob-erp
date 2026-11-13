@@ -1,13 +1,14 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { AlertCircle, Archive, CheckCircle2, Package, Wrench } from "lucide-react"
+import { AlertCircle, Archive, CheckCircle2, MessageSquareWarning, Package, Wrench } from "lucide-react"
 import { DetailList, SectionHeading } from "@/components/ui/detail-list"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AssetTimeline } from "@/components/assets/asset-timeline"
 import { apiJson } from "@/lib/api-client"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { buildAssetActivities, type AssetHistoryPayload } from "@/lib/assets/asset-activity"
+import { ACCEPTANCE_LABELS, type AcceptanceStatus } from "@/lib/assets/acceptance"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
@@ -20,10 +21,18 @@ export function useAssetActivities(assetId: string | null) {
   return useQuery({
     queryKey: QUERY_KEYS.adminAssetHistory(assetId ?? undefined),
     enabled: Boolean(assetId),
-    queryFn: async () =>
-      buildAssetActivities(
-        await apiJson<AssetHistoryPayload>(`/api/admin/assets/${assetId}/history`, { cache: "no-store" })
-      ),
+    queryFn: async () => {
+      const payload = await apiJson<AssetHistoryPayload>(`/api/admin/assets/${assetId}/history`, { cache: "no-store" })
+      // The open assignment (not handed back), newest first: its acceptance is the asset's.
+      const current = payload.assignments
+        .filter((a) => !a.handed_over_at)
+        .sort((a, b) => new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime())[0]
+      return {
+        activities: buildAssetActivities(payload),
+        acceptance: (current?.acceptance_status ?? null) as AcceptanceStatus | null,
+        openReports: (payload.reports ?? []).filter((r) => r.status === "open").length,
+      }
+    },
     staleTime: 60_000,
     meta: { errorMessage: "Failed to load asset history" },
   })
@@ -61,7 +70,7 @@ function StatusStrip({ asset, holder }: { asset: Asset; holder: string }) {
 
 /**
  * An asset's expanded row, laid out like leave's and requisitions': the asset and where it is now
- * on the left, its timeline (added, assigned, returned, issues, status changes) on the right. The
+ * on the left (with whether the holder confirmed receipt), its timeline on the right. The
  * timeline loads when the row opens and reads oldest to newest, showing the latest few with the earlier
  * ones behind a button.
  */
@@ -75,7 +84,8 @@ export function AssetRowPanel({
   holder: string
   createdBy: string
 }) {
-  const { data: activities, isLoading, isError } = useAssetActivities(asset.id)
+  const { data, isLoading, isError } = useAssetActivities(asset.id)
+  const activities = data?.activities
   const openIssues = asset.unresolved_issues_count || 0
 
   return (
@@ -83,6 +93,15 @@ export function AssetRowPanel({
       <div className="space-y-3">
         <SectionHeading title="Asset overview" />
         <StatusStrip asset={asset} holder={holder} />
+        {data?.openReports ? (
+          <div className="border-warning/30 bg-warning/15 text-warning flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs">
+            <MessageSquareWarning className="mt-px h-4 w-4 shrink-0" />
+            <p className="font-medium">
+              {data.openReports === 1 ? "An open staff report" : `${data.openReports} open staff reports`} on this
+              asset. See the Reports tab.
+            </p>
+          </div>
+        ) : null}
         <DetailList
           items={[
             { label: "Type", value: ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type },
@@ -94,6 +113,27 @@ export function AssetRowPanel({
               value: asset.current_assignment?.office_location || asset.office_location || null,
             },
             { label: "Department", value: asset.current_assignment?.department || asset.department || null },
+            ...(data?.acceptance && data.acceptance !== "not_required"
+              ? [
+                  {
+                    label: "Receipt",
+                    value: (
+                      <span
+                        className={cn(
+                          "font-medium",
+                          data.acceptance === "accepted" || data.acceptance === "auto_accepted"
+                            ? "text-success"
+                            : data.acceptance === "disputed"
+                              ? "text-danger"
+                              : "text-warning"
+                        )}
+                      >
+                        {ACCEPTANCE_LABELS[data.acceptance]}
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
             { label: "Added by", value: createdBy },
             { label: "Added on", value: asset.created_at ? formatWATDate(asset.created_at) : null },
             {

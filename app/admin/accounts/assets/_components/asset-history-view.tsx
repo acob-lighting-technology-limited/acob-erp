@@ -54,6 +54,10 @@ function summary(row: HistoryRow): string {
       return row.description ?? "No reason given"
     case "created":
       return "Added to inventory"
+    case "accepted":
+    case "report_raised":
+    case "report_closed":
+      return row.description ? `${row.title}: ${row.description}` : row.title
   }
 }
 
