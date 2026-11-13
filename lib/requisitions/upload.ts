@@ -9,7 +9,18 @@ import {
 } from "./limits"
 
 const BUCKET = "requisition_documents"
-const ALLOWED = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"]
+const ALLOWED = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+])
 
 /**
  * Uploads supporting documents into the uploader's own folder of the private
@@ -39,14 +50,14 @@ export async function uploadRequisitionFiles(
 
   const uploaded: RequisitionAttachment[] = []
   for (const file of files) {
-    if (!ALLOWED.includes(file.type)) throw new Error(`${file.name}: upload a PDF or an image`)
+    if (!ALLOWED.has(file.type)) throw new Error(`${file.name}: upload a PDF, image, Word or Excel file`)
     if (file.size > REQUISITION_ATTACHMENT_MAX_FILE_BYTES) {
       throw new Error(
         `${file.name} exceeds the ${REQUISITION_ATTACHMENT_MAX_FILE_BYTES / (1024 * 1024)} MB limit for a single file`
       )
     }
     const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "")
-    const path = `${user.id}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const path = `${user.id}/${folder}/${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false, contentType: file.type })
     if (error) throw new Error(`Upload failed for ${file.name}: ${error.message}`)
     uploaded.push({ file_name: file.name, file_path: path, file_type: file.type, file_size: file.size })

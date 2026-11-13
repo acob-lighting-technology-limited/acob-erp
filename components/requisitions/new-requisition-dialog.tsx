@@ -36,6 +36,7 @@ import { apiFetch } from "@/lib/api-client"
 import { formatNaira } from "@/lib/requisitions/format"
 import {
   FORM_LABELS,
+  INLINE_BENEFICIARIES,
   MAX_BENEFICIARIES,
   PAYMENT_REQUEST_MIN,
   PETTY_CASH_MAX,
@@ -133,6 +134,7 @@ export function NewRequisitionDialog({
   const [exceptionOn, setExceptionOn] = useState(false)
   const [exceptionReason, setExceptionReason] = useState("")
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDraft[]>([emptyBeneficiary()])
+  const [addMoreBeneficiaries, setAddMoreBeneficiaries] = useState(false)
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -195,6 +197,7 @@ export function NewRequisitionDialog({
           })
         : [emptyBeneficiary()]
     )
+    setAddMoreBeneficiaries((from?.beneficiary_details?.length ?? 0) > INLINE_BENEFICIARIES)
     setAttachments(from?.attachments ?? [])
     setExceptionOn(Boolean(from?.exception_reason))
     setExceptionReason(from?.exception_reason ?? "")
@@ -286,7 +289,7 @@ export function NewRequisitionDialog({
   // Outside the form's usual range (petty cash above the cap, or a Payment Request below the minimum): an exception.
   const isException = rangeProblem !== null
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
-  const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
+  const maxBeneficiaries = formType ? (addMoreBeneficiaries ? MAX_BENEFICIARIES[formType] : INLINE_BENEFICIARIES) : 1
   const showSplit = beneficiaries.length > 1
   // The project is the site: there is no separate site location to ask for.
   const listedProject = costCategory === "operational" ? projects.find((p) => p.id === selectedProjectId) || null : null
@@ -826,6 +829,20 @@ export function NewRequisitionDialog({
                   <Plus className="mr-1.5 h-4 w-4" /> Add beneficiary
                 </Button>
               ) : null}
+              {!addMoreBeneficiaries ? (
+                <label className="text-muted-foreground flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4"
+                    checked={addMoreBeneficiaries}
+                    onChange={(event) => setAddMoreBeneficiaries(event.target.checked)}
+                  />
+                  <span>
+                    Add more beneficiaries (up to {MAX_BENEFICIARIES[formType!]}). The form and PDF will show LOTS; the
+                    full bank-layout spreadsheet is included when downloaded.
+                  </span>
+                </label>
+              ) : null}
               {showSplit ? (
                 <p className="text-muted-foreground text-xs">
                   Split amounts are optional; if you give them, they must add up to the total.
@@ -843,7 +860,7 @@ export function NewRequisitionDialog({
                   id="req-files"
                   type="file"
                   multiple
-                  accept="application/pdf,image/png,image/jpeg,image/webp"
+                  accept="application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                   disabled={uploading || attachments.length >= REQUISITION_ATTACHMENT_MAX_COUNT}
                   onChange={(e) => {
                     handleFiles(e.target.files)

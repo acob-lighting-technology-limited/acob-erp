@@ -6,9 +6,12 @@ export const PAYMENT_REQUEST_MIN = 50_000
 export const PETTY_CASH_MAX = 50_000
 
 export const MAX_BENEFICIARIES: Record<RequisitionFormType, number> = {
-  payment_request: 4,
-  petty_cash: 2,
+  payment_request: 100,
+  petty_cash: 100,
 }
+
+/** Keep ordinary requisitions short; larger payment runs use the bank-layout spreadsheet. */
+export const INLINE_BENEFICIARIES = 4
 
 export const FORM_LABELS: Record<RequisitionFormType, string> = {
   payment_request: "Payment Request",

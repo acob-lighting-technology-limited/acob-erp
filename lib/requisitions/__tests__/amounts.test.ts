@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { cleanAmountInput, lineItemsTotal, parseNaira } from "../limits"
+import { cleanAmountInput, INLINE_BENEFICIARIES, lineItemsTotal, MAX_BENEFICIARIES, parseNaira } from "../limits"
+
+it("uses four inline beneficiaries and up to one hundred on each form", () => {
+  assert.equal(INLINE_BENEFICIARIES, 4)
+  assert.deepEqual(MAX_BENEFICIARIES, { payment_request: 100, petty_cash: 100 })
+})
 
 describe("parseNaira", () => {
   it("reads pasted amounts with separators and symbols", () => {

@@ -186,7 +186,7 @@ export type PettyCashInput = z.input<typeof PettyCashSchema>
 export const AmountChangeSchema = z.object({
   amount: money.optional(),
   line_items: z.array(LineItemSchema).min(1).max(30).optional(),
-  beneficiary_details: z.array(BeneficiarySchema).min(1).max(4).optional(),
+  beneficiary_details: z.array(BeneficiarySchema).min(1).max(MAX_BENEFICIARIES.payment_request).optional(),
   reason: z.string().trim().min(3, "Say why the amount is changing").max(1000),
 })
 

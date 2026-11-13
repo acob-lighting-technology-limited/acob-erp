@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { attachmentHref, attachmentKind, type AttachmentKind } from "@/lib/requisitions/attachment-types"
 import { downloadRequisitionPdf } from "@/lib/requisitions/document-pdf"
 import type { Requisition } from "@/lib/requisitions/types"
+import { INLINE_BENEFICIARIES } from "@/lib/requisitions/limits"
 
 function sizeLabel(bytes: number | undefined) {
   if (!bytes) return null
@@ -40,6 +41,8 @@ export function RequisitionDownloadDialog({
   // Slashes are not allowed in file names: PR/HR/26/001 saves as PR-HR-26-001.pdf.
   const baseName = requisition.requisition_number.replace(/\//g, "-")
   const attachments = requisition.attachments || []
+  const hasBulkBeneficiaries = requisition.beneficiary_details.length > INLINE_BENEFICIARIES
+  const spreadsheetHref = `/api/requisitions/${requisition.id}/beneficiary-spreadsheet`
 
   const makePdf = async (key: string, withAttachments: boolean) => {
     const sheet = getSheet()
@@ -57,6 +60,14 @@ export function RequisitionDownloadDialog({
             }))
           : []
       )
+      if (withAttachments && hasBulkBeneficiaries) {
+        const link = document.createElement("a")
+        link.href = spreadsheetHref
+        link.download = `${baseName}-beneficiaries.xlsx`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create the PDF")
     } finally {
@@ -116,12 +127,28 @@ export function RequisitionDownloadDialog({
               </Button>
             )
           )}
-          {attachments.length
+          {hasBulkBeneficiaries
+            ? row(
+                "beneficiary-spreadsheet",
+                FileIcon,
+                "Beneficiary spreadsheet",
+                `${requisition.beneficiary_details.length} beneficiaries · bank upload layout`,
+                <Button asChild size="sm" variant="outline">
+                  <a href={spreadsheetHref} download={`${baseName}-beneficiaries.xlsx`}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </a>
+                </Button>
+              )
+            : null}
+          {attachments.length || hasBulkBeneficiaries
             ? row(
                 "all",
                 Files,
                 "Everything in one PDF",
-                "The form with every supporting document after it",
+                hasBulkBeneficiaries
+                  ? "The form with every supporting document, plus the beneficiary spreadsheet"
+                  : "The form with every supporting document after it",
                 <Button size="sm" onClick={() => void makePdf("all", true)} disabled={busy !== null}>
                   {busy === "all" ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -133,7 +160,7 @@ export function RequisitionDownloadDialog({
               )
             : null}
         </ul>
-        {attachments.length === 0 ? (
+        {attachments.length === 0 && !hasBulkBeneficiaries ? (
           <p className="text-muted-foreground text-xs">This requisition has no supporting documents.</p>
         ) : null}
       </DialogContent>
