@@ -322,13 +322,10 @@ export function NewRequisitionDialog({
   const nubanResults = beneficiaries.map((b) =>
     b.other_bank ? null : checkNuban(b.account_number, bankByCode.get(b.bank_code))
   )
-  // Ask the bank for the name once the number is complete and passes the check digit.
+  // The bank's name enquiry is the authority. NUBAN is a helpful early signal,
+  // but mergers can leave valid accounts with a legacy institution code.
   const lookupKeys = beneficiaries.map((b, i) =>
-    b.method === "transfer" &&
-    !b.other_bank &&
-    b.bank_code &&
-    b.account_number.length === 10 &&
-    nubanResults[i]?.status !== "invalid"
+    b.method === "transfer" && !b.other_bank && b.bank_code && b.account_number.length === 10
       ? lookupKey(b.bank_code, b.account_number)
       : null
   )
@@ -417,10 +414,7 @@ export function NewRequisitionDialog({
         if (!b.account_name.trim()) found.push(`${who}: enter who receives the cash.`)
       } else if (b.account_number.length !== 10) found.push(`${who}: enter the 10-digit account number.`)
       else if (!b.bank_name.trim()) found.push(`${who}: pick the bank.`)
-      else if (
-        nubanResults[i]?.status === "invalid" ||
-        (lookupKeys[i] && lookups[lookupKeys[i]!]?.status === "not_found")
-      ) {
+      else if (lookupKeys[i] && lookups[lookupKeys[i]!]?.status === "not_found") {
         found.push(`${who}: the account number is not valid for ${b.bank_name}.`)
       } else if (lookupKeys[i] && lookups[lookupKeys[i]!]?.status === "loading") {
         found.push(`${who}: still checking the account name with the bank. Try again in a moment.`)

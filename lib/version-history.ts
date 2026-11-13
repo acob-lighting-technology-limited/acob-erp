@@ -129,6 +129,7 @@ export const RELEASES: Release[] = [
         items: [
           "Requisition amounts are larger and easier to read in the list",
           "Beneficiary account name, account number, bank and amount can each be copied with one click",
+          "Former Diamond Bank accounts can be entered under Access Bank, and valid accounts are confirmed by the bank rather than rejected only by a local check-digit test",
           "Settings → Signing offers Replace signature and Change PIN once you have them. A missing signature or PIN when you sign sends you to set it up, then back to the requisition",
         ],
       },

@@ -30,31 +30,6 @@ export function AccountCheck({
       </p>
     )
   }
-  if (nuban?.status === "invalid") {
-    return (
-      <div className="text-danger space-y-1 text-xs" role="alert">
-        <p className="flex items-start gap-1.5">
-          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-          This is not a valid {nuban.bank.name} account number. Check the digits, or the bank.
-        </p>
-        {nuban.fits.length ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-1 pl-5">
-            It fits:
-            {nuban.fits.slice(0, 4).map((bank) => (
-              <button
-                key={bank.code}
-                type="button"
-                onClick={() => onPickBank(bank.code)}
-                className="text-foreground hover:bg-muted rounded border px-1.5 py-0.5"
-              >
-                {bank.name}
-              </button>
-            ))}
-          </p>
-        ) : null}
-      </div>
-    )
-  }
   if (!lookup) {
     return (
       <p className="text-muted-foreground text-xs">
@@ -71,10 +46,27 @@ export function AccountCheck({
   }
   if (lookup.status === "not_found") {
     return (
-      <p className="text-danger flex items-start gap-1.5 text-xs" role="alert">
-        <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-        The bank has no account with this number. Check the number and the bank.
-      </p>
+      <div className="text-danger space-y-1 text-xs" role="alert">
+        <p className="flex items-start gap-1.5">
+          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+          The bank has no account with this number. Check the number and the bank.
+        </p>
+        {nuban?.status === "invalid" && nuban.fits.length ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-1 pl-5">
+            It fits:
+            {nuban.fits.slice(0, 4).map((bank) => (
+              <button
+                key={bank.code}
+                type="button"
+                onClick={() => onPickBank(bank.code)}
+                className="text-foreground hover:bg-muted rounded border px-1.5 py-0.5"
+              >
+                {bank.name}
+              </button>
+            ))}
+          </p>
+        ) : null}
+      </div>
     )
   }
   if (lookup.status === "unavailable") {

@@ -1,6 +1,6 @@
 import "server-only"
 import { logger } from "@/lib/logger"
-import { NIGERIAN_BANKS, type NigerianBank } from "./nuban"
+import { nubanCodesForBankCode, NIGERIAN_BANKS, type NigerianBank } from "./nuban"
 
 /**
  * Paystack's bank list and account name check (NIBSS name enquiry), used to
@@ -73,7 +73,11 @@ export async function listBanks(): Promise<NigerianBank[]> {
     for (const row of rows) {
       if (!row.active || row.is_deleted || !row.code || seen.has(row.code)) continue
       seen.add(row.code)
-      banks.push({ name: row.name.trim(), code: row.code, nuban: checked.get(row.code) ?? false })
+      banks.push({
+        name: row.name.trim(),
+        code: row.code,
+        nuban: nubanCodesForBankCode(row.code).some((code) => checked.get(code) ?? false),
+      })
     }
     return banks.length ? banks.sort((a, b) => a.name.localeCompare(b.name)) : [...NIGERIAN_BANKS]
   } catch (err) {
@@ -83,15 +87,30 @@ export async function listBanks(): Promise<NigerianBank[]> {
 }
 
 export type AccountNameResult =
-  | { status: "found"; accountName: string }
+  | { status: "found"; accountName: string; bankCode: string }
   /** The bank says there is no such account (or the number and bank do not match). */
   | { status: "not_found" }
   /** Paystack is not set up, down, or timed out: nothing is known either way. */
   | { status: "unavailable" }
 
+type AccountNameLookupResult =
+  | { status: "found"; accountName: string }
+  | { status: "not_found" }
+  | { status: "unavailable" }
+
 export async function resolveAccountName(accountNumber: string, bankCode: string): Promise<AccountNameResult> {
   if (!/^\d{10}$/.test(accountNumber) || !/^\d{3,6}$/.test(bankCode)) return { status: "not_found" }
   if (!isPaystackConfigured()) return { status: "unavailable" }
+  let unavailable = false
+  for (const code of nubanCodesForBankCode(bankCode)) {
+    const result = await resolveAccountNameForCode(accountNumber, code)
+    if (result.status === "found") return { ...result, bankCode: code }
+    if (result.status === "unavailable") unavailable = true
+  }
+  return unavailable ? { status: "unavailable" } : { status: "not_found" }
+}
+
+async function resolveAccountNameForCode(accountNumber: string, bankCode: string): Promise<AccountNameLookupResult> {
   try {
     const query = new URLSearchParams({ account_number: accountNumber, bank_code: bankCode })
     // Not cached: a "not found" while a bank's link is down must not stick.
@@ -143,7 +162,11 @@ export async function confirmBeneficiaries<T extends { account_number: string; b
     ok: true,
     beneficiaries: beneficiaries.map((b, i) => {
       const r = results[i]
-      return { ...b, verified_account_name: r?.status === "found" ? r.accountName : null }
+      return {
+        ...b,
+        ...(r?.status === "found" ? { bank_code: r.bankCode } : {}),
+        verified_account_name: r?.status === "found" ? r.accountName : null,
+      }
     }),
   }
 }
