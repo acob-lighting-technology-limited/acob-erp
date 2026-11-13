@@ -17,6 +17,7 @@ import {
   Download,
   FileText,
   ListFilter,
+  Check,
   ShieldCheck,
   User,
 } from "lucide-react"
@@ -570,47 +571,83 @@ export function AdminReferenceGeneratorContent({
           },
         ]}
         expandable={{
-          render: (r) => (
-            <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
-              <div className="space-y-3">
-                <SectionHeading title="Correspondence overview" />
-                <div>
-                  <Badge className={cn("text-xs", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
+          render: (r) => {
+            const events = [
+              { label: "Created", at: r.created_at },
+              { label: "Submitted", at: r.submitted_at },
+              { label: "Approved", at: r.approved_at },
+              { label: "Sent", at: r.sent_at },
+              { label: "Received", at: r.received_at },
+            ]
+            const recorded = events.filter((ev) => Boolean(ev.at)).length
+            const done = ["approved", "sent", "filed"].includes(r.status)
+            const rejected = r.status === "rejected"
+            const tone = rejected
+              ? "border-danger/30 bg-danger/15 text-danger"
+              : done
+                ? "border-success/30 bg-success/15 text-success"
+                : "border-warning/30 bg-warning/15 text-warning"
+            return (
+              <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+                <div className="space-y-3">
+                  <SectionHeading title="Correspondence overview" />
+                  <div className={cn("flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs", tone)}>
+                    <p className="text-xs font-medium">{statusLabel(r.status)}</p>
+                  </div>
+                  <DetailList
+                    items={[
+                      { label: "Subject", value: r.subject, wide: true },
+                      { label: "Department", value: r.department_name || r.assigned_department_name || null },
+                      {
+                        label: "Recipient",
+                        value: r.recipient_name
+                          ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
+                          : null,
+                      },
+                      { label: "Requested by", value: r.sender_name || null },
+                      ...(r.created_by_name && r.created_by_name !== r.sender_name
+                        ? [{ label: "Created by", value: r.created_by_name }]
+                        : []),
+                      { label: "Due date", value: r.due_date || null },
+                      { label: "Action required", value: r.action_required ? "Yes" : "No" },
+                    ]}
+                  />
                 </div>
-                <DetailList
-                  items={[
-                    { label: "Subject", value: r.subject, wide: true },
-                    { label: "Department", value: r.department_name || r.assigned_department_name || null },
-                    {
-                      label: "Recipient",
-                      value: r.recipient_name
-                        ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
-                        : null,
-                    },
-                    { label: "Requested by", value: r.sender_name || null },
-                    ...(r.created_by_name && r.created_by_name !== r.sender_name
-                      ? [{ label: "Created by", value: r.created_by_name }]
-                      : []),
-                    { label: "Due date", value: r.due_date || null },
-                    { label: "Action required", value: r.action_required ? "Yes" : "No" },
-                  ]}
-                />
+                <div className="space-y-3">
+                  <SectionHeading title="Timeline" aside={`${recorded} of ${events.length} recorded`} />
+                  <ol className="before:bg-border relative space-y-3 before:absolute before:top-2.5 before:bottom-2.5 before:left-[9px] before:w-px">
+                    {events.map((ev, idx) => (
+                      <li key={ev.label} className="relative flex gap-3">
+                        <div
+                          className={cn(
+                            "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
+                            ev.at
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : "border-muted-foreground/30 bg-background text-muted-foreground"
+                          )}
+                        >
+                          {ev.at ? <Check className="h-3 w-3 stroke-[3]" /> : <span>{idx + 1}</span>}
+                        </div>
+                        <div className="min-w-0 flex-1 text-xs">
+                          <div className="flex min-h-5 items-center justify-between gap-2">
+                            <span className={cn("font-medium", ev.at ? "text-foreground" : "text-muted-foreground")}>
+                              {ev.label}
+                            </span>
+                            <span className="text-muted-foreground text-xs">{ev.at ? "Done" : "Pending"}</span>
+                          </div>
+                          {ev.at ? (
+                            <p className="text-muted-foreground mt-0.5 text-xs">{formatWATDate(ev.at)}</p>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                  <SectionHeading title="Version" />
+                  <p className="text-xs">v{r.current_version}</p>
+                </div>
               </div>
-              <div className="space-y-3">
-                <SectionHeading title="Timeline" />
-                <DetailList
-                  items={[
-                    { label: "Created", value: r.created_at ? formatWATDate(r.created_at) : null },
-                    { label: "Submitted", value: r.submitted_at ? formatWATDate(r.submitted_at) : null },
-                    { label: "Approved", value: r.approved_at ? formatWATDate(r.approved_at) : null },
-                    { label: "Sent", value: r.sent_at ? formatWATDate(r.sent_at) : null },
-                    { label: "Received", value: r.received_at ? formatWATDate(r.received_at) : null },
-                    { label: "Version", value: `v${r.current_version}` },
-                  ]}
-                />
-              </div>
-            </div>
-          ),
+            )
+          },
         }}
         viewToggle
         contactsView
