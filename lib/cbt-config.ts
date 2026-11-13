@@ -20,7 +20,12 @@ export interface AccessScopeShape {
   userId?: string | null
   role?: string | null
   isDepartmentLead?: boolean | null
+  /** The admin routes the person holds; an admin with the CBT route gets full access. */
+  adminRoutes?: string[] | null
 }
+
+/** Admin routes that give the same full CBT access as super_admin and developer. */
+const CBT_ADMIN_ROUTES = ["hr.pms", "hr.pms.cbt.manage"]
 
 /**
  * Resolves the identity CBT permissioning is evaluated against.
@@ -38,9 +43,14 @@ export async function resolveCbtAccessScope(
   try {
     const { data } = await supabase
       .from("profiles")
-      .select("id, role, is_department_lead")
+      .select("id, role, is_department_lead, admin_routes")
       .eq("id", userId)
-      .maybeSingle<{ id: string; role: string | null; is_department_lead: boolean | null }>()
+      .maybeSingle<{
+        id: string
+        role: string | null
+        is_department_lead: boolean | null
+        admin_routes: string[] | null
+      }>()
 
     if (!data) return null
 
@@ -48,6 +58,7 @@ export async function resolveCbtAccessScope(
       userId: data.id,
       role: data.role,
       isDepartmentLead: Boolean(data.is_department_lead),
+      adminRoutes: data.admin_routes ?? [],
     }
   } catch {
     return null
@@ -66,6 +77,10 @@ export function canAccessCbt(scope: AccessScopeShape | null | undefined, setting
 
   // System superusers always have full access
   if (normalizedRole === "super_admin" || normalizedRole === "developer") {
+    return true
+  }
+  // An admin holding the CBT route can do what super_admin and developer can.
+  if (normalizedRole === "admin" && (scope.adminRoutes ?? []).some((route) => CBT_ADMIN_ROUTES.includes(route))) {
     return true
   }
 
