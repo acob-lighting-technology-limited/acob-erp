@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { CorrespondenceRowPanel } from "./_components/correspondence-row-panel"
+import { CorrespondenceRowPanel } from "@/components/correspondence/correspondence-row-panel"
 import { Button } from "@/components/ui/button"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import {

@@ -253,8 +253,9 @@ export function CorrespondenceRowPanel({
 }: {
   record: CorrespondenceRecord
   statusText: string
-  onDecide: (decision: Decision) => void
-  deciding: boolean
+  /** Shown only where the viewer can decide (the admin page); the staff page leaves it out. */
+  onDecide?: (decision: Decision) => void
+  deciding?: boolean
 }) {
   return (
     <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
@@ -287,7 +288,7 @@ export function CorrespondenceRowPanel({
         <Attachments record={record} />
       </div>
 
-      {record.status === "under_review" ? (
+      {onDecide && record.status === "under_review" ? (
         <div className="flex flex-wrap gap-2 border-t pt-3 md:col-span-2">
           <Button onClick={() => onDecide("approved")} disabled={deciding} className="gap-2">
             <Check className="h-4 w-4" /> Approve

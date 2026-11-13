@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import { DetailList, SectionHeading } from "@/components/ui/detail-list"
+import { CorrespondenceRowPanel } from "@/components/correspondence/correspondence-row-panel"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -453,29 +453,7 @@ export function PortalReferenceGeneratorContent({
             .includes(query)
         }
         expandable={{
-          render: (row) => (
-            <div className="space-y-3">
-              <SectionHeading title="Correspondence" />
-              <DetailList
-                items={[
-                  { label: "Subject", value: row.subject, wide: true },
-                  { label: "Department", value: row.department_name || row.assigned_department_name || null },
-                  {
-                    label: "Recipient",
-                    value: row.recipient_name
-                      ? `${row.recipient_name}${row.recipient_code ? ` (${row.recipient_code})` : ""}`
-                      : null,
-                  },
-                  { label: "Requested by", value: row.sender_name || null },
-                  ...(row.created_by_name && row.created_by_name !== row.sender_name
-                    ? [{ label: "Created by", value: row.created_by_name }]
-                    : []),
-                  { label: "Due date", value: row.due_date || null },
-                  { label: "Action required", value: row.action_required ? "Yes" : "No" },
-                ]}
-              />
-            </div>
-          ),
+          render: (row) => <CorrespondenceRowPanel record={row} statusText={statusLabel(row.status)} />,
         }}
         mobileRow={{
           title: (row) => (
