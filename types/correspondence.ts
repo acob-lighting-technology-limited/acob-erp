@@ -52,6 +52,9 @@ export interface CorrespondenceRecord {
   current_version: number
   is_locked: boolean
   metadata: Record<string, unknown> | null
+  /** Added by the list loaders for the expanded row; not columns. */
+  approvals?: CorrespondenceApproval[]
+  versions?: Pick<CorrespondenceVersion, "id" | "version_no" | "file_path" | "change_summary" | "created_at">[]
   created_at: string
   updated_at: string
   simulated_sequence?: number | null

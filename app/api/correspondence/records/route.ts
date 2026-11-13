@@ -11,6 +11,7 @@ import {
   isAdminRole,
 } from "@/lib/correspondence/server"
 import { sendCorrespondenceDecisionEmail } from "@/lib/correspondence/mailer"
+import { withCorrespondenceRowDetails } from "@/lib/correspondence/row-details"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -437,8 +438,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Stages and documents ride along, so an expanded row shows them without another request.
+    const withDetails = await withCorrespondenceRowDetails(supabase, enrichedData)
+
     return NextResponse.json({
-      data: enrichedData as any[],
+      data: withDetails as any[],
       total: count || 0,
       page: pagination.page,
       limit: wantsPage ? pagination.per_page : count || enrichedData.length || pagination.per_page,
