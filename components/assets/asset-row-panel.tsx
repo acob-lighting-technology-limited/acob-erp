@@ -159,8 +159,8 @@ export function AssetRowPanel({
         />
         {isLoading ? (
           <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex gap-3">
+            {["first", "second", "third"].map((id) => (
+              <div key={id} className="flex gap-3">
                 <Skeleton className="h-5 w-5 rounded-full" />
                 <div className="flex-1 space-y-1.5">
                   <Skeleton className="h-3 w-2/3" />
