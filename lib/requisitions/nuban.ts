@@ -20,6 +20,19 @@ export interface NigerianBank {
   nuban: boolean
 }
 
+/**
+ * Institution codes which a bank has retired after a merger, but which still
+ * identify accounts issued under its former brand. The first code remains the
+ * current payment-routing code; these aliases are only tried when checking or
+ * resolving an existing account number.
+ */
+const NUBAN_CODE_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  // Diamond Bank accounts retain their 063 NUBAN check digit after the Access
+  // Bank merger. Paystack's current Access option uses 044.
+  "044": ["063"],
+  "063": ["044"],
+}
+
 export const NIGERIAN_BANKS: readonly NigerianBank[] = [
   { name: "Access Bank", code: "044", nuban: true },
   { name: "Citibank Nigeria", code: "023", nuban: true },
@@ -71,7 +84,14 @@ export function nubanCheckDigit(bankCode: string, serial: string): number {
 
 export function isNubanValid(accountNumber: string, bankCode: string): boolean {
   if (!/^\d{10}$/.test(accountNumber) || !/^\d{1,6}$/.test(bankCode)) return false
-  return nubanCheckDigit(bankCode, accountNumber.slice(0, 9)) === Number(accountNumber[9])
+  return nubanCodesForBankCode(bankCode).some(
+    (code) => nubanCheckDigit(code, accountNumber.slice(0, 9)) === Number(accountNumber[9])
+  )
+}
+
+/** Current routing code followed by legacy codes that may identify its accounts. */
+export function nubanCodesForBankCode(bankCode: string): readonly string[] {
+  return [bankCode, ...(NUBAN_CODE_ALIASES[bankCode] ?? [])]
 }
 
 /**

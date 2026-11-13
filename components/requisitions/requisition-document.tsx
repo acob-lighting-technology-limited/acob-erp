@@ -3,7 +3,7 @@ import type { Ref } from "react"
 import { Globe, Mail, MapPin, Phone } from "lucide-react"
 import type { Requisition, RequisitionStage, RequisitionStageCode } from "@/lib/requisitions/types"
 import { formatNaira } from "@/lib/requisitions/format"
-import { MAX_BENEFICIARIES } from "@/lib/requisitions/limits"
+import { INLINE_BENEFICIARIES, MAX_BENEFICIARIES } from "@/lib/requisitions/limits"
 import { isRaisedByHolder, STAGE_LABELS } from "@/lib/requisitions/routing"
 import { cn } from "@/lib/utils"
 import { SignatureMark } from "./signature-mark"
@@ -126,6 +126,7 @@ function blankRows(filled: number, upTo: number) {
 }
 
 function BeneficiaryTable({ req }: { req: Requisition }) {
+  const hasOverflow = req.beneficiary_details.length > INLINE_BENEFICIARIES
   const showAmounts = req.beneficiary_details.length > 1 && req.beneficiary_details.some((b) => b.amount != null)
   const showPurpose = req.beneficiary_details.some((b) => b.purpose)
   return (
@@ -143,29 +144,42 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
             </tr>
           </thead>
           <tbody>
-            {req.beneficiary_details.map((b, i) => (
-              <tr key={`row-${i}`}>
-                <td className="border border-slate-500 p-1.5">{b.account_name}</td>
-                {b.payment_method === "cash" ? (
-                  <td className="border border-slate-500 p-1.5 italic" colSpan={2}>
-                    Cash: no account
-                  </td>
-                ) : (
-                  <>
-                    <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
-                    <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
-                  </>
-                )}
-                {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}
-                {showAmounts && (
-                  <td className="border border-slate-500 p-1.5 text-right">
-                    {b.amount != null ? formatNaira(b.amount) : ""}
-                  </td>
-                )}
+            {hasOverflow ? (
+              <tr>
+                <td className="border border-slate-500 p-1.5">LOTS (Find attached Spreadsheet)</td>
+                <td className="border border-slate-500 p-1.5">LOTS</td>
+                <td className="border border-slate-500 p-1.5">LOTS</td>
+                {showPurpose && <td className="border border-slate-500 p-1.5">LOTS</td>}
+                {showAmounts && <td className="border border-slate-500 p-1.5 text-right">LOTS</td>}
               </tr>
-            ))}
+            ) : (
+              req.beneficiary_details.map((b, i) => (
+                <tr key={`row-${i}`}>
+                  <td className="border border-slate-500 p-1.5">{b.account_name}</td>
+                  {b.payment_method === "cash" ? (
+                    <td className="border border-slate-500 p-1.5 italic" colSpan={2}>
+                      Cash: no account
+                    </td>
+                  ) : (
+                    <>
+                      <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
+                      <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
+                    </>
+                  )}
+                  {showPurpose && <td className="border border-slate-500 p-1.5">{b.purpose || ""}</td>}
+                  {showAmounts && (
+                    <td className="border border-slate-500 p-1.5 text-right">
+                      {b.amount != null ? formatNaira(b.amount) : ""}
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
             {/* Empty ruled rows up to what the form allows, as on the printed sheet. */}
-            {blankRows(req.beneficiary_details.length, MAX_BENEFICIARIES[req.form_type]).map((i) => (
+            {blankRows(
+              hasOverflow ? MAX_BENEFICIARIES[req.form_type] : req.beneficiary_details.length,
+              INLINE_BENEFICIARIES
+            ).map((i) => (
               <tr key={`blank-${i}`} aria-hidden>
                 {Array.from({ length: 3 + Number(showPurpose) + Number(showAmounts) }, (_, c) => (
                   <td key={c} className="h-8 border border-slate-500" />
@@ -273,13 +287,6 @@ function ProcessedSlot({ req }: { req: Requisition }) {
         signatureUrl: last.signature_url,
         name: last.recorder?.full_name,
         date: formatDate(last.paid_on),
-        detail: [
-          payments.length > 1 ? `${payments.length} payments` : null,
-          `${formatNaira(req.amount_paid)} paid`,
-          last.reference ? `ref ${last.reference}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
       }
     : {}
   return <Slot label="Processed by" content={content} />

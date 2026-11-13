@@ -25,6 +25,13 @@ test("3-digit codes give the same digit whether or not they are padded to 6", ()
   assert.equal(nubanCheckDigit("058", "012345678"), nubanCheckDigit("000058", "012345678"))
 })
 
+test("accepts legacy Diamond Bank NUBAN digits under Access Bank", () => {
+  // Access Bank's current code is 044, while former Diamond accounts retain 063.
+  assert.equal(isNubanValid("0107055393", "063"), true)
+  assert.equal(isNubanValid("0107055393", "044"), true)
+  assert.equal(checkNuban("0107055393", bank("044")).status, "valid")
+})
+
 test("rejects anything that is not 10 digits", () => {
   assert.equal(isNubanValid("000001457", "011"), false)
   assert.equal(isNubanValid("00000145790", "011"), false)
