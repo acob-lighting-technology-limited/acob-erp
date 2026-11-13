@@ -284,7 +284,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.rollup.overdueCount,
         render: (r) =>
           r.rollup.overdueCount > 0 ? (
-            <Badge className="text-danger border-danger/20 bg-danger/10">{r.rollup.overdueCount}</Badge>
+            <Badge tone="danger">{r.rollup.overdueCount}</Badge>
           ) : (
             <span className="text-muted-foreground text-xs">None</span>
           ),

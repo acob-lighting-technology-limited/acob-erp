@@ -71,12 +71,12 @@ function getStatusBadge(status: ChallengeItem["status"]) {
   switch (status) {
     case "resolved":
     case "closed":
-      return <Badge className="bg-success/15 text-success">Resolved</Badge>
+      return <Badge tone="success">Resolved</Badge>
     case "mitigating":
-      return <Badge className="bg-info/15 text-info">Mitigating</Badge>
+      return <Badge tone="info">Mitigating</Badge>
     case "open":
     default:
-      return <Badge className="bg-warning/15 text-warning">Open</Badge>
+      return <Badge tone="warning">Open</Badge>
   }
 }
 

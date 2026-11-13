@@ -87,6 +87,19 @@ test("local-status-colour skips the StatusBadge component itself", () => {
   assert.equal(countFile("components/ui/patterns/status-badge.tsx", text)["local-status-colour"], undefined)
 })
 
+test("local-status-colour counts a raw palette colour on a Badge, not a tone or an icon tint", () => {
+  const badge = (attrs) => countFile("components/x.tsx", `<Badge ${attrs}>x</Badge>`)["local-status-colour"]
+  assert.equal(badge('className="bg-emerald-500/10 text-emerald-600"'), 1)
+  assert.equal(badge('variant="outline" className="border-amber-300 text-xs"'), 1)
+  assert.equal(badge('tone="success" className="text-xs"'), undefined)
+  assert.equal(badge('className="bg-success/15 text-success"'), undefined)
+  // the sanctioned StatCard icon tints are not badges
+  assert.equal(
+    countFile("components/x.tsx", '<StatCard iconBgColor="bg-blue-500/10" />')["local-status-colour"],
+    undefined
+  )
+})
+
 test("fixed-px-width ignores widths under 400px and responsive-prefixed ones", () => {
   const c = countFile("components/x.tsx", '"w-[480px] min-w-[600px] w-[200px] sm:w-[500px] max-w-[700px]"')
   assert.equal(c["fixed-px-width"], 2)
@@ -96,10 +109,7 @@ test("click-div flags clickable divs on single line or across lines, and honors 
   assert.equal(countFile("components/x.tsx", "<div className='a' onClick={go}>")["click-div"], 1)
   assert.equal(countFile("components/x.tsx", "<div\n  className='a'\n  onClick={go}\n>")["click-div"], 1)
   assert.equal(countFile("components/x.tsx", "<button onClick={go}>")["click-div"], undefined)
-  assert.equal(
-    countFile("components/x.tsx", "<div onClick={(e) => e.stopPropagation()}>")["click-div"],
-    undefined
-  )
+  assert.equal(countFile("components/x.tsx", "<div onClick={(e) => e.stopPropagation()}>")["click-div"], undefined)
   assert.equal(
     countFile("components/x.tsx", "<div\n  onClick={() => event.stopPropagation()}\n>")["click-div"],
     undefined
@@ -148,12 +158,12 @@ test("title-brand-suffix flags a hand-written brand suffix in app/ but not a pla
 })
 
 test("api-error-message flags returning error.message in NextResponse.json", () => {
-  const bad1 = 'return NextResponse.json({ error: error.message }, { status: 500 })'
-  const bad2 = 'return NextResponse.json({ error: err.message }, { status: 400 })'
+  const bad1 = "return NextResponse.json({ error: error.message }, { status: 500 })"
+  const bad2 = "return NextResponse.json({ error: err.message }, { status: 400 })"
   const bad3 = 'return NextResponse.json({ error: kitError?.message ?? "failed" })'
   const good1 = 'return NextResponse.json({ error: "Something went wrong" })'
-  const good2 = 'return NextResponse.json({ error: parsed.error.issues[0]?.message })'
-  const good3 = 'logger.error(error.message)'
+  const good2 = "return NextResponse.json({ error: parsed.error.issues[0]?.message })"
+  const good3 = "logger.error(error.message)"
   assert.equal(countFile("app/api/foo/route.ts", bad1)["api-error-message"], 1)
   assert.equal(countFile("app/api/foo/route.ts", bad2)["api-error-message"], 1)
   assert.equal(countFile("app/api/foo/route.ts", bad3)["api-error-message"], 1)
@@ -164,20 +174,22 @@ test("api-error-message flags returning error.message in NextResponse.json", () 
 })
 
 test("route-without-zod flags route.ts reading json body without zod validation", () => {
-  const bad1 = 'export async function POST(req) { const body = await req.json(); return ok() }'
-  const bad2 = 'export async function POST(request) { const data = await request.json() }'
+  const bad1 = "export async function POST(req) { const body = await req.json(); return ok() }"
+  const bad2 = "export async function POST(request) { const data = await request.json() }"
   const withImport = 'import { z } from "zod"; export async function POST(req) { const b = await req.json() }'
-  const withZObject = 'export async function POST(req) { const b = await req.json(); const schema = z.object({}) }'
-  const noJson = 'export async function GET(req) { return NextResponse.json({ ok: true }) }'
+  const withZObject = "export async function POST(req) { const b = await req.json(); const schema = z.object({}) }"
+  const noJson = "export async function GET(req) { return NextResponse.json({ ok: true }) }"
   assert.equal(countFile("app/api/test/route.ts", bad1)["route-without-zod"], 1)
   assert.equal(countFile("app/api/test/route.ts", bad2)["route-without-zod"], 1)
   assert.equal(countFile("app/api/test/route.ts", withImport)["route-without-zod"], undefined)
   assert.equal(countFile("app/api/test/route.ts", withZObject)["route-without-zod"], undefined)
   assert.equal(countFile("app/api/test/route.ts", noJson)["route-without-zod"], undefined)
   // A shared schema from lib/ counts as validation; JSON.parse does not.
-  const sharedSchema = 'import { ThingSchema } from "@/lib/x"\nexport async function POST(request) {\n  const parsed = ThingSchema.safeParse(await request.json())\n}'
+  const sharedSchema =
+    'import { ThingSchema } from "@/lib/x"\nexport async function POST(request) {\n  const parsed = ThingSchema.safeParse(await request.json())\n}'
   assert.equal(countFile("app/api/test/route.ts", sharedSchema)["route-without-zod"], undefined)
-  const jsonParse = "export async function POST(request) {\n  const body = JSON.parse(await request.text())\n  const x = await request.json()\n}"
+  const jsonParse =
+    "export async function POST(request) {\n  const body = JSON.parse(await request.text())\n  const x = await request.json()\n}"
   assert.equal(countFile("app/api/test/route.ts", jsonParse)["route-without-zod"], 1)
   assert.equal(countFile("app/api/test/helper.ts", bad1)["route-without-zod"], undefined)
 })

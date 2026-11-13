@@ -12,6 +12,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch, apiJson } from "@/lib/api-client"
@@ -121,11 +122,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
         </div>
         <div className="flex items-center gap-1.5">
           <Badge
-            className={
-              hasTaken
-                ? "text-success border-success/20 bg-success/10 shadow-none"
-                : "text-warning border-warning/30 bg-warning/10"
-            }
+            className={hasTaken ? "text-success border-success/20 bg-success/10 shadow-none" : TONE_CLASSES.warning}
           >
             {hasTaken ? "Taken" : "Not Taken"}
           </Badge>
@@ -143,11 +140,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
           <p className="text-muted-foreground text-xs">Tab Switches</p>
           <Badge
             variant="outline"
-            className={
-              row.tab_switch_count > 0
-                ? "text-warning border-warning/30 bg-warning/10"
-                : "border-border text-muted-foreground"
-            }
+            className={row.tab_switch_count > 0 ? TONE_CLASSES.warning : "border-border text-muted-foreground"}
           >
             {row.tab_switch_count}
           </Badge>
@@ -416,11 +409,11 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       render: (row) => {
         const hasTaken = typeof row.cbt_score === "number"
         return hasTaken ? (
-          <Badge className="text-success border-success/20 bg-success/10 hover:bg-success/10 shadow-none">Taken</Badge>
-        ) : (
-          <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">
-            Not Taken
+          <Badge tone="success" className="shadow-none">
+            Taken
           </Badge>
+        ) : (
+          <Badge tone="warning">Not Taken</Badge>
         )
       },
     },
@@ -453,11 +446,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       render: (row) => (
         <Badge
           variant="outline"
-          className={
-            row.tab_switch_count > 0
-              ? "text-warning border-warning/30 bg-warning/10"
-              : "border-border text-muted-foreground"
-          }
+          className={row.tab_switch_count > 0 ? TONE_CLASSES.warning : "border-border text-muted-foreground"}
         >
           {row.tab_switch_count}
         </Badge>

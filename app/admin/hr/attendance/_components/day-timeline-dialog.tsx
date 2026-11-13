@@ -43,16 +43,18 @@ export function DayTimelineDialog({
         {historyContext && (historyContext.holiday || historyContext.on_leave || historyContext.exempt) && (
           <div className="flex flex-wrap gap-2">
             {historyContext.holiday && (
-              <Badge className="bg-info/15 text-info text-xs">
+              <Badge tone="info" className="text-xs">
                 Holiday — {historyContext.holiday}
                 {historyContext.holiday_added_by ? ` · added by ${historyContext.holiday_added_by}` : ""}
               </Badge>
             )}
             {historyContext.on_leave && (
-              <Badge className="bg-purple/15 text-purple text-xs">On leave — {historyContext.on_leave}</Badge>
+              <Badge tone="purple" className="text-xs">
+                On leave — {historyContext.on_leave}
+              </Badge>
             )}
             {historyContext.exempt && (
-              <Badge className="bg-purple/15 text-purple text-xs">
+              <Badge tone="purple" className="text-xs">
                 Exempt{historyContext.exempt_reason ? ` — ${historyContext.exempt_reason}` : ""}
               </Badge>
             )}

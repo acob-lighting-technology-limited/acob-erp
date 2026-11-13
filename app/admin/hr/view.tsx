@@ -218,10 +218,7 @@ export function HRAdminDashboard({
                       Offices & Rooms
                     </h3>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className="text-success shrink-0 rounded-full border-teal-500/20 bg-teal-500/10 px-2.5 py-0.5 text-xs font-bold"
-                  >
+                  <Badge tone="success" className="shrink-0 rounded-full px-2.5 py-0.5 font-bold">
                     {stats.totalOfficeLocations} Rooms
                   </Badge>
                 </div>
@@ -297,10 +294,7 @@ export function HRAdminDashboard({
                         Resource Booking
                       </h3>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="text-info shrink-0 rounded-full border-indigo-500/20 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-bold"
-                    >
+                    <Badge tone="info" className="shrink-0 rounded-full px-2.5 py-0.5 font-bold">
                       Admin
                     </Badge>
                   </div>

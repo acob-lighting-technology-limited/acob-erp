@@ -16,6 +16,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -39,7 +41,6 @@ import { logger } from "@/lib/logger"
 import { isWeekend, toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { computeAttendanceDay, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import {
-  ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
   deriveUnifiedAttendanceStatus,
   normalizeStoredAttendanceStatus,
@@ -107,42 +108,22 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   const stage = appeal.stage || "pending_lead"
   if (stage === "pending_lead") {
     if (appeal.initiated_by_role === "admin_manual") {
-      return (
-        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
-          Pending Lead
-        </Badge>
-      )
+      return <StatusBadge status="pending" label="Pending Lead" />
     }
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
-          Pending Lead
-        </Badge>
-        <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-          Pending Admin & HR Lead
-        </Badge>
+        <StatusBadge status="pending" label="Pending Lead" />
+        <StatusBadge status="pending" tone="info" label="Pending Admin & HR Lead" />
       </div>
     )
   }
   if (stage === "pending_admin") {
-    return (
-      <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
-        Pending Admin & HR Lead
-      </Badge>
-    )
+    return <StatusBadge status="pending" tone="info" label="Pending Admin & HR Lead" />
   }
   if (stage === "pending_hr_lead") {
-    return (
-      <Badge variant="outline" className="bg-purple/10 text-purple border-purple-500 font-medium">
-        Pending HR Lead
-      </Badge>
-    )
+    return <StatusBadge status="pending" tone="purple" label="Pending HR Lead" />
   }
-  return (
-    <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
-      Pending
-    </Badge>
-  )
+  return <StatusBadge status="pending" />
 }
 type UnifiedDay = {
   date: string
@@ -483,7 +464,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         label: "Status",
         sortable: true,
         accessor: (row) => row.normalizedStatus,
-        render: (row) => <StatusBadge status={row.normalizedStatus} />,
+        render: (row) => <AttendanceStatusBadge status={row.normalizedStatus} />,
       },
       {
         key: "actions",
@@ -768,12 +749,12 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                 `${formatClockTime(row.clock_in)} – ${getClockOutLabel(row)}${
                   (row.missedHoursValue ?? 0) > 0 ? ` · ${row.missedHoursValue!.toFixed(2)} hrs missed` : ""
                 }`,
-              trailing: (row) => <StatusBadge status={row.normalizedStatus} />,
+              trailing: (row) => <AttendanceStatusBadge status={row.normalizedStatus} />,
               detail: {
                 title: (row) =>
                   formatWATDate(row.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
                 subtitle: (row) => row.dayLabel,
-                badges: (row) => <StatusBadge status={row.normalizedStatus} />,
+                badges: (row) => <AttendanceStatusBadge status={row.normalizedStatus} />,
                 fields: (row) => {
                   // Newest first: an appealed day can carry a rejected attempt and
                   // the re-appeal that followed it.
@@ -916,7 +897,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                       </span>
                       <span className="text-muted-foreground block text-xs">{row.dayLabel}</span>
                     </div>
-                    <StatusBadge status={row.normalizedStatus} />
+                    <AttendanceStatusBadge status={row.normalizedStatus} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -951,13 +932,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                       {pendingAppeal ? (
                         renderAppealPendingBadge(pendingAppeal)
                       ) : approvedAppeal ? (
-                        <Badge variant="outline" className="border-emerald-500 bg-emerald-500/5 text-emerald-500">
-                          Appeal Approved
-                        </Badge>
+                        <StatusBadge status="approved" label="Appeal Approved" />
                       ) : resolvedAppeal ? (
-                        <Badge variant="outline" className="border-sky-500 bg-sky-500/5 text-sky-500">
-                          Appeal Resolved
-                        </Badge>
+                        <StatusBadge status="resolved" tone="info" label="Appeal Resolved" />
                       ) : hasRejected ? (
                         <Button
                           size="sm"
@@ -1057,15 +1034,4 @@ function normalizeStatus(record: AttendanceRecord | null, recordDate?: string): 
     record: record ?? undefined,
     recordDate: recordDate ?? (record as { date?: string } | null)?.date,
   }) as AttendanceRow["normalizedStatus"]
-}
-
-function StatusBadge({ status }: { status: AttendanceRow["normalizedStatus"] }) {
-  const norm = normalizeStoredAttendanceStatus(status) || status
-  return (
-    <Badge
-      className={ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-foreground"}
-    >
-      {ATTENDANCE_STATUS_LABELS[norm as keyof typeof ATTENDANCE_STATUS_LABELS] ?? norm}
-    </Badge>
-  )
 }

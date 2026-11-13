@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 import { Button } from "@/components/ui/button"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Label } from "@/components/ui/label"
@@ -246,23 +247,9 @@ export function AppealReviewDialog({
           <div className="space-y-1.5">
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Status Change</p>
             <div className="flex items-center gap-2 text-sm">
-              <Badge
-                className={
-                  ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
-                  "bg-muted text-muted-foreground"
-                }
-              >
-                {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
-              </Badge>
+              <AttendanceStatusBadge status={appeal.current_status} />
               <span className="text-muted-foreground font-medium">→</span>
-              <Badge
-                className={
-                  ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ?? "bg-info/15 text-info"
-                }
-              >
-                {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                  appeal.requested_status}
-              </Badge>
+              <AttendanceStatusBadge status={appeal.requested_status} />
             </div>
           </div>
 

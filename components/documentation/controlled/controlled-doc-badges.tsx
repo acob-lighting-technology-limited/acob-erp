@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleAlert, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { cn } from "@/lib/utils"
 import {
   CONTROLLED_DOC_STATUS_LABELS,
@@ -10,9 +11,9 @@ import {
 } from "@/lib/documentation/controlled"
 
 const STATUS_CLASSES: Record<ControlledDocStatus, string> = {
-  draft: "border-warning/30 bg-warning/10 text-warning",
-  published: "border-success/30 bg-success/10 text-success",
-  retired: "border-muted-foreground/30 bg-muted text-muted-foreground",
+  draft: TONE_CLASSES.warning,
+  published: TONE_CLASSES.success,
+  retired: TONE_CLASSES.neutral,
 }
 
 export function ControlledDocStatusBadge({ status }: { status: ControlledDocStatus }) {
@@ -34,12 +35,7 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
   return (
     <Badge
       variant="outline"
-      className={cn(
-        "text-xs",
-        state === "overdue"
-          ? "text-danger border-danger/30 bg-danger/10"
-          : "text-warning border-warning/30 bg-warning/10"
-      )}
+      className={cn("text-xs", state === "overdue" ? TONE_CLASSES.danger : TONE_CLASSES.warning)}
     >
       {state === "overdue" ? "Overdue" : "Due"} · {label}
     </Badge>
@@ -50,14 +46,14 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
 export function MyAcknowledgementBadge({ doc }: { doc: Pick<ControlledDocRow, "my_acknowledged_at"> }) {
   if (doc.my_acknowledged_at) {
     return (
-      <Badge variant="outline" className="text-success border-success/30 bg-success/10 text-xs">
+      <Badge tone="success" className="text-xs">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Acknowledged
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">
+    <Badge tone="warning" className="text-xs">
       <CircleAlert className="mr-1 h-3 w-3" />
       Action needed
     </Badge>

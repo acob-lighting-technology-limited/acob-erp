@@ -2,16 +2,35 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Building2, Hash, Package, User, Wrench, Layers, CalendarDays, FileText, Barcode } from "lucide-react"
+import {
+  Building2,
+  Hash,
+  Package,
+  User,
+  Wrench,
+  Layers,
+  CalendarDays,
+  FileText,
+  Barcode,
+  CheckCircle2,
+  MessageSquareWarning,
+} from "lucide-react"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { formatName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import type { AssetAssignment } from "./page"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
+import {
+  AssetAcceptanceBanner,
+  ReportAssetProblemDialog,
+  useAcceptAssignment,
+} from "@/components/assets/staff-asset-actions"
+import { ASSET_REPORT_KIND_LABELS, type AssetReportKind } from "@/lib/assets/asset-reports"
 
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
@@ -24,7 +43,10 @@ type AssetRow = AssetAssignment & {
 }
 
 export function AssetsContent({ initialAssignments, initialError }: AssetsContentProps) {
-  const [assignments] = useState<AssetAssignment[]>(initialAssignments)
+  // Server data: after Accept or a report, router.refresh() sends new props.
+  const assignments = initialAssignments
+  const { accept, acceptingId } = useAcceptAssignment()
+  const [reporting, setReporting] = useState<{ row: AssetRow; kind?: AssetReportKind } | null>(null)
 
   useEffect(() => {
     if (initialError) toast.error(initialError)
@@ -44,10 +66,10 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
   )
 
   const statusClass = (status: string) => {
-    if (status === "assigned") return "bg-success/15 text-success"
-    if (status === "maintenance") return "bg-warning/15 text-warning"
-    if (status === "available") return "bg-info/15 text-info"
-    return "bg-muted text-foreground"
+    if (status === "assigned") return TONE_CLASSES.success
+    if (status === "maintenance") return TONE_CLASSES.warning
+    if (status === "available") return TONE_CLASSES.info
+    return TONE_CLASSES.neutral
   }
 
   const columns = useMemo<DataTableColumn<AssetRow>[]>(
@@ -59,7 +81,12 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         accessor: (row) => row.assetTypeLabel,
         resizable: true,
         initialWidth: 220,
-        render: (row) => <span className="font-medium">{row.assetTypeLabel}</span>,
+        render: (row) => (
+          <div className="flex flex-col items-start gap-1">
+            <span className="font-medium">{row.assetTypeLabel}</span>
+            <AssetRowNotice row={row} />
+          </div>
+        ),
       },
       {
         key: "unique_code",
@@ -147,6 +174,25 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
   const maintenanceCount = useMemo(() => rows.filter((r) => r.statusLabel === "maintenance").length, [rows])
   const uniqueTypesCount = useMemo(() => new Set(rows.map((r) => r.assetTypeLabel)).size, [rows])
 
+  const pendingAcceptance = rows.filter((row) => row.acceptance_status === "pending")
+
+  const rowActions: RowAction<AssetRow>[] = [
+    {
+      label: "Accept",
+      icon: CheckCircle2,
+      primary: true,
+      onClick: (row) => void accept(row),
+      hidden: (row) =>
+        !["pending", "auto_accepted"].includes(row.acceptance_status) || row.open_report_kind === "not_received",
+    },
+    {
+      label: "Report a problem",
+      icon: MessageSquareWarning,
+      onClick: (row) => setReporting({ row }),
+      hidden: (row) => Boolean(row.open_report_kind),
+    },
+  ]
+
   return (
     <DataTablePage
       title="Assets"
@@ -194,7 +240,17 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         </StatGrid>
       }
     >
+      <AssetAcceptanceBanner
+        pending={pendingAcceptance}
+        acceptingId={acceptingId}
+        onAccept={(row) => void accept(row)}
+        onNotReceived={(row) => {
+          const match = rows.find((r) => r.id === row.id)
+          if (match) setReporting({ row: match, kind: "not_received" })
+        }}
+      />
       <DataTable<AssetRow>
+        rowActions={rowActions}
         data={rows}
         columns={columns}
         filters={filters}
@@ -297,6 +353,34 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         )}
         urlSync
       />
+      <ReportAssetProblemDialog
+        key={reporting ? `${reporting.row.id}-${reporting.kind ?? ""}` : "closed"}
+        assignment={reporting?.row ?? null}
+        initialKind={reporting?.kind}
+        onOpenChange={(open) => {
+          if (!open) setReporting(null)
+        }}
+      />
     </DataTablePage>
   )
+}
+
+/** Under the asset name: what is waiting on this row, if anything. */
+function AssetRowNotice({ row }: { row: AssetRow }) {
+  if (row.open_report_kind) {
+    const label = ASSET_REPORT_KIND_LABELS[row.open_report_kind as AssetReportKind]?.label ?? "Problem"
+    return (
+      <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-xs font-normal">
+        Report sent: {label}
+      </Badge>
+    )
+  }
+  if (row.acceptance_status === "pending") {
+    return (
+      <Badge variant="outline" className="bg-info/15 text-info border-info/30 text-xs font-normal">
+        Waiting for you to confirm
+      </Badge>
+    )
+  }
+  return null
 }

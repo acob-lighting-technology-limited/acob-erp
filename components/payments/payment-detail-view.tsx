@@ -49,6 +49,7 @@ import type {
   PaymentEditFormData,
 } from "@/components/payments/payment-types"
 import { paymentUsesReceipts } from "@/components/payments/payment-types"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 interface PaymentPageData {
   payment: Payment | null
@@ -372,13 +373,13 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
   const getStatusColor = (status: string) => {
     switch (status) {
       case "paid":
-        return "bg-success/15 text-success"
+        return TONE_CLASSES.success
       case "due":
-        return "bg-warning/15 text-warning"
+        return TONE_CLASSES.warning
       case "overdue":
-        return "bg-danger/15 text-danger"
+        return TONE_CLASSES.danger
       case "cancelled":
-        return "bg-muted text-foreground"
+        return TONE_CLASSES.neutral
       default:
         return ""
     }

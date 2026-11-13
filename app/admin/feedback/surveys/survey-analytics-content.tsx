@@ -141,20 +141,20 @@ export function SurveyAnalyticsContent() {
         if (!r.training_rating) return <span className="text-muted-foreground text-xs">—</span>
         if (r.training_rating === "adequate") {
           return (
-            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-xs text-emerald-700">
+            <Badge tone="success" className="text-xs">
               Adequate
             </Badge>
           )
         }
         if (r.training_rating === "somewhat") {
           return (
-            <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-xs text-amber-700">
+            <Badge tone="warning" className="text-xs">
               Somewhat
             </Badge>
           )
         }
         return (
-          <Badge variant="outline" className="border-rose-500/30 bg-rose-50 text-xs text-rose-700">
+          <Badge tone="danger" className="text-xs">
             Inadequate
           </Badge>
         )

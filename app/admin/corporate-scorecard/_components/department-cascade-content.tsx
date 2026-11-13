@@ -71,11 +71,9 @@ type CascadeRow = {
 }
 
 function ragBadge(status: RagStatus | null) {
-  if (status === "green")
-    return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Target</Badge>
-  if (status === "amber")
-    return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">Needs Attention</Badge>
-  if (status === "red") return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">At Risk</Badge>
+  if (status === "green") return <Badge tone="success">On Target</Badge>
+  if (status === "amber") return <Badge tone="warning">Needs Attention</Badge>
+  if (status === "red") return <Badge tone="danger">At Risk</Badge>
   return <span className="text-muted-foreground text-xs">No data</span>
 }
 
@@ -266,7 +264,9 @@ export function DepartmentCascadeContent({
         accessor: (r) => r.role,
         render: (r) =>
           r.role === "core" ? (
-            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">CORE</Badge>
+            <Badge tone="success" className="text-xs">
+              CORE
+            </Badge>
           ) : (
             <Badge variant="outline" className="text-xs">
               SUPPORT
@@ -413,10 +413,7 @@ export function DepartmentCascadeContent({
             Export
           </Button>
           {lockedDepartment && (
-            <Badge
-              variant="outline"
-              className="border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600"
-            >
+            <Badge tone="success" className="px-3 py-1 text-xs font-semibold">
               {lockedDepartment}
             </Badge>
           )}

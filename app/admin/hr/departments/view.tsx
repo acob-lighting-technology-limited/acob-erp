@@ -48,14 +48,14 @@ const TABS: DataTableTab[] = [
 export function DepartmentStatusBadge({ isActive }: { isActive: boolean }) {
   if (isActive) {
     return (
-      <Badge variant="outline" className="border-success/30 bg-success/15 text-success font-medium">
+      <Badge tone="success" className="font-medium">
         Active
       </Badge>
     )
   }
 
   return (
-    <Badge variant="outline" className="border-border bg-muted text-foreground font-medium">
+    <Badge tone="neutral" className="border-border font-medium">
       Inactive
     </Badge>
   )

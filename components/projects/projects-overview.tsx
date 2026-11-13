@@ -64,9 +64,7 @@ export function ProjectsOverview({
             Ranked by what needs attention most: behind first, done last, higher priority first within each.
           </CardDescription>
         </div>
-        {needAttention > 0 && (
-          <Badge className="text-danger border-danger/20 bg-danger/10">{needAttention} need attention</Badge>
-        )}
+        {needAttention > 0 && <Badge tone="danger">{needAttention} need attention</Badge>}
       </CardHeader>
       <CardContent className="p-0">
         {ranked.length === 0 ? (

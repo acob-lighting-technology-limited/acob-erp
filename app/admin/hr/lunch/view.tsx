@@ -645,7 +645,7 @@ export function LunchRegisterPage({
     }
     if (!vote.is_eating) {
       return (
-        <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-xs font-medium text-rose-600">
+        <Badge tone="danger" className="text-xs font-medium">
           NO — Opted out
         </Badge>
       )
@@ -657,7 +657,7 @@ export function LunchRegisterPage({
           .join(" + ")
       : "Opted In"
     return (
-      <Badge className="border-0 bg-emerald-500/10 text-xs font-medium text-emerald-600">
+      <Badge tone="success" className="border-0 text-xs font-medium">
         {dishNames || "Opted In"}
       </Badge>
     )
@@ -674,17 +674,7 @@ export function LunchRegisterPage({
 
   const renderDailyServed = (userId: string) => {
     const hasEaten = ateUserIds.includes(userId)
-    return (
-      <Badge
-        className={
-          hasEaten
-            ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-            : "border bg-gray-100 text-gray-400 hover:bg-gray-100/80"
-        }
-      >
-        {hasEaten ? "Served" : "Skipped"}
-      </Badge>
-    )
+    return <Badge tone={hasEaten ? "success" : "neutral"}>{hasEaten ? "Served" : "Skipped"}</Badge>
   }
 
   const openDailyOverride = (userId: string) => {
@@ -788,10 +778,7 @@ export function LunchRegisterPage({
       sortable: true,
       accessor: (row) => row.eatingCount,
       render: (row) => (
-        <Badge
-          variant="outline"
-          className="border-2 border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-semibold text-emerald-600 hover:bg-emerald-500/10"
-        >
+        <Badge tone="success" className="border-2 px-2.5 py-0.5 font-semibold">
           {row.eatingCount}
         </Badge>
       ),
@@ -807,10 +794,7 @@ export function LunchRegisterPage({
           return <span className="text-muted-foreground text-xs">—</span>
         }
         return (
-          <Badge
-            variant="outline"
-            className="border-2 border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 font-semibold text-rose-600 hover:bg-rose-500/10"
-          >
+          <Badge tone="danger" className="border-2 px-2.5 py-0.5 font-semibold">
             {notEating}
           </Badge>
         )
@@ -829,10 +813,7 @@ export function LunchRegisterPage({
         }
         return (
           <div className="flex items-center gap-1.5">
-            <Badge
-              variant="outline"
-              className="gap-1 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600"
-            >
+            <Badge tone="warning" className="gap-1 px-2 py-0.5 text-xs font-semibold">
               <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
               {avg.toFixed(1)}
             </Badge>
@@ -999,10 +980,7 @@ export function LunchRegisterPage({
       accessor: (row) => row.lunch_count,
       sortable: true,
       render: (row) => (
-        <Badge
-          variant="outline"
-          className="border-2 border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 font-semibold text-blue-600 hover:bg-blue-500/10"
-        >
+        <Badge tone="info" className="border-2 px-2.5 py-0.5 font-semibold">
           {row.lunch_count} {row.lunch_count === 1 ? "day" : "days"}
         </Badge>
       ),
@@ -1043,10 +1021,7 @@ export function LunchRegisterPage({
           return <span className="text-muted-foreground text-xs">—</span>
         }
         return (
-          <Badge
-            variant="outline"
-            className="gap-1 border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600"
-          >
+          <Badge tone="warning" className="gap-1 px-2.5 py-0.5 text-xs font-semibold">
             <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
             {row.average_rating.toFixed(1)} / 5
           </Badge>
@@ -2099,10 +2074,12 @@ export function LunchRegisterPage({
 
             {/* Legend matching attendance CalendarView exact UI styling */}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Badge className="border-0 bg-emerald-500/10 text-xs text-emerald-500 hover:bg-emerald-500/10">
+              <Badge tone="success" className="border-0 text-xs">
                 Served
               </Badge>
-              <Badge className="border bg-gray-100 text-xs text-gray-400 hover:bg-gray-100">Skipped</Badge>
+              <Badge tone="neutral" className="border text-xs">
+                Skipped
+              </Badge>
             </div>
           </div>
         ))}
@@ -2617,11 +2594,11 @@ function EmployeeLunchExpandPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-success/15 text-success">{served} served</Badge>
+          <Badge tone="success">{served} served</Badge>
           <Badge variant="outline" className="font-normal">
             {skipped} skipped
           </Badge>
-          <Badge className="bg-danger/15 text-danger">Surcharge {formatNaira(totals.surcharge)}</Badge>
+          <Badge tone="danger">Surcharge {formatNaira(totals.surcharge)}</Badge>
         </div>
       </div>
 
@@ -2652,7 +2629,7 @@ function EmployeeLunchExpandPanel({
                     </span>
                     <div>
                       {log ? (
-                        <Badge className="bg-success/15 text-success">Served</Badge>
+                        <Badge tone="success">Served</Badge>
                       ) : (
                         <Badge variant="outline" className="text-muted-foreground font-normal">
                           Skipped

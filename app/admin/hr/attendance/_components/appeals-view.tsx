@@ -6,6 +6,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
@@ -47,35 +48,35 @@ function groupBatches(appeals: AppealRow[]): AppealRow[] {
 
 function renderStatusBadge(r: AppealRow) {
   if (r.overridden_at) {
-    return <Badge className="bg-warning/15 text-warning">Overridden</Badge>
+    return <Badge tone="warning">Overridden</Badge>
   }
 
   if (r.status === "approved") {
-    return <Badge className="bg-success/15 text-success">Approved</Badge>
+    return <Badge tone="success">Approved</Badge>
   }
 
   if (r.status === "rejected") {
-    return <Badge className="bg-danger/15 text-danger">Rejected</Badge>
+    return <Badge tone="danger">Rejected</Badge>
   }
 
   // Closed because the day was changed directly rather than through the appeal.
   if (r.status === "resolved") {
-    return <Badge className="bg-info/15 text-info">Resolved</Badge>
+    return <Badge tone="info">Resolved</Badge>
   }
 
   // Nobody decided it by its deadline. Not a rejection: the day stays as recorded.
   if (r.status === "expired") {
-    return <Badge className="bg-muted text-muted-foreground">Expired</Badge>
+    return <Badge tone="neutral">Expired</Badge>
   }
 
   if (r.stage === "pending_lead") {
     if (r.initiated_by_role === "admin_manual") {
-      return <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
+      return <Badge tone="warning">Pending Lead</Badge>
     }
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge className="bg-warning/15 text-warning">Pending Lead</Badge>
-        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
+        <Badge tone="warning">Pending Lead</Badge>
+        <Badge tone="info">Pending Admin & HR Lead</Badge>
       </div>
     )
   }
@@ -83,17 +84,17 @@ function renderStatusBadge(r: AppealRow) {
   if (r.stage === "pending_admin") {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-info/15 text-info">Pending Admin & HR Lead</Badge>
+        <Badge tone="info">Pending Admin & HR Lead</Badge>
         {r.lead_reviewer_name ? <span className="text-success pl-0.5 text-xs font-medium">Lead Endorsed ✓</span> : null}
       </div>
     )
   }
 
   if (r.stage === "pending_hr_lead") {
-    return <Badge className="bg-purple/15 text-purple">Pending Admin & HR Lead</Badge>
+    return <Badge tone="purple">Pending Admin & HR Lead</Badge>
   }
 
-  return <Badge className="bg-warning/15 text-warning">Pending</Badge>
+  return <Badge tone="warning">Pending</Badge>
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
@@ -186,22 +187,9 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         render: (r) => (
           <div className="flex flex-col items-start gap-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge
-                className={
-                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
-                  "bg-muted text-muted-foreground"
-                }
-              >
-                {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
-              </Badge>
+              <AttendanceStatusBadge status={r.current_status} />
               <span className="text-muted-foreground text-xs font-semibold">→</span>
-              <Badge
-                className={
-                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-info/15 text-info"
-                }
-              >
-                {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
-              </Badge>
+              <AttendanceStatusBadge status={r.requested_status} />
             </div>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
@@ -406,23 +394,9 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      className={
-                        ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
-                        "bg-muted text-muted-foreground"
-                      }
-                    >
-                      {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
-                    </Badge>
+                    <AttendanceStatusBadge status={r.current_status} />
                     <span className="text-muted-foreground text-xs font-semibold">→</span>
-                    <Badge
-                      className={
-                        ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ??
-                        "bg-info/15 text-info"
-                      }
-                    >
-                      {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
-                    </Badge>
+                    <AttendanceStatusBadge status={r.requested_status} />
                     {renderStatusBadge(r)}
                   </div>
                 </div>

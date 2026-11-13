@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 import type { PaymentScheduleStatus, ScheduleItemOutcome } from "@/lib/requisitions/types"
 import { cn } from "@/lib/utils"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 export const SCHEDULE_STATUS_LABELS: Record<PaymentScheduleStatus, string> = {
   draft: "Draft",
@@ -9,9 +10,9 @@ export const SCHEDULE_STATUS_LABELS: Record<PaymentScheduleStatus, string> = {
 }
 
 const SCHEDULE_STATUS_CLASS: Record<PaymentScheduleStatus, string> = {
-  draft: "border-warning/30 bg-warning/15 text-warning",
-  sent: "border-info/30 bg-info/15 text-info",
-  closed: "border-success/30 bg-success/15 text-success",
+  draft: TONE_CLASSES.warning,
+  sent: TONE_CLASSES.info,
+  closed: TONE_CLASSES.success,
 }
 
 export function ScheduleStatusBadge({ status, className }: { status: PaymentScheduleStatus; className?: string }) {
@@ -29,9 +30,9 @@ const OUTCOME_LABELS: Record<ScheduleItemOutcome, string> = {
 }
 
 const OUTCOME_CLASS: Record<ScheduleItemOutcome, string> = {
-  pending: "border-warning/30 bg-warning/15 text-warning",
-  paid: "border-success/30 bg-success/15 text-success",
-  unpaid: "border-danger/30 bg-danger/15 text-danger",
+  pending: TONE_CLASSES.warning,
+  paid: TONE_CLASSES.success,
+  unpaid: TONE_CLASSES.danger,
 }
 
 export function OutcomeBadge({ outcome }: { outcome: ScheduleItemOutcome }) {

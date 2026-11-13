@@ -218,7 +218,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         render: (r) => (
           <div className="flex flex-wrap gap-1">
             {r.core_departments.map((d) => (
-              <Badge key={d} className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">
+              <Badge key={d} tone="success" className="text-xs">
                 {d}
               </Badge>
             ))}
@@ -340,17 +340,17 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                       {planYear} Timeline Pacing:
                     </span>
                     {pacing?.status === "ahead" && (
-                      <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
+                      <Badge tone="success" className="gap-1 text-xs">
                         <TrendingUp className="h-3 w-3" /> Ahead of schedule ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
                     {pacing?.status === "on_pace" && (
-                      <Badge className="gap-1 border-blue-500/30 bg-blue-500/10 text-xs text-blue-600">
+                      <Badge tone="info" className="gap-1 text-xs">
                         <Clock className="h-3 w-3" /> On pace ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
                     {pacing?.status === "behind" && (
-                      <Badge className="gap-1 border-red-500/30 bg-red-500/10 text-xs text-red-600">
+                      <Badge tone="danger" className="gap-1 text-xs">
                         <AlertTriangle className="h-3 w-3" /> Behind schedule ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
@@ -417,7 +417,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                                 <td className="px-3 py-2 font-medium">{a.department}</td>
                                 <td className="px-3 py-2">
                                   {isCore ? (
-                                    <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">
+                                    <Badge tone="success" className="text-xs">
                                       CORE
                                     </Badge>
                                   ) : (
@@ -727,7 +727,9 @@ function ManageDepartmentsDialog({
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{a.department}</span>
                     {a.role === "core" ? (
-                      <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">CORE</Badge>
+                      <Badge tone="success" className="text-xs">
+                        CORE
+                      </Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs">
                         SUPPORT

@@ -49,6 +49,10 @@ export function stripComments(text) {
 
 const count = (text, re) => (text.match(re) || []).length
 
+/** A raw Tailwind palette colour class (`bg-emerald-500/10`, `text-red-600`, `border-amber-300`). */
+const RAW_PALETTE_RE =
+  /\b(?:bg|text|border)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/
+
 const isPage = (f) => /(^|\/)page\.tsx$/.test(f)
 const isViewLike = (f) => /(^|\/)(page|view)\.tsx$/.test(f) || /-content\.tsx$/.test(f)
 const inComponentsDir = (f) => f.startsWith("components/") || /\/_components\//.test(f)
@@ -126,7 +130,11 @@ export const RULES = [
   {
     id: "local-status-colour",
     applies: (f) => !/status-badge/.test(f),
-    count: (text) => count(text, /\bbg-(?:green|red|amber|yellow|blue|emerald|rose|orange)-100\s+text-/g),
+    // Hand-picked `bg-*-100 text-*` pairs anywhere, plus any raw palette colour inside a `<Badge>` tag:
+    // a badge takes its colour from `tone` (or StatusBadge), never from the Tailwind palette.
+    count: (text) =>
+      count(text, /\bbg-(?:green|red|amber|yellow|blue|emerald|rose|orange)-100\s+text-/g) +
+      [...text.matchAll(/<Badge\b[^>]*>/g)].filter((m) => RAW_PALETTE_RE.test(m[0])).length,
   },
   {
     id: "fixed-px-width",
@@ -173,8 +181,7 @@ export const RULES = [
   {
     id: "api-error-message",
     applies: (f) => f.startsWith("app/api/"),
-    count: (text) =>
-      count(text, /NextResponse\.json\(\s*\{\s*error:\s*(?:[a-zA-Z0-9_]*Error|error|err)\??\.message/g),
+    count: (text) => count(text, /NextResponse\.json\(\s*\{\s*error:\s*(?:[a-zA-Z0-9_]*Error|error|err)\??\.message/g),
   },
   {
     id: "route-without-zod",

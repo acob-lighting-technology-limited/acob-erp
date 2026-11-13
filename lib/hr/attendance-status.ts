@@ -1,6 +1,7 @@
 import { isLate, isWeekend } from "@/lib/hr/attendance-utils"
 import { toLocalISODate } from "@/lib/utils/date"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 export function isLateWithPolicy(clockIn: string | null | undefined, lateCutoff: string): boolean {
   if (!clockIn) return false
@@ -37,34 +38,34 @@ export type UnifiedAttendanceStatus =
 
 /** Tailwind colour classes for every canonical attendance status (with dark mode support). */
 export const ATTENDANCE_STATUS_COLORS: Record<UnifiedAttendanceStatus, string> = {
-  cds: "bg-success/15 text-success border-success/30",
-  early: "bg-success/15 text-success border-success/30",
-  present: "bg-info/15 text-info border-info/30",
-  late: "bg-warning/15 text-warning border-warning/30",
+  cds: TONE_CLASSES.success,
+  early: TONE_CLASSES.success,
+  present: TONE_CLASSES.info,
+  late: TONE_CLASSES.warning,
   lateness_with_permission:
     "bg-gradient-to-r from-amber-100 to-green-100 text-success border-amber-200 dark:from-amber-950/40 dark:to-green-950/40",
-  early_departure: "bg-warning/15 text-warning border-warning/30",
+  early_departure: TONE_CLASSES.warning,
   early_departure_with_permission:
     "bg-gradient-to-r from-orange-100 to-green-100 text-success border-orange-200 dark:from-orange-950/40 dark:to-green-950/40",
-  early_closure: "bg-info/15 text-info border-info/30",
-  late_resumption: "bg-info/15 text-info border-info/30",
-  incomplete: "bg-info/15 text-info border-info/30",
+  early_closure: TONE_CLASSES.info,
+  late_resumption: TONE_CLASSES.info,
+  incomplete: TONE_CLASSES.info,
   incomplete_with_permission:
     "bg-gradient-to-r from-cyan-100 to-green-100 text-success border-cyan-200 dark:from-cyan-950/40 dark:to-green-950/40",
-  absent: "bg-danger/15 text-danger border-danger/30",
+  absent: TONE_CLASSES.danger,
   absent_with_permission:
     "bg-gradient-to-r from-red-100 to-green-100 text-success border-red-200 dark:from-red-950/40 dark:to-green-950/40",
-  out_of_station: "bg-info/15 text-info border-info/30",
-  waiver: "bg-info/15 text-info border-info/30",
-  waived: "bg-info/15 text-info border-info/30",
-  exempted: "bg-purple/15 text-purple border-purple/30",
-  on_leave: "bg-purple/15 text-purple border-purple/30",
+  out_of_station: TONE_CLASSES.info,
+  waiver: TONE_CLASSES.info,
+  waived: TONE_CLASSES.info,
+  exempted: TONE_CLASSES.purple,
+  on_leave: TONE_CLASSES.purple,
   // Deliberately not purple like paid leave — an unpaid day should not read as a benefit.
-  lwop: "bg-danger/15 text-danger border-danger/30",
-  holiday: "bg-info/15 text-info border-info/30",
-  weekend: "bg-muted text-foreground border-border",
-  no_record: "bg-muted text-foreground border-border",
-  half_day: "bg-warning/15 text-warning border-warning/30",
+  lwop: TONE_CLASSES.danger,
+  holiday: TONE_CLASSES.info,
+  weekend: TONE_CLASSES.neutral,
+  no_record: TONE_CLASSES.neutral,
+  half_day: TONE_CLASSES.warning,
 }
 
 /** Human-readable labels for statuses whose raw value would look bad in the UI. */

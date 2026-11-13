@@ -43,11 +43,9 @@ type SummaryResponse = {
 }
 
 function ragBadge(status: RagStatus | null) {
-  if (status === "green")
-    return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Target</Badge>
-  if (status === "amber")
-    return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">Needs Attention</Badge>
-  if (status === "red") return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">At Risk</Badge>
+  if (status === "green") return <Badge tone="success">On Target</Badge>
+  if (status === "amber") return <Badge tone="warning">Needs Attention</Badge>
+  if (status === "red") return <Badge tone="danger">At Risk</Badge>
   return <span className="text-muted-foreground text-xs">No data</span>
 }
 

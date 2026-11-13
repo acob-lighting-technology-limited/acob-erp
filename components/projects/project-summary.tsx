@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { ColumnHelp } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -26,22 +27,22 @@ export function formatCapacity(watts: number | null | undefined) {
 /** One colour per progress status, shared by badges, dots and bars. */
 export const HEALTH_TONE: Record<ProjectHealthStatus, { badge: string; dot: string; text: string }> = {
   on_track: {
-    badge: "border-success/20 bg-success/10 text-success",
+    badge: TONE_CLASSES.success,
     dot: "bg-emerald-500",
     text: "text-success",
   },
   at_risk: {
-    badge: "border-warning/20 bg-warning/10 text-warning",
+    badge: TONE_CLASSES.warning,
     dot: "bg-amber-500",
     text: "text-warning",
   },
   behind_schedule: {
-    badge: "border-danger/20 bg-danger/10 text-danger",
+    badge: TONE_CLASSES.danger,
     dot: "bg-red-500",
     text: "text-danger",
   },
   completed: {
-    badge: "border-info/20 bg-info/10 text-info",
+    badge: TONE_CLASSES.info,
     dot: "bg-blue-500",
     text: "text-info",
   },
@@ -54,11 +55,11 @@ export function HealthBadge({ status }: { status: ProjectHealthStatus }) {
 export function PortfolioStatusBadge({ status }: { status: string }) {
   switch (status) {
     case "active":
-      return <Badge className="text-success border-success/20 bg-success/10">Active</Badge>
+      return <Badge tone="success">Active</Badge>
     case "on_hold":
-      return <Badge className="text-warning border-warning/20 bg-warning/10">On hold</Badge>
+      return <Badge tone="warning">On hold</Badge>
     case "closed":
-      return <Badge className="text-muted-foreground border-slate-500/20 bg-slate-500/10">Closed</Badge>
+      return <Badge tone="neutral">Closed</Badge>
     default:
       return (
         <Badge variant="outline" className="capitalize">
@@ -69,8 +70,8 @@ export function PortfolioStatusBadge({ status }: { status: string }) {
 }
 
 const PRIORITY_BADGE: Record<ProjectPriority, string> = {
-  critical: "border-danger/30 bg-danger/10 text-danger",
-  high: "border-warning/30 bg-warning/10 text-warning",
+  critical: TONE_CLASSES.danger,
+  high: TONE_CLASSES.warning,
   medium: "border-border text-muted-foreground",
   low: "border-border text-muted-foreground/80",
 }

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 /**
  * Company events calendar — shared types, labels and the write schema.
@@ -74,19 +75,19 @@ export const EVENT_RSVP_LABELS: Record<EventRsvp, string> = {
 
 /** Semantic badge colours, one per type — also used for calendar chips. */
 export const EVENT_TYPE_BADGE_CLASSES: Record<EventType, string> = {
-  meeting: "bg-info/10 text-info",
-  workshop: "bg-purple/10 text-purple",
-  webinar: "bg-cyan-500/10 text-info",
-  activity: "bg-success/10 text-success",
-  training: "bg-warning/10 text-warning",
-  holiday: "bg-danger/10 text-danger",
+  meeting: TONE_CLASSES.info,
+  workshop: TONE_CLASSES.purple,
+  webinar: TONE_CLASSES.info,
+  activity: TONE_CLASSES.success,
+  training: TONE_CLASSES.warning,
+  holiday: TONE_CLASSES.danger,
 }
 
 export const EVENT_STATUS_BADGE_CLASSES: Record<EventStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  scheduled: "bg-info/10 text-info",
-  cancelled: "bg-danger/10 text-danger",
-  completed: "bg-success/10 text-success",
+  draft: TONE_CLASSES.neutral,
+  scheduled: TONE_CLASSES.info,
+  cancelled: TONE_CLASSES.danger,
+  completed: TONE_CLASSES.success,
 }
 
 export type EventAttendee = {

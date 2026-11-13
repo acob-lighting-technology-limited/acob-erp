@@ -350,7 +350,7 @@ function CheckInContent() {
                   <CardDescription className="text-xs">Schedule and attendance status</CardDescription>
                 </div>
               </div>
-              <Badge variant="outline" className="text-success border-success/40 bg-success/10 text-xs">
+              <Badge tone="success" className="text-xs">
                 Week {week}
               </Badge>
             </div>
@@ -378,11 +378,11 @@ function CheckInContent() {
                 <UserCheck className="h-3.5 w-3.5" /> Your Status
               </span>
               {successResult || userStatus?.alreadyCheckedIn ? (
-                <Badge variant="outline" className="text-success border-success/40 bg-success/10">
+                <Badge tone="success">
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Checked In
                 </Badge>
               ) : userStatus && !userStatus.hasOfficeClockIn ? (
-                <Badge variant="outline" className="text-warning border-warning/40 bg-warning/10">
+                <Badge tone="warning">
                   <AlertCircle className="mr-1 h-3 w-3" /> Punch Required
                 </Badge>
               ) : (

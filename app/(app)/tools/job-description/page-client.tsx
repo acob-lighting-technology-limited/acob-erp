@@ -206,7 +206,7 @@ export default function JobDescriptionPage() {
                 <span className="print:hidden">Job Description</span>
                 <span className="hidden print:block">Job Description</span>
                 {!jobDescription && (
-                  <Badge variant="outline" className="bg-warning/15 text-yellow-700 print:hidden">
+                  <Badge tone="warning" className="print:hidden">
                     Not Set
                   </Badge>
                 )}

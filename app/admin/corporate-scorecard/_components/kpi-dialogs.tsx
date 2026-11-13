@@ -639,12 +639,8 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                 </p>
               </div>
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="bg-success/15 text-emerald-700">
-                  {assignments.filter((a) => a.role === "core").length} Core
-                </Badge>
-                <Badge variant="outline" className="bg-info/15 text-blue-700">
-                  {assignments.filter((a) => a.role === "support").length} Support
-                </Badge>
+                <Badge tone="success">{assignments.filter((a) => a.role === "core").length} Core</Badge>
+                <Badge tone="info">{assignments.filter((a) => a.role === "support").length} Support</Badge>
               </div>
             </div>
 

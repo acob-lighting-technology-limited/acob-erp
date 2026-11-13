@@ -156,7 +156,7 @@ function ApprovalStages({ approvals, status }: { approvals: CorrespondenceApprov
                     {bypassed ? (
                       <span className="text-muted-foreground text-xs">Bypassed</span>
                     ) : pending ? (
-                      <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning text-xs">
+                      <Badge tone="warning" className="text-xs">
                         Awaiting action
                       </Badge>
                     ) : badge ? (

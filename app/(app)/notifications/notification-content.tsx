@@ -262,7 +262,9 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         width: "70px",
         render: (n) =>
           n.read ? null : (
-            <Badge className="bg-info/15 text-info border-transparent text-xs font-medium capitalize">New</Badge>
+            <Badge tone="info" className="text-xs font-medium capitalize">
+              New
+            </Badge>
           ),
       },
       {
@@ -432,7 +434,9 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           subtitle: (n) => n.message,
           trailing: (n) =>
             !n.read ? (
-              <Badge className="bg-info/15 text-info border-transparent text-xs font-medium">New</Badge>
+              <Badge tone="info" className="text-xs font-medium">
+                New
+              </Badge>
             ) : (
               <span className="text-muted-foreground text-xs whitespace-nowrap">
                 {formatRelativeTime(n.created_at)}
@@ -443,7 +447,11 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
             subtitle: (n) => <span className="text-muted-foreground text-xs">{formatRelativeTime(n.created_at)}</span>,
             badges: (n) => (
               <>
-                {!n.read && <Badge className="bg-info/15 text-info border-transparent text-xs font-medium">New</Badge>}
+                {!n.read && (
+                  <Badge tone="info" className="text-xs font-medium">
+                    New
+                  </Badge>
+                )}
                 <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
                   {n.priority}
                 </Badge>
@@ -525,7 +533,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
                     {n.category}
                   </Badge>
                   {!n.read && (
-                    <Badge className="bg-info/15 text-info border-transparent px-1.5 py-0 text-xs font-medium">
+                    <Badge tone="info" className="px-1.5 py-0 text-xs font-medium">
                       New
                     </Badge>
                   )}

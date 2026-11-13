@@ -338,18 +338,12 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   {getRoleDisplayName(profile.role as UserRole)}
                 </Badge>
                 {profile.is_department_lead && (
-                  <Badge
-                    variant="outline"
-                    className="text-warning border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium"
-                  >
+                  <Badge tone="warning" className="px-2 py-0.5 text-xs font-medium">
                     Dept Lead
                   </Badge>
                 )}
                 {confirmationDate ? (
-                  <Badge
-                    variant="outline"
-                    className="text-success border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium"
-                  >
+                  <Badge tone="success" className="px-2 py-0.5 text-xs font-medium">
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (
@@ -419,12 +413,12 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   {getRoleDisplayName(profile.role as UserRole)}
                 </Badge>
                 {profile.is_department_lead && (
-                  <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs font-medium">
+                  <Badge tone="warning" className="text-xs font-medium">
                     Dept Lead
                   </Badge>
                 )}
                 {confirmationDate ? (
-                  <Badge variant="outline" className="text-success border-success/30 bg-success/10 text-xs font-medium">
+                  <Badge tone="success" className="text-xs font-medium">
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (

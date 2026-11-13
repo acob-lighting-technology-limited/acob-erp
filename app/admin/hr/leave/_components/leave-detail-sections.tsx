@@ -131,7 +131,7 @@ export function LeaveOverlapNotice({ leave }: { leave: LeaveItem }) {
       </div>
       <div className="flex flex-wrap gap-1.5">
         {leave.department_overlaps.map((overlap) => (
-          <Badge key={overlap.id} variant="outline" className="border-warning/30 bg-warning/15 text-warning">
+          <Badge key={overlap.id} tone="warning">
             {overlap.full_name} ({safeDateDisplay(overlap.start_date)} to {safeDateDisplay(overlap.end_date)})
           </Badge>
         ))}
@@ -187,11 +187,11 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                 {isApproved ? "Direct admin approval" : "Direct admin entry"}
               </span>
               {isApproved ? (
-                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
+                <Badge tone="success" className="text-xs">
                   Approved
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-600">
+                <Badge tone="warning" className="text-xs">
                   Awaiting confirmation
                 </Badge>
               )}
@@ -295,8 +295,8 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                         </Badge>
                         {!isStageRejected && skippedBefore(idx).length > 0 ? (
                           <Badge
-                            variant="outline"
-                            className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-600"
+                            tone="warning"
+                            className="text-xs font-medium"
                             title={`Signed ahead of ${skippedBefore(idx)
                               .map((k) => STAGE_NAME[k])
                               .join(", ")}`}
@@ -306,7 +306,7 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                         ) : null}
                       </span>
                     ) : isCurrent && isOpen ? (
-                      <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning text-xs">
+                      <Badge tone="warning" className="text-xs">
                         Awaiting action
                       </Badge>
                     ) : (

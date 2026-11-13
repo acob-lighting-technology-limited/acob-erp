@@ -414,9 +414,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className="text-success border-success/40 bg-success/20">
-              Approved
-            </Badge>
+            <Badge tone="success">Approved</Badge>
           </div>
         )}
 
@@ -1237,7 +1235,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <h4 className="text-foreground text-xs font-bold tracking-wider uppercase">
                 Tax Bracket Computation (2-Column Schedule Comparison):
               </h4>
-              <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 w-fit font-mono text-xs">
+              <Badge tone="warning" className="w-fit font-mono text-xs">
                 PITA vs New Tax Reform Act
               </Badge>
             </div>

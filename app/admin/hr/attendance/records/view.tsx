@@ -20,7 +20,7 @@ import { isEarlyDeparture, getManualStatusEditOptions, isPermissionAttendanceSta
 import { isLate } from "@/lib/hr/attendance-utils"
 import { Select } from "@/components/ui/select"
 import { apiFetch, apiJson } from "@/lib/api-client"
-import { StatusBadge, labelSource } from "../_components/status-badge"
+import { AttendanceStatusBadge, labelSource } from "@/components/hr/attendance-record-display"
 import { ClockTimes, NameWithDept } from "../_components/clock-times"
 import { cn } from "@/lib/utils"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
@@ -274,7 +274,7 @@ export function AdminAttendanceRecordsPage({
       label: "Status",
       sortable: true,
       accessor: (r) => r.status,
-      render: (r) => <StatusBadge status={r.status} record={r} />,
+      render: (r) => <AttendanceStatusBadge status={r.status} record={r} />,
     },
     {
       key: "source",
@@ -422,12 +422,12 @@ export function AdminAttendanceRecordsPage({
                 {` · ${r.total_hours?.toFixed(1) ?? 0}h · ${formatDate(r.date)}`}
               </>
             ),
-            trailing: (r) => <StatusBadge status={r.status} record={r} />,
+            trailing: (r) => <AttendanceStatusBadge status={r.status} record={r} />,
             detail: {
               title: (r) => r.user_name,
               subtitle: (r) =>
                 `${r.department} · ${formatWATDate(r.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`,
-              badges: (r) => <StatusBadge status={r.status} record={r} />,
+              badges: (r) => <AttendanceStatusBadge status={r.status} record={r} />,
               fields: (r) => [
                 { icon: Building, label: "Department", value: r.department },
                 {
@@ -461,7 +461,7 @@ export function AdminAttendanceRecordsPage({
                   <p className="text-sm font-semibold">{r.user_name}</p>
                   <p className="text-muted-foreground text-xs">{r.department}</p>
                 </div>
-                <StatusBadge status={r.status} record={r} />
+                <AttendanceStatusBadge status={r.status} record={r} />
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>

@@ -120,13 +120,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "status",
       label: "Status",
       render: (row: PayrollPeriod) =>
-        row.status === "completed" ? (
-          <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20">Locked / Paid</Badge>
-        ) : (
-          <Badge variant="outline" className="border-amber-500/30 text-amber-500">
-            Draft
-          </Badge>
-        ),
+        row.status === "completed" ? <Badge tone="success">Locked / Paid</Badge> : <Badge tone="warning">Draft</Badge>,
     },
     {
       key: "actions",

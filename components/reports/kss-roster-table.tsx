@@ -764,7 +764,7 @@ export function KssRosterTable({
               </Tooltip>
             )
           }
-          return <Badge className="bg-success/15 text-success text-xs">Uploaded</Badge>
+          return <Badge tone="success">Uploaded</Badge>
         },
       },
       {

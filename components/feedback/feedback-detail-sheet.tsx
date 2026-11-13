@@ -8,34 +8,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import type { FeedbackRecord } from "@/components/feedback/types"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 function getTypeColor(type: string): string {
   switch (type) {
     case "concern":
-      return "bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
     case "complaint":
-      return "bg-danger/15 text-danger"
+      return TONE_CLASSES.danger
     case "suggestion":
-      return "bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "required_item":
-      return "bg-purple/15 text-purple"
+      return TONE_CLASSES.purple
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 
 function getStatusColor(status: string): string {
   switch (status) {
     case "open":
-      return "bg-success/15 text-success"
+      return TONE_CLASSES.success
     case "in_progress":
-      return "bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "resolved":
-      return "bg-purple/15 text-purple"
+      return TONE_CLASSES.purple
     case "closed":
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 

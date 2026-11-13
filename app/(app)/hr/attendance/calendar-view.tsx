@@ -263,7 +263,7 @@ export function EmployeeCalendarView() {
           .map(([key, label]) => (
             <Badge
               key={key}
-              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-gray-100 text-gray-800"}`}
+              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-muted-foreground"}`}
             >
               {label}
             </Badge>

@@ -317,7 +317,7 @@ export function WeekSetupCard() {
           <Calendar className="text-muted-foreground h-5 w-5" />
           <CardTitle className="text-base">{`Week Setup: W${weekNumber}, ${yearNumber}`}</CardTitle>
           {lockState?.hasOverrideRole && (
-            <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+            <Badge tone="success" className="gap-1">
               <ShieldCheck className="h-3 w-3" />
               Override Active
             </Badge>

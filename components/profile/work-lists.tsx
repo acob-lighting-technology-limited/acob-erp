@@ -15,6 +15,7 @@ import {
 import type { Task, Asset, LeaveItem, LunchLogItem, WorkDayAttendanceItem } from "@/app/(app)/profile/page"
 import { getTaskUrgency, sortTasksByUrgency } from "./work-items"
 import { formatCurrency } from "@/lib/format"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 const MAX_TASKS = 6
 const MAX_LEAVE_ITEMS = 5
@@ -30,20 +31,20 @@ function statusBadgeClass(status: string): string {
     case "completed":
     case "resolved":
     case "approved":
-      return "bg-success/15 text-success"
+      return TONE_CLASSES.success
     case "in_progress":
     case "under_review":
-      return "bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "pending":
     case "open":
     case "new":
-      return "bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
     case "assigned":
-      return "bg-purple/15 text-purple"
+      return TONE_CLASSES.purple
     case "rejected":
-      return "bg-danger/15 text-danger"
+      return TONE_CLASSES.danger
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 
@@ -178,10 +179,10 @@ const LEAVE_STATE_LABELS: Record<LeaveState, string> = {
 }
 
 const LEAVE_STATE_CLASSES: Record<LeaveState, string> = {
-  on_leave: "bg-purple/15 text-purple",
-  upcoming: "bg-success/15 text-success",
-  pending: "bg-warning/15 text-warning",
-  pending_evidence: "bg-warning/15 text-warning",
+  on_leave: TONE_CLASSES.purple,
+  upcoming: TONE_CLASSES.success,
+  pending: TONE_CLASSES.warning,
+  pending_evidence: TONE_CLASSES.warning,
 }
 
 // Ongoing leave first, then anything waiting on the employee, then the queue.
@@ -340,7 +341,7 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                 : ATTENDANCE_STATUS_LABELS[statusKey] || humanizeStatus(item.status)
             const statusColor =
               item.status === "not_clocked_in"
-                ? "bg-muted text-foreground border-border"
+                ? TONE_CLASSES.neutral
                 : ATTENDANCE_STATUS_COLORS[statusKey] || statusBadgeClass(item.status)
 
             return (

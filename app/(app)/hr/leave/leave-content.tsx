@@ -328,8 +328,8 @@ export function LeaveContent({
             <LeavePeriodCell start={r.start_date} end={r.end_date} days={r.days_count} />
             {r.department_overlaps && r.department_overlaps.length > 0 && (
               <Badge
-                variant="outline"
-                className="border-warning/30 bg-warning/15 text-warning flex w-fit items-center gap-1 px-1.5 py-0 text-xs"
+                tone="warning"
+                className="flex w-fit items-center gap-1 px-1.5 py-0 text-xs"
                 title={`Department overlap with ${r.department_overlaps.map((o) => o.full_name).join(", ")}`}
               >
                 <AlertCircle className="h-3 w-3 shrink-0" />

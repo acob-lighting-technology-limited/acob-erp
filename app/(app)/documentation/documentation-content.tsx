@@ -22,6 +22,7 @@ import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 const log = logger("documentation-documentation-content")
 
@@ -203,7 +204,7 @@ export function DocumentationContent({
     draft: docs.filter((d) => d.is_draft).length,
   }
 
-  const getStatusColor = (isDraft: boolean) => (isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success")
+  const getStatusColor = (isDraft: boolean) => (isDraft ? TONE_CLASSES.warning : TONE_CLASSES.success)
 
   const categoryOptions = useMemo(
     () =>

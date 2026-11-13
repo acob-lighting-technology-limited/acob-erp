@@ -185,7 +185,7 @@ export function RiskImportDialog({ open, onOpenChange, onImported }: RiskImportD
                         ) : row.warnings.length > 0 ? (
                           <Badge variant="outline">Review mapping</Badge>
                         ) : (
-                          <Badge className="bg-emerald-600 text-white">
+                          <Badge tone="success">
                             <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden /> Ready
                           </Badge>
                         )}

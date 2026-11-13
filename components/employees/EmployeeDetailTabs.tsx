@@ -13,6 +13,7 @@ import { activityModuleNoun, activitySentenceCase, describeAuditActivity } from 
 import { CheckSquare, Laptop, Package, FileText, MessageSquare, ScrollText } from "lucide-react"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import Link from "next/link"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import type {
   EmployeeTask,
   EmployeeDevice,
@@ -26,29 +27,29 @@ function getStatusColor(status: string) {
   switch (status?.toLowerCase()) {
     case "completed":
     case "resolved":
-      return "bg-success/15 text-success"
+      return TONE_CLASSES.success
     case "in_progress":
-      return "bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "pending":
     case "open":
-      return "bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
     case "assigned":
-      return "bg-purple/15 text-purple"
+      return TONE_CLASSES.purple
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 
 function getPriorityColor(priority: string) {
   switch (priority?.toLowerCase()) {
     case "high":
-      return "bg-danger/15 text-danger"
+      return TONE_CLASSES.danger
     case "medium":
-      return "bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
     case "low":
-      return "bg-success/15 text-success"
+      return TONE_CLASSES.success
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 

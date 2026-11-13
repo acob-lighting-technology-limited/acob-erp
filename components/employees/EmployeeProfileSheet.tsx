@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -53,15 +54,15 @@ function getAssetStatusColor(status: string | null | undefined): string {
     case "resolved":
     case "completed":
     case "approved":
-      return "bg-success/15 text-success"
+      return TONE_CLASSES.success
     case "in_progress":
     case "under_review":
-      return "bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "pending":
     case "open":
-      return "bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
     default:
-      return "bg-muted text-foreground"
+      return TONE_CLASSES.neutral
   }
 }
 
@@ -79,29 +80,29 @@ function StaffTypeBadge({
   const isContract = normType === "contract"
 
   let label = normType.replace(/_/g, " ")
-  let colorClasses = "border-info/30 bg-blue-500/10 text-blue-600"
+  let colorClasses = TONE_CLASSES.info
 
   if (isPartTime) {
     label = "Part Time"
-    colorClasses = "border-border bg-slate-500/10 text-slate-600"
+    colorClasses = TONE_CLASSES.neutral
   } else if (categoryName) {
     label = categoryName
     const catUpper = categoryName.toUpperCase()
     if (catUpper.includes("NYSC")) {
-      colorClasses = "border-purple/30 bg-purple/10 text-purple-600"
+      colorClasses = TONE_CLASSES.purple
     } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
-      colorClasses = "border-info/30 bg-cyan-500/10 text-cyan-600"
+      colorClasses = TONE_CLASSES.info
     } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
-      colorClasses = "border-success/30 bg-emerald-500/10 text-emerald-600"
+      colorClasses = TONE_CLASSES.success
     } else {
-      colorClasses = "border-warning/30 bg-orange-500/10 text-orange-600"
+      colorClasses = TONE_CLASSES.warning
     }
   } else if (isContract) {
     label = "Contract Staff"
-    colorClasses = "border-warning/30 bg-orange-500/10 text-orange-600"
+    colorClasses = TONE_CLASSES.warning
   } else {
     label = "Full Time"
-    colorClasses = "border-info/30 bg-blue-500/10 text-blue-600"
+    colorClasses = TONE_CLASSES.info
   }
 
   return (
@@ -315,7 +316,7 @@ function LegacyEmployeeProfileSheet({
                             {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
                           </Badge>
                           {viewEmployeeProfile.is_department_lead && (
-                            <Badge variant="outline" className="border-amber-300 px-1 py-0 text-xs text-amber-600">
+                            <Badge tone="warning" className="px-1 py-0 text-xs">
                               Lead
                             </Badge>
                           )}
@@ -441,10 +442,7 @@ function LegacyEmployeeProfileSheet({
                         />
                         {viewEmployeeProfile.employment_status === "active" &&
                           !viewEmployeeProfile.mailbox_credentials_sent_at && (
-                            <Badge
-                              variant="outline"
-                              className="text-warning border-warning/20 bg-warning/10 px-2 py-0.5 text-xs font-semibold shadow-none"
-                            >
+                            <Badge tone="warning" className="px-2 py-0.5 text-xs font-semibold shadow-none">
                               Mailbox Pending
                             </Badge>
                           )}
@@ -454,10 +452,7 @@ function LegacyEmployeeProfileSheet({
                           className="px-2 py-0.5"
                         />
                         {viewEmployeeProfile.nysc_cds_day && (
-                          <Badge
-                            variant="outline"
-                            className="text-success border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-xs font-semibold capitalize shadow-none"
-                          >
+                          <Badge tone="success" className="px-2 py-0.5 text-xs font-semibold capitalize shadow-none">
                             CDS: {viewEmployeeProfile.nysc_cds_day}
                           </Badge>
                         )}

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 
 import { apiFetch } from "@/lib/api-client"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 export interface ActionTask {
   id: string
   title: string
@@ -86,17 +87,16 @@ export async function fetchActionTrackerTasks(
 
 export function getDeptStatus(tasks: ActionTask[], dept: string) {
   const deptActions = tasks.filter((t) => t.department === dept)
-  if (deptActions.length === 0) return { label: "Pending", color: "bg-muted text-muted-foreground" }
-  if (deptActions.every((a) => a.status === "completed"))
-    return { label: "Finished", color: "bg-success/15 text-success" }
+  if (deptActions.length === 0) return { label: "Pending", color: TONE_CLASSES.neutral }
+  if (deptActions.every((a) => a.status === "completed")) return { label: "Finished", color: TONE_CLASSES.success }
   if (deptActions.some((a) => a.status === "in_progress" || a.status === "completed"))
-    return { label: "Started", color: "bg-info/15 text-info" }
-  return { label: "Pending", color: "bg-muted text-muted-foreground" }
+    return { label: "Started", color: TONE_CLASSES.info }
+  return { label: "Pending", color: TONE_CLASSES.neutral }
 }
 
 export function getStatusColor(status: string) {
-  if (status === "completed") return "bg-success/15 text-success"
-  if (status === "in_progress") return "bg-info/15 text-info"
-  if (status === "not_started") return "bg-warning/15 text-warning"
-  return "bg-muted text-muted-foreground"
+  if (status === "completed") return TONE_CLASSES.success
+  if (status === "in_progress") return TONE_CLASSES.info
+  if (status === "not_started") return TONE_CLASSES.warning
+  return TONE_CLASSES.neutral
 }
