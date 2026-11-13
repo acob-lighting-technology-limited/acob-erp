@@ -247,11 +247,7 @@ export function DirectoryContent() {
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2">
                 <CopyValue value={displayName(r)} className="font-medium" />
-                {r.is_department_lead && (
-                  <Badge variant="outline" className="text-success">
-                    Lead
-                  </Badge>
-                )}
+                {r.is_department_lead && <Badge tone="success">Lead</Badge>}
               </div>
               {r.designation && <p className="text-muted-foreground text-xs">{r.designation}</p>}
             </div>
@@ -463,7 +459,7 @@ export function DirectoryContent() {
           subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
           trailing: (r) =>
             r.is_department_lead ? (
-              <Badge variant="outline" className="text-success text-xs">
+              <Badge tone="success" className="text-xs">
                 Lead
               </Badge>
             ) : null,
@@ -473,7 +469,7 @@ export function DirectoryContent() {
             avatar: (r) => <DirectoryAvatar row={r} size="xl" />,
             badges: (r) =>
               r.is_department_lead ? (
-                <Badge variant="outline" className="text-success border-success/40 bg-success/10 text-xs">
+                <Badge tone="success" className="text-xs">
                   Lead
                 </Badge>
               ) : null,
@@ -523,7 +519,7 @@ export function DirectoryContent() {
                 </div>
               </div>
               {r.is_department_lead && (
-                <Badge variant="outline" className="text-success shrink-0">
+                <Badge tone="success" className="shrink-0">
                   Lead
                 </Badge>
               )}

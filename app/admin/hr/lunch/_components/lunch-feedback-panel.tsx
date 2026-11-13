@@ -26,7 +26,7 @@ export function FeedbackExpandPanel({ entry }: { entry: LunchReviewSummary }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-warning/15 text-warning gap-1">
+          <Badge tone="warning" className="gap-1">
             <Star className="h-3 w-3 fill-current" />
             {entry.average_rating ? `${entry.average_rating.toFixed(1)} / 5` : "No rating"}
           </Badge>

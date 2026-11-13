@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Edit2, FileText, MessageSquare, Plus, Star, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -48,19 +49,19 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
   const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
 
   const getTypeColor = (type: string) => {
-    if (type === "concern") return "bg-warning/15 text-warning"
-    if (type === "complaint") return "bg-danger/15 text-danger"
-    if (type === "suggestion") return "bg-info/15 text-info"
-    if (type === "required_item") return "bg-purple/15 text-purple"
-    return "bg-muted text-muted-foreground"
+    if (type === "concern") return TONE_CLASSES.warning
+    if (type === "complaint") return TONE_CLASSES.danger
+    if (type === "suggestion") return TONE_CLASSES.info
+    if (type === "required_item") return TONE_CLASSES.purple
+    return TONE_CLASSES.neutral
   }
 
   const getStatusColor = (status: string) => {
-    if (status === "open") return "bg-success/15 text-success"
-    if (status === "in_progress") return "bg-info/15 text-info"
-    if (status === "resolved") return "bg-purple/15 text-purple"
-    if (status === "closed") return "bg-muted text-muted-foreground"
-    return "bg-muted text-muted-foreground"
+    if (status === "open") return TONE_CLASSES.success
+    if (status === "in_progress") return TONE_CLASSES.info
+    if (status === "resolved") return TONE_CLASSES.purple
+    if (status === "closed") return TONE_CLASSES.neutral
+    return TONE_CLASSES.neutral
   }
 
   const handleFeedbackSubmitted = (newFeedback: Feedback) => {
@@ -216,11 +217,11 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">ACOB Matrix ERP Experience Pulse</h3>
                 {userSurvey ? (
-                  <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-xs">
+                  <Badge tone="success" className="text-xs">
                     Completed
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-xs">
+                  <Badge tone="warning" className="text-xs">
                     Pending Feedback
                   </Badge>
                 )}

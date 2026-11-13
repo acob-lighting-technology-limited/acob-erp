@@ -29,7 +29,6 @@ import { AttendancePrintSheetDialog } from "./_components/attendance-print-sheet
 import { AttendanceEditDialog } from "./_components/attendance-edit-dialog"
 import { AttendanceConfirmDialog } from "./_components/attendance-confirm-dialog"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 import { formatTime as formatClockTime } from "@/lib/format"
@@ -69,26 +68,26 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
     case "present":
       if (isVirtual) {
         return (
-          <Badge variant="outline" className="text-success border-success/40 bg-success/10 gap-1 text-xs font-medium">
+          <Badge tone="success" className="gap-1 text-xs font-medium">
             <Laptop className="h-3 w-3" /> Present (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
+        <Badge tone="success" className="gap-1 text-xs">
           <Building2 className="h-3 w-3" /> Present (In-Room)
         </Badge>
       )
     case "late":
       if (isVirtual) {
         return (
-          <Badge variant="outline" className="text-warning border-warning/40 bg-warning/10 gap-1 text-xs font-medium">
+          <Badge tone="warning" className="gap-1 text-xs font-medium">
             <Laptop className="h-3 w-3" /> Late (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-amber-600 text-xs text-white hover:bg-amber-600">
+        <Badge tone="warning" className="gap-1 text-xs">
           <Clock className="h-3 w-3" /> Late (In-Room)
         </Badge>
       )
@@ -279,7 +278,7 @@ export default function AdminMeetingAttendancePage() {
           if (!r.meeting_clock_in) {
             if (r.office_clock_in && !r.is_on_leave) {
               return (
-                <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
+                <Badge tone="warning" className="gap-1 text-xs">
                   <AlertTriangle className="h-3 w-3" /> Missed scan
                 </Badge>
               )
@@ -486,21 +485,21 @@ export default function AdminMeetingAttendancePage() {
           trailing: (r) => {
             if (r.is_on_leave) {
               return (
-                <Badge variant="outline" className="text-info border-info/50 bg-info/10 gap-1 text-xs">
+                <Badge tone="info" className="gap-1 text-xs">
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
               )
             }
             if (r.meeting_clock_in) {
               return (
-                <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
+                <Badge tone="success" className="gap-1 text-xs">
                   <CheckCircle2 className="h-2.5 w-2.5" /> In Room
                 </Badge>
               )
             }
             if (r.office_clock_in) {
               return (
-                <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
+                <Badge tone="warning" className="gap-1 text-xs">
                   <AlertTriangle className="h-2.5 w-2.5" /> Missed
                 </Badge>
               )
@@ -589,7 +588,7 @@ export default function AdminMeetingAttendancePage() {
                 {r.meeting_clock_in ? (
                   <span className="text-success font-semibold">{formatTime(r.meeting_clock_in)}</span>
                 ) : r.office_clock_in && !r.is_on_leave ? (
-                  <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
+                  <Badge tone="warning" className="gap-1 text-xs">
                     <AlertTriangle className="h-3 w-3" /> Missed scan
                   </Badge>
                 ) : (

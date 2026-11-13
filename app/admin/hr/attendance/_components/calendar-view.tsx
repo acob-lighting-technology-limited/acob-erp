@@ -24,7 +24,7 @@ import {
   isEarlyDeparture,
   getManualStatusEditOptions,
 } from "@/lib/hr/attendance-status"
-import { formatTime } from "./status-badge"
+import { formatTime } from "@/components/hr/attendance-record-display"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -357,7 +357,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
           .map(([key, label]) => (
             <Badge
               key={key}
-              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-gray-100 text-gray-800"}`}
+              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-muted-foreground"}`}
             >
               {label}
             </Badge>

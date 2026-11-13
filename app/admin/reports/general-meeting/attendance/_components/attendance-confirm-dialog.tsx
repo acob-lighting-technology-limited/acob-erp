@@ -156,11 +156,11 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
               </div>
             </div>
             {isPhysical ? (
-              <Badge variant="outline" className="text-success border-success/30 bg-success/10 shrink-0 text-xs">
+              <Badge tone="success" className="shrink-0 text-xs">
                 Physical
               </Badge>
             ) : (
-              <Badge variant="outline" className="border-border text-foreground bg-muted/60 shrink-0 text-xs">
+              <Badge tone="neutral" className="border-border shrink-0 text-xs">
                 Virtual / Teams
               </Badge>
             )}

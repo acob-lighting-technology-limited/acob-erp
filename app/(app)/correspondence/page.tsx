@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PortalReferenceGeneratorContent } from "@/app/(app)/correspondence/portal-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
+import { withCorrespondenceRowDetails } from "@/lib/correspondence/row-details"
 
 import type { Metadata } from "next"
 
@@ -75,7 +76,8 @@ async function getData() {
     currentViewerName,
     currentViewerId: user.id,
     currentViewerDepartment: profile?.department || "",
-    records: scopedRecords || [],
+    // Stages and documents ride along, so an expanded row shows them without another request.
+    records: await withCorrespondenceRowDetails(supabase, scopedRecords),
     departmentCodes: departmentCodes || [],
   }
 }

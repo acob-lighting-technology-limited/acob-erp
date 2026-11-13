@@ -4,7 +4,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { AttendanceReport, CalendarDay, DayRecord } from "../view"
-import { StatusBadge } from "./status-badge"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 
 interface HourBreakdown {
   total: number | null
@@ -119,7 +119,7 @@ export function EmployeeAttendanceLog({
                 <div className="hover:bg-muted/30 hidden grid-cols-10 items-center gap-3 px-4 py-3 transition-colors lg:grid">
                   <span className="text-foreground truncate text-xs font-semibold">{day.dayName}</span>
                   <div className="min-w-0">
-                    <StatusBadge
+                    <AttendanceStatusBadge
                       status={day.status}
                       waived={day.record?.waived}
                       record={day.record}
@@ -156,7 +156,7 @@ export function EmployeeAttendanceLog({
                       <p className="text-foreground text-sm font-semibold">{day.dayName}</p>
                       <p className="text-muted-foreground mt-0.5 text-xs">{sourceLabel}</p>
                     </div>
-                    <StatusBadge
+                    <AttendanceStatusBadge
                       status={day.status}
                       waived={day.record?.waived}
                       record={day.record}

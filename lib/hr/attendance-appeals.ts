@@ -542,7 +542,7 @@ export async function departmentHasLead(client: SupabaseClient, department: stri
 export type AppealReviewer = Pick<
   AdminScope,
   "userId" | "department" | "isDepartmentLead" | "leadDepartments" | "isAdminLike" | "scopeMode"
-> & { role?: string }
+> & { role?: string; adminRoutes?: readonly string[] | null }
 
 export type ReviewableAppeal = {
   stage?: string | null
@@ -715,10 +715,10 @@ export function appealStuckReason(
  * - An admin-side change waiting on the lead (`admin_manual`, pending_lead): whoever
  *   works on the admin side may override the lead. The Admin & HR department gave them
  *   that access, so the admin side is already filled and the lead is the only step left.
- * - Any other pending appeal: super admins and developers only.
+ * - Any other pending appeal: super admins, developers, and admins holding the attendance route.
  */
 export function overrideBlock(
-  reviewer: Pick<AppealReviewer, "role" | "isAdminLike" | "scopeMode"> & { userId?: string },
+  reviewer: Pick<AppealReviewer, "role" | "isAdminLike" | "scopeMode" | "adminRoutes"> & { userId?: string },
   appeal: ReviewableAppeal
 ): string | null {
   if (reviewer.userId && appeal.user_id === reviewer.userId) {
@@ -729,8 +729,11 @@ export function overrideBlock(
   if (appeal.initiated_by_role === "admin_manual" && stage === "pending_lead") {
     return reviewer.isAdminLike ? null : "Only someone working from the admin side can override the lead."
   }
-  const isSeniorAdmin = reviewer.role === "super_admin" || reviewer.role === "developer"
-  return isSeniorAdmin ? null : "Only a super admin or developer can override."
+  // An admin holding the attendance route can do what super_admin and developer can.
+  const holdsAttendanceRoute =
+    reviewer.role === "admin" && (reviewer.adminRoutes ?? []).some((r) => r === "hr.attendance" || r === "hr.main")
+  const isSeniorAdmin = reviewer.role === "super_admin" || reviewer.role === "developer" || holdsAttendanceRoute
+  return isSeniorAdmin ? null : "Only an admin with attendance access, a super admin or a developer can override."
 }
 
 /** The Admin & HR Lead(s) plus anyone they have an active delegation to. */

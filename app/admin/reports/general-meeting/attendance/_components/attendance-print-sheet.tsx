@@ -185,7 +185,7 @@ export function AttendancePrintSheetDialog({
             </div>
 
             <div className="mt-3 flex items-center gap-1.5">
-              <Badge variant="outline" className="text-success border-success/30 bg-success/10 text-[11px]">
+              <Badge tone="success" className="text-[11px]">
                 <ShieldCheck className="text-success mr-1 h-3.5 w-3.5" /> Biometric Entrance Punch Required
               </Badge>
             </div>

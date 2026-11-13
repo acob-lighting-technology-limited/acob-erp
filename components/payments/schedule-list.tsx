@@ -9,23 +9,24 @@ import { format } from "date-fns"
 import { EmptyState } from "@/components/ui/patterns"
 import type { StarlinkMonth } from "@/lib/starlink/billing-schedule"
 import type { ScheduleItem, PaymentDocument } from "./payment-types"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 const STARLINK_BADGES: Record<StarlinkMonth["status"], { label: string; className: string }> = {
   confirmed: {
     label: "Paid · confirmed by Starlink",
-    className: "bg-success/15 text-success",
+    className: TONE_CLASSES.success,
   },
   autopay: {
     label: "Paid · autopay",
-    className: "bg-success/15 text-success",
+    className: TONE_CLASSES.success,
   },
   failed: {
     label: "Payment failed",
-    className: "bg-danger/15 text-danger",
+    className: TONE_CLASSES.danger,
   },
   pending: {
     label: "Awaiting payment",
-    className: "bg-warning/15 text-warning",
+    className: TONE_CLASSES.warning,
   },
 }
 
@@ -88,12 +89,12 @@ export function ScheduleList({
                 className={cn(
                   "rounded-full p-2",
                   item.status === "paid"
-                    ? "bg-success/15 text-green-600"
+                    ? TONE_CLASSES.success
                     : item.status === "overdue"
-                      ? "bg-danger/15 text-red-600"
+                      ? TONE_CLASSES.danger
                       : item.status === "due"
-                        ? "bg-warning/15 text-yellow-600"
-                        : "bg-muted text-gray-600"
+                        ? TONE_CLASSES.warning
+                        : TONE_CLASSES.neutral
                 )}
               >
                 {item.status === "paid" ? (

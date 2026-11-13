@@ -134,14 +134,17 @@ test("stuck: five working days with no decision, or the approver on leave with n
   )
 })
 
-test("override: a staff or lead appeal is for super admin or developer, with no wait", () => {
+test("override: a staff or lead appeal is for super admin, developer, or an admin holding the attendance route", () => {
   const fresh = { stage: "pending_lead", initiated_by_role: "employee", created_at: "2026-11-11T07:00:00Z" }
   const superAdmin = { role: "super_admin", isAdminLike: true, scopeMode: "global" as const }
   const dev = { role: "developer", isAdminLike: true, scopeMode: "global" as const }
   const plainAdmin = { role: "admin", isAdminLike: true, scopeMode: "global" as const }
   assert.equal(overrideBlock(superAdmin, fresh), null)
   assert.equal(overrideBlock(dev, fresh), null)
-  assert.match(overrideBlock(plainAdmin, fresh) ?? "", /super admin or developer/)
+  assert.match(overrideBlock(plainAdmin, fresh) ?? "", /attendance access/)
+  // An admin holding the attendance route can do what super admin and developer can.
+  assert.equal(overrideBlock({ ...plainAdmin, adminRoutes: ["hr.attendance"] }, fresh), null)
+  assert.match(overrideBlock({ ...plainAdmin, adminRoutes: ["hr.leave"] }, fresh) ?? "", /attendance access/)
   assert.match(overrideBlock({ ...superAdmin, scopeMode: "lead" }, fresh) ?? "", /admin side/)
 })
 
@@ -159,9 +162,9 @@ test("override: an admin-side change waiting on the lead can be overridden at on
   assert.match(overrideBlock({ ...plainAdmin, userId: "staff-1" }, change) ?? "", /own/)
   assert.match(overrideBlock({ ...superAdmin, userId: "staff-1" }, change) ?? "", /own/)
   assert.match(overrideBlock({ ...plainAdmin, scopeMode: "lead" }, change) ?? "", /admin side/)
-  // A staff appeal is not an admin-side change: a plain admin still cannot override it.
+  // A staff appeal is not an admin-side change: an admin without the attendance route cannot override it.
   const staffAppeal = { ...change, initiated_by_role: "employee" }
-  assert.match(overrideBlock(plainAdmin, staffAppeal) ?? "", /super admin or developer/)
+  assert.match(overrideBlock(plainAdmin, staffAppeal) ?? "", /attendance access/)
 })
 
 test("staging: an admin's manual change goes to the lead side, a lead's change to the second stage", () => {

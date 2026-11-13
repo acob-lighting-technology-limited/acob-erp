@@ -1,20 +1,7 @@
+import type { ReactNode } from "react"
+
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-
-/**
- * Tones come from the `--success/--warning/--danger/--info` tokens in
- * `app/globals.css`, which carry their own dark values: no `dark:` overrides here.
- */
-export const TONE_CLASSES = {
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
-  danger: "bg-danger/15 text-danger",
-  info: "bg-info/15 text-info",
-  purple: "bg-purple/15 text-purple",
-  neutral: "bg-muted text-muted-foreground",
-} as const
-
-export type StatusTone = keyof typeof TONE_CLASSES
+import type { StatusTone } from "@/lib/ui/status-tones"
 
 const STATUS_TONES: Record<string, StatusTone> = {
   active: "success",
@@ -33,8 +20,10 @@ const STATUS_TONES: Record<string, StatusTone> = {
   draft: "neutral",
   under_review: "warning",
   in_review: "warning",
+  returned_for_correction: "warning",
   paid: "success",
   unpaid: "danger",
+  overdue: "danger",
   passed: "success",
   failed: "danger",
   verified: "success",
@@ -46,6 +35,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   on_leave: "info",
   ok: "success",
   error: "danger",
+  not_started: "warning",
   // Document validity (Sites register conveyance documents).
   valid: "success",
   expiring: "warning",
@@ -53,10 +43,15 @@ const STATUS_TONES: Record<string, StatusTone> = {
   not_required: "neutral",
 }
 
+/** The tone a status string maps to, or `neutral` for one this map does not know. */
+export function statusTone(status: string | null | undefined): StatusTone {
+  return STATUS_TONES[String(status || "").toLowerCase()] ?? "neutral"
+}
+
 interface StatusBadgeProps {
   status: string
   /** Text to show instead of the status itself; the status still picks the colour. */
-  label?: string
+  label?: ReactNode
   /** Force a tone for a status this map does not know. */
   tone?: StatusTone
   className?: string
@@ -64,7 +59,11 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, label, tone, className }: StatusBadgeProps) {
   const key = String(status || "").toLowerCase()
-  const resolved = tone ?? STATUS_TONES[key] ?? "neutral"
+  const resolved = tone ?? statusTone(key)
   const text = label ?? (key.replaceAll("_", " ") || "unknown")
-  return <Badge className={cn(TONE_CLASSES[resolved], className)}>{text}</Badge>
+  return (
+    <Badge tone={resolved} className={className}>
+      {text}
+    </Badge>
+  )
 }

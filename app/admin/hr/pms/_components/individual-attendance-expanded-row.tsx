@@ -1,7 +1,7 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
-import { StatusBadge, formatTime, labelSource } from "@/app/admin/hr/attendance/_components/status-badge"
+import { AttendanceStatusBadge, formatTime, labelSource } from "@/components/hr/attendance-record-display"
 import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -122,7 +122,12 @@ export function IndividualAttendanceExpandedRow({
                   <td className="px-4 py-2">{formatTime(rec?.clock_in)}</td>
                   <td className="px-4 py-2">{formatTime(rec?.clock_out)}</td>
                   <td className="px-4 py-2">
-                    <StatusBadge status={day.status} waived={rec?.waived} record={rec} recordDate={day.date} />
+                    <AttendanceStatusBadge
+                      status={day.status}
+                      waived={rec?.waived}
+                      record={rec}
+                      recordDate={day.date}
+                    />
                   </td>
                   <td className="text-muted-foreground px-4 py-2 text-xs">{labelSource(rec)}</td>
                 </tr>

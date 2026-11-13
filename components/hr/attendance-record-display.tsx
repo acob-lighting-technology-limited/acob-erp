@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
@@ -16,7 +17,7 @@ import { isLate, toLocalISODate } from "@/lib/hr/attendance-utils"
  * When late arrival (> 08:20) occurs with a missing clock-out on a past day, surfaces [ Late ] [ Inc ]
  * (or [ LWP ] [ IWP ] if excused).
  */
-export function StatusBadge({
+export function AttendanceStatusBadge({
   status,
   waived,
   record,
@@ -71,8 +72,9 @@ export function StatusBadge({
 
   const primary = (
     <Badge
+      variant="outline"
       className={
-        ATTENDANCE_STATUS_COLORS[primaryStatus as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-foreground"
+        ATTENDANCE_STATUS_COLORS[primaryStatus as keyof typeof ATTENDANCE_STATUS_COLORS] ?? TONE_CLASSES.neutral
       }
     >
       {ATTENDANCE_STATUS_LABELS[primaryStatus as keyof typeof ATTENDANCE_STATUS_LABELS] ?? primaryStatus}
@@ -83,7 +85,9 @@ export function StatusBadge({
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {primary}
-      <Badge className={secondary.className}>{secondary.label}</Badge>
+      <Badge variant="outline" className={secondary.className}>
+        {secondary.label}
+      </Badge>
     </span>
   )
 }

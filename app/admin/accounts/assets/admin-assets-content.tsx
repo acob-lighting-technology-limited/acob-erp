@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,22 +19,11 @@ import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { ASSET_TYPES, ASSET_TYPE_MAP } from "@/lib/asset-types"
 import { getDepartmentForOffice } from "@/lib/rooms-and-offices"
 import { assignmentValidation } from "@/lib/validation"
-import {
-  Package,
-  AlertCircle,
-  Plus,
-  Download,
-  History,
-  Pencil,
-  RefreshCw,
-  Wrench,
-  UserMinus,
-  FileText,
-} from "lucide-react"
+import { Package, AlertCircle, Plus, Download, Pencil, RefreshCw, Wrench, UserMinus, FileText } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -43,7 +32,9 @@ import { logger } from "@/lib/logger"
 
 import { AssetFormDialog } from "@/components/assets/AssetFormDialog"
 import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
-import { AssetHistorySheet } from "@/components/assets/asset-history-sheet"
+import { AssetRowPanel } from "@/components/assets/asset-row-panel"
+import { AssetHistoryView, type AssetHistoryViewHandle } from "./_components/asset-history-view"
+import { AssetReportsView } from "./_components/asset-reports-view"
 import { AssetIssuesSheet } from "@/components/assets/asset-issues-sheet"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
@@ -64,16 +55,7 @@ import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
 import { useShellBase } from "@/hooks/use-shell-base"
-import type {
-  Asset,
-  AssetActivity,
-  AssetAssignment,
-  AssetIssue,
-  AssignableAsset,
-  Employee,
-  ProfileNameRow,
-  UserProfile,
-} from "./_lib/types"
+import type { Asset, AssetAssignment, AssetIssue, AssignableAsset, Employee, UserProfile } from "./_lib/types"
 
 export type { Asset, Employee, UserProfile } from "./_lib/types"
 const log = logger("assets-admin-assets-content")
@@ -107,6 +89,14 @@ async function fetchAssetTypes(): Promise<{ label: string; code: string; require
 
 const currentYear = new Date().getFullYear()
 
+type AssetsTab = "assets" | "history" | "reports"
+
+const ASSETS_TABS: DataTableTab[] = [
+  { key: "assets", label: "Assets" },
+  { key: "history", label: "History" },
+  { key: "reports", label: "Staff reports" },
+]
+
 interface AdminAssetsContentProps {
   initialAssets: Asset[]
   initialEmployees: Employee[]
@@ -127,6 +117,16 @@ export function AdminAssetsContent({
   const shell = useShellBase()
   const issuesHref = shell.href("/admin/accounts/assets/issues")
   const router = useRouter()
+  // Links can open a tab directly (e.g. ?tab=history).
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<AssetsTab>(
+    ASSETS_TABS.some((t) => t.key === searchParams.get("tab")) ? (searchParams.get("tab") as AssetsTab) : "assets"
+  )
+  const isHistoryTab = activeTab === "history"
+  const isReportsTab = activeTab === "reports"
+  // Export follows the open tab: on History it exports the history, not the asset list.
+  const historyRef = useRef<AssetHistoryViewHandle>(null)
+  const [historyCount, setHistoryCount] = useState(0)
   const normalizedRole = String(userProfile?.role || "")
     .trim()
     .toLowerCase()
@@ -173,7 +173,6 @@ export function AdminAssetsContent({
   const [isReleaseDialogOpen, setIsReleaseDialogOpen] = useState(false)
   const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false)
   const [selectedHandoverAsset, setSelectedHandoverAsset] = useState<Asset | null>(null)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isIssuesDialogOpen, setIsIssuesDialogOpen] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null)
@@ -182,7 +181,6 @@ export function AdminAssetsContent({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isReleasing, setIsReleasing] = useState(false)
-  const [assetHistory, setAssetHistory] = useState<AssetActivity[]>([])
 
   // Issue tracking states
   const [assetIssues, setAssetIssues] = useState<AssetIssue[]>([])
@@ -381,151 +379,13 @@ export function AdminAssetsContent({
       const payload = (await response.json()) as { data: Asset[]; employees: Employee[] }
       setAssets(payload.data || [])
       setEmployees(payload.employees || [])
+      // Every change on this page ends here, so open timelines and the History tab refresh too.
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminAssetHistory() })
     } catch (error: unknown) {
       log.error("Error loading data:", error)
       toast.error("Failed to refresh data")
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const loadAssetHistory = async (asset: Asset) => {
-    try {
-      const res = await apiFetch(`/api/admin/assets/${asset.id}/history`, { cache: "no-store" })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load asset history")
-      type HistoryAssignmentRow = {
-        id: string
-        assigned_at: string
-        handed_over_at: string | null
-        assignment_notes: string | null
-        handover_notes: string | null
-        assigned_by: string | null
-        assigned_to: string | null
-        department: string | null
-        office_location: string | null
-        assignment_type: string | null
-      }
-      type HistoryIssueRow = {
-        id: string
-        description: string
-        resolved: boolean
-        created_at: string
-        resolved_at: string | null
-        created_by: string | null
-        resolved_by: string | null
-      }
-      type HistoryAuditRow = {
-        id: string
-        created_at: string
-        user_id: string | null
-        old_values: { status?: string } | null
-        new_values: { status?: string } | null
-      }
-      const payload = (await res.json()) as {
-        assignments: HistoryAssignmentRow[]
-        issues: HistoryIssueRow[]
-        auditLogs: HistoryAuditRow[]
-        users: ProfileNameRow[]
-      }
-      const { assignments, issues, auditLogs } = payload
-
-      const usersMap = new Map<string, ProfileNameRow>(payload.users.map((u) => [u.id, u] as const))
-
-      const getUName = (id: string | null | undefined) => {
-        if (!id) return null
-        const u = usersMap.get(id)
-        return u ? `${formatName(u.first_name)} ${formatName(u.last_name)}` : "System"
-      }
-
-      // 5. Transform into unified Activity list
-      const activities: AssetActivity[] = []
-
-      // Add Assignments & Handovers
-      assignments?.forEach((a) => {
-        // The Assignment itself
-        activities.push({
-          id: `${a.id}-assign`,
-          timestamp: a.assigned_at,
-          type: "assignment",
-          title: "Asset Assigned",
-          user_name: a.assigned_to
-            ? getUName(a.assigned_to) || a.department || a.office_location || "Office"
-            : a.department || a.office_location || "Office",
-          performed_by_name: getUName(a.assigned_by) || "System Admin",
-          details: {
-            notes: a.assignment_notes ?? undefined,
-            assignment_type: a.assignment_type ?? undefined,
-          },
-        })
-
-        // The Handover/Return (if closed)
-        if (a.handed_over_at) {
-          activities.push({
-            id: `${a.id}-return`,
-            timestamp: a.handed_over_at,
-            type: "unassignment",
-            title: "Asset Returned / Unassigned",
-            user_name: a.assigned_to
-              ? getUName(a.assigned_to) || a.department || a.office_location || "Office"
-              : a.department || a.office_location || "Office",
-            details: {
-              notes: a.handover_notes ?? undefined,
-            },
-          })
-        }
-      })
-
-      // Add Issues
-      issues?.forEach((i) => {
-        activities.push({
-          id: `${i.id}-issue`,
-          timestamp: i.created_at,
-          type: "issue_reported",
-          title: "Issue Reported",
-          description: i.description,
-          performed_by_name: getUName(i.created_by) || "System Admin",
-        })
-
-        if (i.resolved && i.resolved_at) {
-          activities.push({
-            id: `${i.id}-resolved`,
-            timestamp: i.resolved_at,
-            type: "issue_resolved",
-            title: "Issue Resolved",
-            performed_by_name: getUName(i.resolved_by) || "System Admin",
-          })
-        }
-      })
-
-      // Add Status Changes (filter for meaningful changes)
-      auditLogs?.forEach((l) => {
-        const oldStatus = l.old_values?.status
-        const newStatus = l.new_values?.status
-        if (newStatus && oldStatus !== newStatus) {
-          activities.push({
-            id: l.id,
-            timestamp: l.created_at,
-            type: "status_change",
-            title: `Status Changed: ${formatName(newStatus)}`,
-            performed_by_name: getUName(l.user_id) || "System Admin",
-            details: {
-              old_status: oldStatus,
-              status: newStatus,
-            },
-          })
-        }
-      })
-
-      // Sort chronological (descending)
-      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-      setAssetHistory(activities)
-      setSelectedAsset(asset)
-      setIsHistoryOpen(true)
-    } catch (error: unknown) {
-      log.error("Error loading asset history:", error)
-      const message = error instanceof Error ? error.message : "Unknown error"
-      toast.error(`Failed to load history: ${message}`)
     }
   }
 
@@ -1062,6 +922,8 @@ export function AdminAssetsContent({
     setFilteredAssetsForExport(scopedAssets)
   }, [scopedAssets])
 
+  const scopedAssetIds = useMemo(() => new Set(scopedAssets.map((asset) => asset.id)), [scopedAssets])
+
   const stats = {
     total: scopedAssets.filter((d) => !d.deleted_at).length,
     available: scopedAssets.filter((d) => !d.deleted_at && d.status === "available").length,
@@ -1309,11 +1171,6 @@ export function AdminAssetsContent({
       hidden: (asset) => Boolean(asset.deleted_at),
     },
     {
-      label: "History",
-      icon: History,
-      onClick: (asset) => void loadAssetHistory(asset),
-    },
-    {
       label: "Handover Policy",
       icon: FileText,
       onClick: (asset) => {
@@ -1343,16 +1200,33 @@ export function AdminAssetsContent({
   return (
     <DataTablePage
       title="Assets"
-      description="Manage asset inventory, assignments, history, and issue tracking."
+      description={
+        isHistoryTab
+          ? "Everything that has happened to each asset: added, assigned, returned, status changes, issues and archiving."
+          : isReportsTab
+            ? "Problems staff reported about assets assigned to them: not received, not with them, already returned, wrong details."
+            : "Manage asset inventory, assignments, history, and issue tracking."
+      }
+      tabs={ASSETS_TABS}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as AssetsTab)}
       icon={Package}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <HeaderMoreMenu items={[{ label: "Asset issues", icon: AlertCircle, href: issuesHref }]} />
-          <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="gap-2" size="sm">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-          {!userProfile?.is_department_lead && (
+          {!isReportsTab && (
+            <Button
+              variant="outline"
+              onClick={() => (isHistoryTab ? historyRef.current?.exportToExcel() : setExportOptionsOpen(true))}
+              disabled={isHistoryTab && historyCount === 0}
+              className="gap-2"
+              size="sm"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          )}
+          {!userProfile?.is_department_lead && !isHistoryTab && !isReportsTab && (
             <Button onClick={() => void handleOpenAssetDialog()} className="gap-2" size="sm">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Asset</span>
@@ -1362,211 +1236,202 @@ export function AdminAssetsContent({
         </div>
       }
       stats={
-        <StatGrid>
-          <StatCard
-            variant="compact"
-            title="Total Assets"
-            value={stats.total}
-            icon={Package}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Open Issues"
-            value={stats.unresolvedIssues}
-            icon={AlertCircle}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Maintenance"
-            value={stats.maintenance}
-            icon={Wrench}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Available"
-            value={stats.available}
-            icon={Package}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Assigned"
-            value={stats.assigned}
-            icon={Package}
-            iconBgColor="bg-violet-500/10"
-            iconColor="text-violet-500"
-          />
-        </StatGrid>
+        isHistoryTab || isReportsTab ? undefined : (
+          <StatGrid>
+            <StatCard
+              variant="compact"
+              title="Total Assets"
+              value={stats.total}
+              icon={Package}
+              iconBgColor="bg-blue-500/10"
+              iconColor="text-blue-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Open Issues"
+              value={stats.unresolvedIssues}
+              icon={AlertCircle}
+              iconBgColor="bg-red-500/10"
+              iconColor="text-red-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Maintenance"
+              value={stats.maintenance}
+              icon={Wrench}
+              iconBgColor="bg-amber-500/10"
+              iconColor="text-amber-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Available"
+              value={stats.available}
+              icon={Package}
+              iconBgColor="bg-emerald-500/10"
+              iconColor="text-emerald-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Assigned"
+              value={stats.assigned}
+              icon={Package}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+          </StatGrid>
+        )
       }
     >
-      <DataTable<Asset>
-        data={scopedAssets}
-        columns={assetColumns}
-        filters={assetFilters}
-        onProcessedDataChange={setFilteredAssetsForExport}
-        getRowId={(asset) => asset.id}
-        pagination={{ pageSize: 50 }}
-        searchPlaceholder="Search asset code, type, model, assignee, office, or creator..."
-        searchFn={(asset, query) =>
-          [
-            asset.unique_code,
-            ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
-            asset.asset_model || "",
-            asset.serial_number || "",
-            getAssignedToLabel(asset),
-            asset.department || "",
-            asset.office_location || "",
-            getCreatedByLabel(asset.created_by),
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query)
-        }
-        isLoading={isLoading}
-        error={initialError || null}
-        onRetry={() => void loadData()}
-        rowActions={assetRowActions}
-        expandable={{
-          render: (asset) => (
-            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-muted-foreground text-xs">Model</p>
-                <p className="mt-1">{asset.asset_model || "-"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Serial Number</p>
-                <p className="mt-1">{asset.serial_number || "-"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Created By</p>
-                <p className="mt-1">{getCreatedByLabel(asset.created_by)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Issue Count</p>
-                <p className="mt-1">{asset.unresolved_issues_count || 0}</p>
-              </div>
-              <div className="sm:col-span-2 lg:col-span-4">
-                <p className="text-muted-foreground text-xs">Notes</p>
-                <p className="mt-1">{asset.notes || "No notes added."}</p>
-              </div>
-            </div>
-          ),
-        }}
-        viewToggle
-        contactsView
-        stickyToolbar
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          title: (asset) =>
-            `${asset.unique_code} · ${asset.asset_model || ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}`,
-          subtitle: (asset) =>
-            `${getAssignedToLabel(asset, true)} · ${asset.office_location || asset.department || "HQ"}`,
-          trailing: (asset) => (
-            <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)} variant="outline">
-              {asset.deleted_at ? "archived" : asset.status}
-            </Badge>
-          ),
-          detail: {
-            title: (asset) => `${asset.unique_code} · ${asset.asset_model || asset.asset_type}`,
+      {isReportsTab ? (
+        <AssetReportsView assetIds={scopedAssetIds} onAssetsChanged={() => void loadData()} />
+      ) : isHistoryTab ? (
+        <AssetHistoryView ref={historyRef} assetIds={scopedAssetIds} onVisibleCountChange={setHistoryCount} />
+      ) : (
+        <DataTable<Asset>
+          data={scopedAssets}
+          columns={assetColumns}
+          filters={assetFilters}
+          onProcessedDataChange={setFilteredAssetsForExport}
+          getRowId={(asset) => asset.id}
+          pagination={{ pageSize: 50 }}
+          searchPlaceholder="Search asset code, type, model, assignee, office, or creator..."
+          searchFn={(asset, query) =>
+            [
+              asset.unique_code,
+              ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
+              asset.asset_model || "",
+              asset.serial_number || "",
+              getAssignedToLabel(asset),
+              asset.department || "",
+              asset.office_location || "",
+              getCreatedByLabel(asset.created_by),
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(query)
+          }
+          isLoading={isLoading}
+          error={initialError || null}
+          onRetry={() => void loadData()}
+          rowActions={assetRowActions}
+          expandable={{
+            render: (asset) => (
+              <AssetRowPanel
+                asset={asset}
+                holder={getAssignedToLabel(asset)}
+                createdBy={getCreatedByLabel(asset.created_by)}
+              />
+            ),
+          }}
+          viewToggle
+          contactsView
+          stickyToolbar
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (asset) =>
+              `${asset.unique_code} · ${asset.asset_model || ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}`,
             subtitle: (asset) =>
               `${getAssignedToLabel(asset, true)} · ${asset.office_location || asset.department || "HQ"}`,
-            fields: (asset) => [
-              {
-                label: "Asset Type",
-                value: ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
-              },
-              {
-                label: "Status",
-                value: asset.deleted_at ? "Archived" : asset.status,
-              },
-              {
-                label: "Assigned To",
-                value: getAssignedToLabel(asset, false),
-              },
-              {
-                label: "Office / Room",
-                value: asset.office_location || "-",
-              },
-              {
-                label: "Department",
-                value: asset.department || "-",
-              },
-              {
-                label: "Serial Number",
-                value: asset.serial_number || "-",
-              },
-              {
-                label: "Acquisition Year",
-                value: String(asset.acquisition_year || "-"),
-              },
-              {
-                label: "Assignment Type",
-                value: asset.assignment_type ? asset.assignment_type.replace(/_/g, " ") : "-",
-              },
-              ...(asset.notes
-                ? [
-                    {
-                      label: "Notes",
-                      value: asset.notes,
-                      fullWidth: true,
-                    },
-                  ]
-                : []),
-            ],
-            actions: (asset) => [
-              {
-                label: "Edit / View Asset",
-                icon: Pencil,
-                onClick: () => void handleOpenAssetDialog(asset),
-              },
-            ],
-          },
-        }}
-        cardRenderer={(asset) => (
-          <div className="space-y-3 rounded-xl border p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{asset.unique_code}</p>
-                <p className="text-muted-foreground text-xs">
-                  {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
-                </p>
-              </div>
+            trailing: (asset) => (
               <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)} variant="outline">
                 {asset.deleted_at ? "archived" : asset.status}
               </Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Assigned To</p>
-                <p>{getAssignedToLabel(asset, true)}</p>
+            ),
+            detail: {
+              title: (asset) => `${asset.unique_code} · ${asset.asset_model || asset.asset_type}`,
+              subtitle: (asset) =>
+                `${getAssignedToLabel(asset, true)} · ${asset.office_location || asset.department || "HQ"}`,
+              fields: (asset) => [
+                {
+                  label: "Asset Type",
+                  value: ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
+                },
+                {
+                  label: "Status",
+                  value: asset.deleted_at ? "Archived" : asset.status,
+                },
+                {
+                  label: "Assigned To",
+                  value: getAssignedToLabel(asset, false),
+                },
+                {
+                  label: "Office / Room",
+                  value: asset.office_location || "-",
+                },
+                {
+                  label: "Department",
+                  value: asset.department || "-",
+                },
+                {
+                  label: "Serial Number",
+                  value: asset.serial_number || "-",
+                },
+                {
+                  label: "Acquisition Year",
+                  value: String(asset.acquisition_year || "-"),
+                },
+                {
+                  label: "Assignment Type",
+                  value: asset.assignment_type ? asset.assignment_type.replace(/_/g, " ") : "-",
+                },
+                ...(asset.notes
+                  ? [
+                      {
+                        label: "Notes",
+                        value: asset.notes,
+                        fullWidth: true,
+                      },
+                    ]
+                  : []),
+              ],
+              actions: (asset) => [
+                {
+                  label: "Edit / View Asset",
+                  icon: Pencil,
+                  onClick: () => void handleOpenAssetDialog(asset),
+                },
+              ],
+            },
+          }}
+          cardRenderer={(asset) => (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{asset.unique_code}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}
+                  </p>
+                </div>
+                <Badge className={getStatusColor(asset.deleted_at ? "archived" : asset.status)} variant="outline">
+                  {asset.deleted_at ? "archived" : asset.status}
+                </Badge>
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Issues</p>
-                <p>{asset.unresolved_issues_count || 0}</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs">Assigned To</p>
+                  <p>{getAssignedToLabel(asset, true)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Issues</p>
+                  <p>{asset.unresolved_issues_count || 0}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => void handleOpenAssetDialog(asset)}>
+                  Edit
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => void handleOpenIssuesDialog(asset)}>
+                  Issues
+                </Button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => void handleOpenAssetDialog(asset)}>
-                Edit
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => void handleOpenIssuesDialog(asset)}>
-                Issues
-              </Button>
-            </div>
-          </div>
-        )}
-        emptyTitle="No assets found"
-        emptyDescription="Add the first asset to start tracking inventory, assignments, and maintenance issues."
-        emptyIcon={Package}
-        skeletonRows={8}
-      />
+          )}
+          emptyTitle="No assets found"
+          emptyDescription="Add the first asset to start tracking inventory, assignments, and maintenance issues."
+          emptyIcon={Package}
+          skeletonRows={8}
+        />
+      )}
       {/* asset Dialog */}
       <AssetFormDialog
         isOpen={isAssetDialogOpen}
@@ -1645,14 +1510,6 @@ export function AdminAssetsContent({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Asset history sheet */}
-      <AssetHistorySheet
-        isOpen={isHistoryOpen}
-        onOpenChange={setIsHistoryOpen}
-        selectedAsset={selectedAsset}
-        assetHistory={assetHistory}
-      />
 
       {/* Asset Issues Dialog */}
       <AssetIssuesSheet

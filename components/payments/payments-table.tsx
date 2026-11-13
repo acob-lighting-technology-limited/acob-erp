@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -248,10 +249,10 @@ export function PaymentsTable({
     new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
 
   const getStatusColor = (status: string) => {
-    if (status === "paid") return "bg-success/15 text-success"
-    if (status === "due") return "bg-warning/15 text-warning"
-    if (status === "overdue") return "bg-danger/15 text-danger"
-    if (status === "cancelled") return "bg-muted text-foreground"
+    if (status === "paid") return TONE_CLASSES.success
+    if (status === "due") return TONE_CLASSES.warning
+    if (status === "overdue") return TONE_CLASSES.danger
+    if (status === "cancelled") return TONE_CLASSES.neutral
     return ""
   }
 
@@ -454,11 +455,7 @@ export function PaymentsTable({
       render: (row) => (
         <Badge
           variant="outline"
-          className={
-            row.payment_type === "recurring"
-              ? "border-info/30 bg-info/15 text-info"
-              : "border-success/30 bg-success/15 text-success"
-          }
+          className={row.payment_type === "recurring" ? TONE_CLASSES.info : TONE_CLASSES.success}
         >
           {row.paymentTypeLabel}
         </Badge>
@@ -993,13 +990,9 @@ export function PaymentsTable({
                   <p className="text-muted-foreground text-xs uppercase">Receipt Status</p>
                   {row.payment_type === "one-time" ? (
                     row.hasReceipt ? (
-                      <Badge variant="outline" className="border-emerald-300 text-emerald-700">
-                        Receipt Available
-                      </Badge>
+                      <Badge tone="success">Receipt Available</Badge>
                     ) : (
-                      <Badge variant="outline" className="border-amber-300 text-amber-700">
-                        Missing Receipt
-                      </Badge>
+                      <Badge tone="warning">Missing Receipt</Badge>
                     )
                   ) : (
                     <span className="text-sm">Not required</span>

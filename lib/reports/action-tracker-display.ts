@@ -1,6 +1,7 @@
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 /** The fields of an action item these helpers read. */
 type TrackedItem = { status: string; due_date?: string | null; week_number: number; year: number }
@@ -40,17 +41,17 @@ export function getDeptSummaryStatus(tasks: Array<{ status: string }>): Departme
 }
 
 export function getItemStatusBadgeClass(status: string) {
-  if (status === "completed") return "bg-success/15 text-success"
-  if (status === "in_progress") return "bg-info/15 text-info"
-  if (status === "not_started") return "bg-warning/15 text-warning"
-  return "bg-muted text-muted-foreground"
+  if (status === "completed") return TONE_CLASSES.success
+  if (status === "in_progress") return TONE_CLASSES.info
+  if (status === "not_started") return TONE_CLASSES.warning
+  return TONE_CLASSES.neutral
 }
 
 export function getSummaryBadgeClass(status: DepartmentSummaryStatus) {
-  if (status === "Finished") return "bg-success/15 text-success"
-  if (status === "Started") return "bg-info/15 text-info"
-  if (status === "Not Started") return "bg-warning/15 text-warning"
-  return "bg-muted text-muted-foreground"
+  if (status === "Finished") return TONE_CLASSES.success
+  if (status === "Started") return TONE_CLASSES.info
+  if (status === "Not Started") return TONE_CLASSES.warning
+  return TONE_CLASSES.neutral
 }
 
 /** A department's action-tracker status for the week, with its badge colour (weekly-report tables). */

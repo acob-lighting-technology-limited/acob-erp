@@ -1,14 +1,15 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { formatLeavePeriod } from "./leave-period"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 /** Colour per leave type, so sick, casual and annual leave read apart in a list. The name stays as text. */
 function toneFor(name: string) {
   const lower = name.toLowerCase()
-  if (lower.includes("sick")) return "border-rose-500/30 bg-rose-500/10 text-rose-600"
-  if (lower.includes("casual")) return "border-sky-500/30 bg-sky-500/10 text-sky-600"
-  if (lower.includes("annual")) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-  return "border-muted-foreground/30 bg-muted text-muted-foreground"
+  if (lower.includes("sick")) return TONE_CLASSES.danger
+  if (lower.includes("casual")) return TONE_CLASSES.info
+  if (lower.includes("annual")) return TONE_CLASSES.success
+  return TONE_CLASSES.neutral
 }
 
 /** A leave type as a coloured badge. Give the name, or the id and the list of types to look it up. */

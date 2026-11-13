@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { FileText, Plus, Eye, Edit2, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -46,7 +47,7 @@ interface PersonalDocumentationContentProps {
 }
 
 function getStatusColor(isDraft: boolean) {
-  return isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+  return isDraft ? TONE_CLASSES.warning : TONE_CLASSES.success
 }
 
 export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDocumentationContentProps) {
@@ -164,9 +165,9 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         accessor: (row) => row.visibility ?? "private",
         render: (row) =>
           (row.visibility ?? "private") === "general" ? (
-            <Badge className="bg-info/15 text-info">General</Badge>
+            <Badge tone="info">General</Badge>
           ) : (
-            <Badge className="bg-muted text-foreground">Private</Badge>
+            <Badge tone="neutral">Private</Badge>
           ),
         hideOnMobile: true,
       },

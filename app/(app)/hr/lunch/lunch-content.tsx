@@ -657,16 +657,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                         Clear choice
                       </Button>
                     )}
-                    <Badge
-                      className={cn(
-                        "border-0",
-                        votingOpen
-                          ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                          : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                      )}
-                    >
-                      {votingOpen ? "Open for voting" : "Closed"}
-                    </Badge>
+                    <Badge tone={votingOpen ? "success" : "danger"}>{votingOpen ? "Open for voting" : "Closed"}</Badge>
                   </div>
                 </div>
               </CardHeader>

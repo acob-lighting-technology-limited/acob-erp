@@ -4,8 +4,8 @@ import { useCanEdit } from "@/components/admin/edit-access-context"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import { DeviceStatusBanner } from "@/components/hr/device-status-banner"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { DeviceStatusBanner } from "@/components/hr/device-status-banner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DailyRosterView } from "./_components/daily-roster-view"
@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils"
 import { getManualStatusEditOptions, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
-import { StatusBadge, labelSource } from "./_components/status-badge"
+import { AttendanceStatusBadge, labelSource } from "@/components/hr/attendance-record-display"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -572,7 +572,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
               >
                 <span className="text-xs font-medium">{day.dayName}</span>
                 <div>
-                  <StatusBadge
+                  <AttendanceStatusBadge
                     status={day.status}
                     waived={day.record?.waived}
                     record={day.record}

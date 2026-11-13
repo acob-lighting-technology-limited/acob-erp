@@ -39,7 +39,7 @@ import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { isEarlyDeparture, getManualStatusEditOptions } from "@/lib/hr/attendance-status"
 import { cn } from "@/lib/utils"
-import { StatusBadge, formatTime, labelSource } from "./status-badge"
+import { AttendanceStatusBadge, formatTime, labelSource } from "@/components/hr/attendance-record-display"
 import { ClockTimes, NameWithDept } from "./clock-times"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { apiFetch, apiJson } from "@/lib/api-client"
@@ -495,7 +495,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         const pendingBadge = r.pending_appeal ? getPendingAppealBadge(r.pending_appeal) : null
         return (
           <div className="flex flex-col items-center gap-1">
-            <StatusBadge
+            <AttendanceStatusBadge
               status={r.status}
               record={r}
               earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
@@ -712,7 +712,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
             />
           ),
           trailing: (r) => (
-            <StatusBadge
+            <AttendanceStatusBadge
               status={r.status}
               record={r}
               earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
@@ -723,7 +723,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
             subtitle: (r) =>
               `${r.department} · ${formatWATDate(r.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`,
             badges: (r) => (
-              <StatusBadge
+              <AttendanceStatusBadge
                 status={r.status}
                 record={r}
                 earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
@@ -782,7 +782,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
                 <p className="text-sm font-semibold">{r.user_name}</p>
                 <p className="text-muted-foreground text-xs">{r.department}</p>
               </div>
-              <StatusBadge
+              <AttendanceStatusBadge
                 status={r.status}
                 record={r}
                 earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}

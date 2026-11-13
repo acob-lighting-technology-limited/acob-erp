@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -243,9 +244,7 @@ export function AppealDialog({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Current Status</span>
-              <Badge className={ATTENDANCE_STATUS_COLORS[row.normalizedStatus] ?? "bg-gray-100 text-gray-800"}>
-                {ATTENDANCE_STATUS_LABELS[row.normalizedStatus] ?? row.normalizedStatus}
-              </Badge>
+              <AttendanceStatusBadge status={row.normalizedStatus} />
             </div>
             {row.clock_in && (
               <div className="flex items-center justify-between text-xs">

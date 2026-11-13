@@ -774,7 +774,16 @@ if a token is wrong in one theme, fix the token in `app/globals.css`.
 tokens in `app/globals.css`: `text-success`, `text-warning`, `text-danger`, `text-info`,
 `text-purple`, with `bg-success/15` and `border-success/30` for the tint. Each token carries
 its own light and dark value, so a call site never writes `dark:`. A status shown as a badge
-uses `<StatusBadge status=... tone=... />`, whose `TONE_CLASSES` is the single map of these.
+uses `<StatusBadge status=... tone=... />`. A badge whose tone is decided by the call site uses
+`<Badge tone="success">` (no `variant` needed: the tone replaces the variant's colours). The
+single map is `TONE_CLASSES` in `@/lib/ui/status-tones`; a helper that returns badge classes
+(`getStatusColor`, a status-to-class map) returns `TONE_CLASSES.<tone>`, never palette classes.
+
+**Which badges get a colour.** A badge that states a state or an outcome (approved, overdue,
+expired, failed, signed in) gets a tone. A badge that only labels (a department, a count, a tag,
+"Recurring") stays `outline` or `secondary`: colour carries meaning only while most badges are
+grey. A categorical palette that needs more than five distinct hues (lunch dish chips, medal
+ranks) is the one place raw palette classes stay, in a named constant.
 
 ### Hard prohibitions
 
@@ -959,7 +968,7 @@ the tree. It is two checks:
 | `select-star` | `.select("*")` | list the columns |
 | `inline-query-key` | `queryKey: ["literal"...]` | `QUERY_KEYS` in `lib/query-keys.ts` |
 | `dark-color-override` | `dark:bg-*`, `dark:text-*`, `dark:border-*` | a theme token or `StatusBadge` |
-| `local-status-colour` | `bg-*-100 text-*` status pairs | `StatusBadge` |
+| `local-status-colour` | `bg-*-100 text-*` status pairs; any raw palette colour inside a `<Badge>` tag | `StatusBadge` or `<Badge tone=…>` |
 | `fixed-px-width` | `w-[400px]` or wider | `w-full` with `max-w-*` |
 | `click-div` | `<div onClick>` | `<button>` or `<Link>` |
 | `client-page` | `page.tsx` that starts with `"use client"` | server page, client child |

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { DetailList, SectionHeading } from "@/components/ui/detail-list"
+import { CorrespondenceRowPanel } from "@/components/correspondence/correspondence-row-panel"
 import { Button } from "@/components/ui/button"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import {
@@ -40,6 +40,7 @@ import {
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useUrlTab } from "@/hooks/use-url-tab"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 const LETTER_TAB_KEYS = ["all", "external", "internal"] as const
 
@@ -149,13 +150,13 @@ export function AdminReferenceGeneratorContent({
   }, [globalCounts.total, globalCounts.underReview, globalCounts.approved, globalCounts.rejected])
   const statusLabel = (status: string) => (status === "under_review" ? "Sent for review" : formatName(status))
   const statusBadgeClass = (status: string) => {
-    if (status === "approved") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-    if (status === "rejected") return "bg-red-500/10 text-red-500 border-red-500/20"
-    if (status === "returned_for_correction") return "bg-amber-500/10 text-amber-500 border-amber-500/20"
-    if (status === "under_review") return "bg-blue-500/10 text-blue-500 border-blue-500/20"
-    if (status === "draft") return "bg-slate-500/10 text-slate-500 border-slate-500/20"
-    if (status === "sent" || status === "filed") return "bg-violet-500/10 text-violet-500 border-violet-500/20"
-    return "bg-muted text-muted-foreground border-muted-foreground/20"
+    if (status === "approved") return TONE_CLASSES.success
+    if (status === "rejected") return TONE_CLASSES.danger
+    if (status === "returned_for_correction") return TONE_CLASSES.warning
+    if (status === "under_review") return TONE_CLASSES.info
+    if (status === "draft") return TONE_CLASSES.neutral
+    if (status === "sent" || status === "filed") return TONE_CLASSES.purple
+    return TONE_CLASSES.neutral
   }
 
   const handleExport = async (format: "excel" | "pdf" | "word") => {
@@ -571,27 +572,12 @@ export function AdminReferenceGeneratorContent({
         ]}
         expandable={{
           render: (r) => (
-            <div className="space-y-3">
-              <SectionHeading title="Correspondence" />
-              <DetailList
-                items={[
-                  { label: "Subject", value: r.subject, wide: true },
-                  { label: "Department", value: r.department_name || r.assigned_department_name || null },
-                  {
-                    label: "Recipient",
-                    value: r.recipient_name
-                      ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
-                      : null,
-                  },
-                  { label: "Requested by", value: r.sender_name || null },
-                  ...(r.created_by_name && r.created_by_name !== r.sender_name
-                    ? [{ label: "Created by", value: r.created_by_name }]
-                    : []),
-                  { label: "Due date", value: r.due_date || null },
-                  { label: "Action required", value: r.action_required ? "Yes" : "No" },
-                ]}
-              />
-            </div>
+            <CorrespondenceRowPanel
+              record={r}
+              statusText={statusLabel(r.status)}
+              onDecide={(decision) => decide(r.id, decision)}
+              deciding={loadingRecordId === r.id}
+            />
           ),
         }}
         viewToggle

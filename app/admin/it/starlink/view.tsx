@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import { AlertTriangle, Bell, CreditCard, FolderKanban, Inbox, Pencil, Plus, Satellite, Wifi } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -24,16 +25,16 @@ export const STARLINK_KITS_QUERY_KEY = ["starlink-kits"] as const
 const MONTH_LABELS: Record<StarlinkMonthStatus, { label: string; className: string }> = {
   confirmed: {
     label: "Paid · confirmed",
-    className: "bg-success/15 text-success",
+    className: TONE_CLASSES.success,
   },
   autopay: {
     label: "Paid · autopay",
-    className: "bg-success/15 text-success",
+    className: TONE_CLASSES.success,
   },
-  failed: { label: "Payment failed", className: "bg-danger/15 text-danger" },
+  failed: { label: "Payment failed", className: TONE_CLASSES.danger },
   pending: {
     label: "Awaiting payment",
-    className: "bg-warning/15 text-warning",
+    className: TONE_CLASSES.warning,
   },
 }
 
@@ -77,7 +78,7 @@ function MonthBadge({ kit }: { kit: StarlinkKitListRow }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       {status}
-      <Badge variant="outline" className="font-normal text-amber-600">
+      <Badge tone="warning" className="font-normal">
         Ends {formatDay(kit.service_end_date)}
       </Badge>
     </span>

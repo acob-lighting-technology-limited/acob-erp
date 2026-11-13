@@ -36,27 +36,28 @@ import { SignDialog, type SignMode } from "./sign-dialog"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 
 import { LinesSkeleton } from "@/components/skeletons"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 export type Viewer = RequisitionViewerActions & { is_admin: boolean }
 
 /** One colour per status, so "in approval" and "awaiting payment" never look alike. */
 export function statusBadgeClass(status: Requisition["status"]) {
   switch (status) {
     case "rejected":
-      return "border-danger/30 bg-danger/15 text-danger"
+      return TONE_CLASSES.danger
     case "cancelled":
-      return "border-muted-foreground/30 bg-muted text-muted-foreground"
+      return TONE_CLASSES.neutral
     case "paid":
-      return "border-success/30 bg-success/15 text-success"
+      return TONE_CLASSES.success
     case "awaiting_payment":
-      return "border-info/30 bg-info/15 text-info"
+      return TONE_CLASSES.info
     case "scheduled":
       return "border-primary/30 bg-primary/15 text-primary"
     case "partly_paid":
-      return "border-info/40 bg-transparent text-info"
+      return TONE_CLASSES.info
     case "awaiting_approval":
-      return "border-success/40 bg-transparent text-success"
+      return TONE_CLASSES.success
     default:
-      return "border-warning/30 bg-warning/15 text-warning"
+      return TONE_CLASSES.warning
   }
 }
 

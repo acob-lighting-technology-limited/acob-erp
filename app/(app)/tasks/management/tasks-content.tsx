@@ -75,7 +75,7 @@ function TaskStatusPill({ task }: { task: Task }) {
 
   if (isEscalated) {
     return (
-      <Badge variant="destructive" className="text-danger border-danger/30 bg-danger/15 text-xs whitespace-nowrap">
+      <Badge variant="destructive" tone="danger" className="text-xs whitespace-nowrap">
         {cfg.label} · Escalated
       </Badge>
     )
@@ -83,7 +83,7 @@ function TaskStatusPill({ task }: { task: Task }) {
 
   if (isOverdue) {
     return (
-      <Badge variant="outline" className="text-warning border-warning/30 bg-warning/15 text-xs whitespace-nowrap">
+      <Badge tone="warning" className="text-xs whitespace-nowrap">
         {cfg.label} · Grace
       </Badge>
     )

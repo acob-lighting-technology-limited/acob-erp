@@ -17,6 +17,7 @@ import type { AdminDocumentation, UserProfile, employeeMember } from "@/componen
 import { formatDate } from "@/lib/format"
 
 import { useShellBase } from "@/hooks/use-shell-base"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
 export type Documentation = AdminDocumentation
@@ -39,7 +40,7 @@ interface AdminDocumentationContentProps {
   backLinkLabel?: string
 }
 
-const getStatusColor = (isDraft: boolean) => (isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success")
+const getStatusColor = (isDraft: boolean) => (isDraft ? TONE_CLASSES.warning : TONE_CLASSES.success)
 
 export function AdminDocumentationContent({
   initialDocumentation,

@@ -218,6 +218,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       !actingDepartment &&
       (role === "super_admin" ||
         role === "developer" ||
+        // An admin holding the correspondence route can do what super_admin and developer can.
+        (role === "admin" &&
+          ((profile as { admin_routes?: string[] }).admin_routes ?? []).includes("correspondence.main")) ||
         designation.includes("managing director") ||
         designation === "md")
 

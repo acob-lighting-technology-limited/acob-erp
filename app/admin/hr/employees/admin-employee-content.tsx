@@ -784,7 +784,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.mailbox_status === "failed" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="bg-danger/15 text-danger shrink-0 text-xs font-normal">Failed</Badge>
+                  <Badge tone="danger" className="shrink-0 font-normal">
+                    Failed
+                  </Badge>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   {r.mailbox_error || "Matrix could not create this mailbox on cPanel."} Use Send Webmail Credentials to
@@ -808,10 +810,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               {r.department}
             </span>
             {r.is_department_lead && (
-              <Badge
-                variant="outline"
-                className="text-warning border-warning/40 bg-warning/10 shrink-0 gap-1 px-1.5 py-0 text-xs font-medium whitespace-nowrap"
-              >
+              <Badge tone="warning" className="shrink-0 gap-1 px-1.5 py-0 text-xs font-medium whitespace-nowrap">
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
               </Badge>

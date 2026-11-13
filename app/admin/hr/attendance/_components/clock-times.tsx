@@ -1,5 +1,5 @@
 import { Clock } from "lucide-react"
-import { formatTime } from "./status-badge"
+import { formatTime } from "@/components/hr/attendance-record-display"
 import { isLate } from "@/lib/hr/attendance-utils"
 import { cn } from "@/lib/utils"
 

@@ -184,22 +184,16 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                     <div>
                       {chosen ? (
                         isCorrect ? (
-                          <Badge
-                            variant="outline"
-                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-500"
-                          >
+                          <Badge tone="success" className="gap-1 text-xs">
                             <CheckCircle2 className="h-3 w-3" /> Correct
                           </Badge>
                         ) : (
-                          <Badge
-                            variant="outline"
-                            className="gap-1 border-red-500/20 bg-red-500/10 text-xs text-red-500"
-                          >
+                          <Badge tone="danger" className="gap-1 text-xs">
                             <XCircle className="h-3 w-3" /> Incorrect
                           </Badge>
                         )
                       ) : (
-                        <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-xs text-amber-500">
+                        <Badge tone="warning" className="text-xs">
                           Unanswered
                         </Badge>
                       )}

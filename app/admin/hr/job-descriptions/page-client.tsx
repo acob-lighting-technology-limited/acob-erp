@@ -120,14 +120,11 @@ export default function AdminJobDescriptionsPage() {
         accessor: (r) => (r.job_description ? "completed" : "pending"),
         render: (r) =>
           r.job_description ? (
-            <Badge
-              variant="outline"
-              className="gap-1.5 border-emerald-200 bg-emerald-500/10 px-2 py-0.5 text-emerald-500"
-            >
+            <Badge tone="success" className="gap-1.5 px-2 py-0.5">
               <CheckCircle className="h-3 w-3" /> Completed
             </Badge>
           ) : (
-            <Badge variant="outline" className="gap-1.5 border-amber-200 bg-amber-500/10 px-2 py-0.5 text-amber-500">
+            <Badge tone="warning" className="gap-1.5 px-2 py-0.5">
               <XCircle className="h-3 w-3" /> Pending
             </Badge>
           ),
@@ -271,11 +268,11 @@ export default function AdminJobDescriptionsPage() {
           subtitle: (r) => [r.department, r.designation].filter(Boolean).join(" · ") || r.company_email,
           trailing: (r) =>
             r.job_description ? (
-              <Badge variant="outline" className="border-transparent bg-emerald-500/10 text-xs text-emerald-500">
+              <Badge tone="success" className="text-xs">
                 Completed
               </Badge>
             ) : (
-              <Badge variant="outline" className="border-transparent bg-amber-500/10 text-xs text-amber-500">
+              <Badge tone="warning" className="text-xs">
                 Pending
               </Badge>
             ),
@@ -297,14 +294,11 @@ export default function AdminJobDescriptionsPage() {
                 {r.first_name.charAt(0)}
               </div>
               {r.job_description ? (
-                <Badge
-                  variant="outline"
-                  className="border-transparent bg-emerald-500/10 px-1.5 text-xs text-emerald-500"
-                >
+                <Badge tone="success" className="px-1.5 text-xs">
                   Completed
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-transparent bg-amber-500/10 px-1.5 text-xs text-amber-500">
+                <Badge tone="warning" className="px-1.5 text-xs">
                   Pending
                 </Badge>
               )}

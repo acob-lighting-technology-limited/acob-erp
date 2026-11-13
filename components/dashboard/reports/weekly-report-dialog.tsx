@@ -61,12 +61,15 @@ function WeeklyReportForm({ onClose, onSuccess, initialData }: Omit<WeeklyReport
   // Once the grace window has closed the week is read-only — block typing outright
   // instead of letting the user fill the form and fail at submit. Also treat the
   // unresolved state as locked so there is no editable gap while the RPC is in flight.
-  const isWeekLocked = !lock.data || lock.data.isLocked
+  // A locked week with no report yet stays open so the missing report can be filed late;
+  // an existing report in a locked week is read-only.
+  const isWeekLocked = !lock.data || (lock.data.isLocked && Boolean(id))
+  const isLateSubmission = Boolean(lock.data?.isLocked && !id)
 
   const handleSubmit = async () => {
     const state = await fetchWeeklyReportLockState(createClient(), week, year)
     queryClient.setQueryData(QUERY_KEYS.weeklyReportLockState(week, year), state)
-    if (state.isLocked) {
+    if (state.isLocked && id) {
       toast.error("This report week is locked. Contact admin for a temporary unlock.")
       return
     }
@@ -114,7 +117,13 @@ function WeeklyReportForm({ onClose, onSuccess, initialData }: Omit<WeeklyReport
         <DialogDescription>
           Progress update for <span className="text-primary font-semibold">{department}</span> — Week {week}, {year}
         </DialogDescription>
-        {lock.data?.isLocked && (
+        {isLateSubmission && (
+          <p className="text-warning text-xs">
+            This week locked after meeting date {lock.data?.meetingDate}, but no report was filed for it. You can still
+            submit it; it will be marked as submitted late.
+          </p>
+        )}
+        {lock.data?.isLocked && id && (
           <p className="text-destructive text-xs">
             Locked after meeting date {lock.data.meetingDate}. This week is read-only — contact an admin for a temporary
             unlock.

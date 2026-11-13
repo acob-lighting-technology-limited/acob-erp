@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { AdminReferenceGeneratorContent } from "@/app/admin/correspondence/admin-reference-generator-content"
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import type { CorrespondenceRecord } from "@/types/correspondence"
+import { withCorrespondenceRowDetails } from "@/lib/correspondence/row-details"
 
 import type { Metadata } from "next"
 
@@ -105,7 +106,8 @@ async function getData() {
     }
   })
 
-  return { records: enrichedRecords }
+  // Stages and documents ride along, so an expanded row shows them without another request.
+  return { records: await withCorrespondenceRowDetails(dataClient, enrichedRecords) }
 }
 
 export default async function AdminCorrespondencePage() {

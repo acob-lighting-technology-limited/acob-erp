@@ -1,3 +1,4 @@
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 export const TASK_STATUSES = [
   "pending",
   "in_progress",
@@ -28,49 +29,49 @@ export interface TaskStatusConfig {
 export const TASK_STATUS_CONFIG: Record<TaskStatus, TaskStatusConfig> = {
   pending: {
     label: "Pending",
-    color: "text-amber-600 bg-amber-500/10 border-amber-500/20",
+    color: TONE_CLASSES.warning,
     badgeVariant: "outline",
     description: "Task is assigned and awaiting commencement.",
   },
   in_progress: {
     label: "In Progress",
-    color: "text-blue-600 bg-blue-500/10 border-blue-500/20",
+    color: TONE_CLASSES.info,
     badgeVariant: "default",
     description: "Task is actively being worked on.",
   },
   submitted_for_review: {
     label: "Submitted for Review",
-    color: "text-purple-600 bg-purple-500/10 border-purple-500/20",
+    color: TONE_CLASSES.purple,
     badgeVariant: "secondary",
     description: "Employee has submitted work for lead/admin approval.",
   },
   completed: {
     label: "Completed",
-    color: "text-emerald-600 bg-emerald-500/10 border-emerald-500/20",
+    color: TONE_CLASSES.success,
     badgeVariant: "default",
     description: "Task has been approved and completed.",
   },
   unable_to_complete: {
     label: "Unable to Complete",
-    color: "text-orange-600 bg-orange-500/10 border-orange-500/20",
+    color: TONE_CLASSES.warning,
     badgeVariant: "destructive",
     description: "Employee reported an issue blocking completion.",
   },
   reassigned: {
     label: "Reassigned",
-    color: "text-sky-600 bg-sky-500/10 border-sky-500/20",
+    color: TONE_CLASSES.info,
     badgeVariant: "outline",
     description: "Task was reassigned to another person (neutral for employee KPI).",
   },
   failed: {
     label: "Failed",
-    color: "text-rose-600 bg-rose-500/10 border-rose-500/20",
+    color: TONE_CLASSES.danger,
     badgeVariant: "destructive",
     description: "Task was marked as failed / expired without completion.",
   },
   cancelled: {
     label: "Cancelled",
-    color: "text-muted-foreground bg-muted border-border",
+    color: TONE_CLASSES.neutral,
     badgeVariant: "outline",
     description: "Task was cancelled.",
   },

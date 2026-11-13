@@ -1,5 +1,6 @@
 import type { UserRole } from "@/types/database"
 import { canAssignRole as canAssignManagedRole } from "@/lib/role-management"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 /**
  * Role Hierarchy (from highest to lowest):
@@ -153,11 +154,11 @@ export function getRoleDisplayName(role: UserRole): string {
 
 export function getRoleBadgeColor(role: UserRole): string {
   const colors: Record<UserRole, string> = {
-    visitor: "bg-muted text-foreground",
-    employee: "bg-muted text-foreground",
-    admin: "bg-purple/15 text-purple",
-    super_admin: "bg-danger/15 text-danger",
-    developer: "bg-warning/15 text-warning",
+    visitor: TONE_CLASSES.neutral,
+    employee: TONE_CLASSES.neutral,
+    admin: TONE_CLASSES.purple,
+    super_admin: TONE_CLASSES.danger,
+    developer: TONE_CLASSES.warning,
   }
-  return colors[role] || "bg-gray-100 text-gray-800"
+  return colors[role] || TONE_CLASSES.neutral
 }

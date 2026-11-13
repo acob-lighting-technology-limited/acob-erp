@@ -1,11 +1,12 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { RATING_LABELS, STATUS_LABELS, type RiskRating, type RiskStatus } from "@/lib/risk-register/model"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 
 export const RATING_STYLES: Record<RiskRating, string> = {
-  green: "border-success/30 bg-success/15 text-success",
-  yellow: "border-warning/30 bg-warning/20 text-warning",
-  red: "border-danger/30 bg-danger/15 text-danger",
+  green: TONE_CLASSES.success,
+  yellow: TONE_CLASSES.warning,
+  red: TONE_CLASSES.danger,
 }
 
 const STATUS_STYLES: Record<RiskStatus, string> = {

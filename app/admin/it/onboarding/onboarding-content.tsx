@@ -11,7 +11,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { StaffAvatar, type StaffAvatarSize } from "@/components/ui/staff-avatar"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { cn } from "@/lib/utils"
 import {
   Building2,
   Calendar,
@@ -235,11 +234,7 @@ export function OnboardingContent() {
         sortable: true,
         accessor: (row) => (row.has_signed_in ? "Signed in" : "Never signed in"),
         render: (row) =>
-          row.has_signed_in ? (
-            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
-          ) : (
-            <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never signed in</Badge>
-          ),
+          row.has_signed_in ? <Badge tone="success">Signed in</Badge> : <Badge tone="danger">Never signed in</Badge>,
       },
       {
         key: "last_sign_in_at",
@@ -451,9 +446,13 @@ export function OnboardingContent() {
             subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>
               row.has_signed_in ? (
-                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">Signed in</Badge>
+                <Badge tone="success" className="text-xs">
+                  Signed in
+                </Badge>
               ) : (
-                <Badge className="border-red-500/20 bg-red-500/10 text-xs text-red-600">Never</Badge>
+                <Badge tone="danger" className="text-xs">
+                  Never
+                </Badge>
               ),
             detail: {
               title: (row) => row.full_name,
@@ -461,9 +460,9 @@ export function OnboardingContent() {
               avatar: (row) => <OnboardingAvatar row={row} size="xl" />,
               badges: (row) =>
                 row.has_signed_in ? (
-                  <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
+                  <Badge tone="success">Signed in</Badge>
                 ) : (
-                  <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never signed in</Badge>
+                  <Badge tone="danger">Never signed in</Badge>
                 ),
               fields: (row) => [
                 { icon: Mail, label: "Email", value: row.email || "—", fullWidth: true, copyable: Boolean(row.email) },
@@ -520,11 +519,7 @@ export function OnboardingContent() {
                     <p className="text-muted-foreground truncate text-xs">{row.email || "No email"}</p>
                   </div>
                 </div>
-                {row.has_signed_in ? (
-                  <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
-                ) : (
-                  <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never</Badge>
-                )}
+                {row.has_signed_in ? <Badge tone="success">Signed in</Badge> : <Badge tone="danger">Never</Badge>}
               </div>
               <div className="grid gap-1 border-t pt-2 text-xs">
                 <div className="flex items-center justify-between">

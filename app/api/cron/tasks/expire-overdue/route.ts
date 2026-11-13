@@ -11,9 +11,10 @@ import {
   taskDeadline,
   workingDaysPastDeadline,
 } from "@/lib/tasks/overdue"
-import { addIsoDays, eachIsoDate, isWorkingDay, type HolidaySet } from "@/lib/hr/leave-days"
+import { addIsoDays, isWorkingDay, type HolidaySet } from "@/lib/hr/leave-days"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
 import { createNotification } from "@/lib/notifications/create"
+import { loadApprovedLeaveDates, loadHolidays } from "@/lib/hr/non-working-days"
 
 const log = logger("cron-tasks-expire-overdue")
 
@@ -260,61 +261,6 @@ function actByLabelFor(todayIso: string, nonWorking: HolidaySet): string {
     month: "short",
     timeZone: "UTC",
   })
-}
-
-async function loadHolidays(supabase: Supabase, start: string, end: string): Promise<HolidaySet> {
-  const { data, error } = await supabase
-    .from("holiday_calendar")
-    .select("holiday_date")
-    .gte("holiday_date", start)
-    .lte("holiday_date", end)
-
-  if (error) {
-    // Weekends alone still give most of the intended grace, and a lookup
-    // failure must not be allowed to fail the whole run.
-    log.error({ err: String(error) }, "Holiday lookup failed; falling back to weekends only")
-    return new Set<string>()
-  }
-  return new Set((data as Array<{ holiday_date: string }> | null)?.map((row) => row.holiday_date) ?? [])
-}
-
-/**
- * Approved leave for each assignee, expanded to the individual dates it
- * covers. Only approved leave counts: a request still sitting in the queue is
- * not yet time off, and treating it as such would let anyone pause a deadline
- * by filing one.
- */
-async function loadApprovedLeaveDates(
-  supabase: Supabase,
-  userIds: string[],
-  start: string,
-  end: string
-): Promise<Map<string, Set<string>>> {
-  const byUser = new Map<string, Set<string>>()
-  if (userIds.length === 0) return byUser
-
-  const { data, error } = await supabase
-    .from("leave_requests")
-    .select("user_id, start_date, end_date")
-    .in("user_id", userIds)
-    .eq("status", "approved")
-    .lte("start_date", end)
-    .gte("end_date", start)
-
-  if (error) {
-    // Falling back to weekends and holidays alone can fail someone's task
-    // while they were away, so this is loud rather than silent.
-    log.error({ err: String(error) }, "Approved-leave lookup failed; grace will not account for leave")
-    return byUser
-  }
-
-  for (const row of (data as Array<{ user_id: string; start_date: string; end_date: string }> | null) ?? []) {
-    if (!row.user_id || !row.start_date || !row.end_date) continue
-    const dates = byUser.get(row.user_id) ?? new Set<string>()
-    for (const iso of eachIsoDate(row.start_date.slice(0, 10), row.end_date.slice(0, 10))) dates.add(iso)
-    byUser.set(row.user_id, dates)
-  }
-  return byUser
 }
 
 /** Notifies the assignee and the assigner, counting the sends that landed. */

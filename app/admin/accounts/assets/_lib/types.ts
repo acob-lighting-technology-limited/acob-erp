@@ -89,30 +89,7 @@ export type AssignableAsset = {
   }
 }
 
-export type ProfileNameRow = {
-  id: string
-  first_name?: string | null
-  last_name?: string | null
-}
-
-export interface AssetActivity {
-  id: string
-  timestamp: string
-  type: "assignment" | "unassignment" | "status_change" | "issue_reported" | "issue_resolved"
-  title: string
-  description?: string
-  user_name?: string
-  performed_by_name?: string
-  details?: {
-    assigned_to?: string
-    department?: string
-    office_location?: string
-    assignment_type?: string
-    notes?: string
-    status?: string
-    old_status?: string
-  }
-}
+export type { AssetActivity } from "@/lib/assets/asset-activity"
 
 export interface UserProfile {
   first_name?: string | null

@@ -258,14 +258,7 @@ export function LunchMenuViewersSheet({
                 <div className="flex items-center gap-2 text-right sm:block">
                   {row.hasViewed ? (
                     <div className="flex items-center gap-2 sm:block">
-                      <Badge
-                        variant="outline"
-                        className={
-                          row.viewedDuringWindow
-                            ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-xs text-emerald-600"
-                            : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-xs text-amber-600"
-                        }
-                      >
+                      <Badge tone={row.viewedDuringWindow ? "success" : "warning"} className="px-1.5 py-0">
                         {row.viewedDuringWindow ? "During Voting" : "After Cut-off"}
                       </Badge>
                       <span className="text-muted-foreground block text-xs sm:mt-0.5">
@@ -273,7 +266,7 @@ export function LunchMenuViewersSheet({
                       </span>
                     </div>
                   ) : (
-                    <Badge variant="outline" className="border-gray-200 px-1.5 py-0 text-xs text-gray-400">
+                    <Badge variant="outline" className="text-muted-foreground px-1.5 py-0">
                       Not viewed
                     </Badge>
                   )}
@@ -284,12 +277,15 @@ export function LunchMenuViewersSheet({
                   {row.vote ? (
                     row.vote.is_eating ? (
                       <div>
-                        <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 sm:max-w-[150px]">
+                        <Badge
+                          tone="success"
+                          className="inline-block max-w-[180px] truncate border-0 px-2 py-0.5 text-xs font-medium sm:max-w-[150px]"
+                        >
                           {row.mealChoice}
                         </Badge>
                       </div>
                     ) : (
-                      <Badge className="border-0 bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-600">
+                      <Badge tone="danger" className="border-0 px-2 py-0.5 text-xs font-medium">
                         Said No
                       </Badge>
                     )

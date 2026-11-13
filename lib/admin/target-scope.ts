@@ -96,6 +96,56 @@ export async function denyUnlessAssetInScope(
   return forbidden()
 }
 
+/**
+ * Every asset id `denyUnlessAssetInScope` would let this scope open, worked out in a handful of
+ * queries instead of several per asset, for routes that list across assets. `null` means an
+ * unrestricted scope (every asset). Throws when a lookup fails, so a failure never widens access.
+ */
+export async function listAssetIdsInScope(db: SupabaseClient, scope: AdminScope): Promise<string[] | null> {
+  const scopeDepartments = getScopedDepartments(scope)
+  if (scopeDepartments === null) return null
+
+  const [assetsRes, currentRes, officesRes] = await Promise.all([
+    db.from("assets").select("id, department"),
+    db.from("asset_assignments").select("asset_id, assigned_to, department, office_location").eq("is_current", true),
+    db.from("office_locations").select("name, department"),
+  ])
+  const failed = assetsRes.error || currentRes.error || officesRes.error
+  if (failed) throw failed
+
+  const current = (currentRes.data ?? []) as {
+    asset_id: string
+    assigned_to: string | null
+    department: string | null
+    office_location: string | null
+  }[]
+  const assigneeIds = Array.from(new Set(current.map((c) => c.assigned_to).filter((id): id is string => Boolean(id))))
+  const assigneeDept = new Map<string, string | null>()
+  if (assigneeIds.length > 0) {
+    const { data, error } = await db.from("profiles").select("id, department").in("id", assigneeIds)
+    if (error) throw error
+    ;((data ?? []) as { id: string; department: string | null }[]).forEach((p) => assigneeDept.set(p.id, p.department))
+  }
+  const officeDept = new Map(
+    ((officesRes.data ?? []) as { name: string; department: string | null }[]).map((o) => [o.name, o.department])
+  )
+  const currentByAsset = new Map(current.map((c) => [c.asset_id, c]))
+
+  const inScope = (department: string | null | undefined) => departmentInScope(scopeDepartments, department)
+  return ((assetsRes.data ?? []) as { id: string; department: string | null }[])
+    .filter((asset) => {
+      if (inScope(asset.department)) return true
+      const c = currentByAsset.get(asset.id)
+      if (!c) return false
+      return (
+        inScope(c.department) ||
+        (c.assigned_to ? inScope(assigneeDept.get(c.assigned_to)) : false) ||
+        (c.office_location ? inScope(officeDept.get(c.office_location)) : false)
+      )
+    })
+    .map((asset) => asset.id)
+}
+
 /** A help desk ticket is in scope when a managed department services it or one of its people raised it. */
 export async function denyUnlessTicketInScope(
   db: SupabaseClient,

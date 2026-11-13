@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
+import { TONE_CLASSES } from "@/lib/ui/status-tones"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
@@ -222,23 +223,23 @@ export function getStageBadge(item: LeaveItem) {
   const stage = rawStage.toLowerCase()
   const label = STAGE_LABELS[rawStage] || rawStage
 
-  let colorClass = "bg-muted/10 text-muted-foreground border-muted-foreground/20"
+  let colorClass = TONE_CLASSES.neutral
   if (stage.includes("reliever")) {
-    colorClass = "bg-purple-500/10 text-purple-500 border-purple-500/20"
+    colorClass = TONE_CLASSES.purple
   } else if (stage.includes("department_lead") || stage.includes("supervisor")) {
-    colorClass = "bg-amber-500/10 text-amber-500 border-amber-500/20"
+    colorClass = TONE_CLASSES.warning
   } else if (stage.includes("admin_hr_lead") || stage.includes("hr_pending")) {
-    colorClass = "bg-blue-500/10 text-blue-500 border-blue-500/20"
+    colorClass = TONE_CLASSES.info
   } else if (stage.includes("md")) {
-    colorClass = "bg-rose-500/10 text-rose-500 border-rose-500/20"
+    colorClass = TONE_CLASSES.purple
   } else if (stage.includes("hcs")) {
-    colorClass = "bg-violet-500/10 text-violet-500 border-violet-500/20"
+    colorClass = TONE_CLASSES.purple
   } else if (stage === "completed" || stage === "approved") {
-    colorClass = "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+    colorClass = TONE_CLASSES.success
   } else if (stage === "rejected") {
-    colorClass = "bg-red-500/10 text-red-500 border-red-500/20"
+    colorClass = TONE_CLASSES.danger
   } else if (stage === "cancelled") {
-    colorClass = "bg-muted/10 text-muted-foreground border-muted-foreground/20"
+    colorClass = TONE_CLASSES.neutral
   }
 
   return (

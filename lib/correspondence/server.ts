@@ -73,6 +73,9 @@ export async function getAuthContext() {
       ? {
           ...profile,
           managed_departments: managedDepartments,
+          // The admin routes this person holds, so route-level checks treat an admin
+          // holding correspondence.main the same as super_admin and developer.
+          admin_routes: (scope?.adminRoutes ?? []) as string[],
         }
       : null,
   }

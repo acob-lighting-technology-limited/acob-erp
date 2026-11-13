@@ -6,7 +6,9 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Badge } from "@/components/ui/badge"
 import { History } from "lucide-react"
 import { toast } from "sonner"
-import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
+import { ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
+import type { StatusTone } from "@/lib/ui/status-tones"
+import { AttendanceStatusBadge } from "@/components/hr/attendance-record-display"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { getAttendanceMonthOptions, monthBounds, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
@@ -19,13 +21,13 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("admin-attendance-change-log-view")
 
-const CATEGORY_CLASSES: Record<ChangeLogCategory, string> = {
-  edits: "bg-info/15 text-info",
-  bulk: "bg-info/15 text-info",
-  appeals: "bg-info/15 text-info",
-  leave: "bg-purple/15 text-purple",
-  exemptions: "bg-purple/15 text-purple",
-  out_of_station: "bg-info/15 text-info",
+const CATEGORY_TONES: Record<ChangeLogCategory, StatusTone> = {
+  edits: "info",
+  bulk: "info",
+  appeals: "info",
+  leave: "purple",
+  exemptions: "purple",
+  out_of_station: "info",
 }
 
 const APPEAL_OUTCOME_LABELS: Record<string, string> = {
@@ -59,13 +61,9 @@ function fromText(row: ChangeLogRow): string {
   return row.from_mixed ? "Various" : statusText(row.from_status)
 }
 
-function StatusBadge({ status }: { status: string | null }) {
+function StatusCell({ status }: { status: string | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>
-  return (
-    <Badge className={ATTENDANCE_STATUS_COLORS[status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"}>
-      {statusText(status)}
-    </Badge>
-  )
+  return <AttendanceStatusBadge status={status} />
 }
 
 /**
@@ -269,7 +267,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
         accessor: (r) => r.change_label,
         render: (r) => (
           <div className="flex flex-col items-start gap-1">
-            <Badge className={CATEGORY_CLASSES[r.category]}>{r.change_label}</Badge>
+            <Badge tone={CATEGORY_TONES[r.category]}>{r.change_label}</Badge>
             {(r.from_status || r.from_mixed || r.to_status) && (
               <span className="flex items-center gap-1 text-xs">
                 {r.from_mixed ? (
@@ -277,10 +275,10 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                     Various
                   </Badge>
                 ) : (
-                  <StatusBadge status={r.from_status} />
+                  <StatusCell status={r.from_status} />
                 )}
                 <span className="text-muted-foreground">→</span>
-                <StatusBadge status={r.to_status} />
+                <StatusCell status={r.to_status} />
               </span>
             )}
           </div>
@@ -336,15 +334,11 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
             `${daySpan(r)}${r.days.length > 1 ? ` (${dayCount(r)})` : ""} · by ${r.actor_name}${r.from_status || r.from_mixed || r.to_status ? ` · ${fromText(r) || "—"} → ${statusText(r.to_status) || "—"}` : ""}`,
           snippet: (r) => (r.comment ? `Comment: ${r.comment}` : null),
           expandInline: true,
-          trailing: (r) => (
-            <Badge className={CATEGORY_CLASSES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
-          ),
+          trailing: (r) => <Badge tone={CATEGORY_TONES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>,
           detail: {
             title: (r) => `${r.employee_name} — ${r.change_label}`,
             subtitle: (r) => `${daySpan(r)} · by ${r.actor_name}`,
-            badges: (r) => (
-              <Badge className={CATEGORY_CLASSES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
-            ),
+            badges: (r) => <Badge tone={CATEGORY_TONES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>,
             fields: (r) => [
               { label: "Employee", value: r.employee_name },
               { label: "Department", value: r.department },
@@ -366,7 +360,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                 <p className="text-sm font-semibold">{r.employee_name}</p>
                 <p className="text-muted-foreground">{r.department}</p>
               </div>
-              <Badge className={CATEGORY_CLASSES[r.category]}>{r.change_label}</Badge>
+              <Badge tone={CATEGORY_TONES[r.category]}>{r.change_label}</Badge>
             </div>
             <p className="text-muted-foreground">
               {daySpan(r)}
@@ -404,13 +398,13 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                             Various
                           </Badge>
                         ) : (
-                          <StatusBadge status={r.from_status} />
+                          <StatusCell status={r.from_status} />
                         )}
                         <span className="text-muted-foreground text-xs font-semibold">→</span>
-                        <StatusBadge status={r.to_status} />
+                        <StatusCell status={r.to_status} />
                       </>
                     )}
-                    <Badge className={CATEGORY_CLASSES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
+                    <Badge tone={CATEGORY_TONES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
                   </div>
                 </div>
 
@@ -469,7 +463,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
                             </Badge>
                           </div>
                           <p className="mt-2 text-sm">
-                            Asked for <StatusBadge status={r.appeal.requested_status} />
+                            Asked for <StatusCell status={r.appeal.requested_status} />
                           </p>
                           {r.appeal.appeal_reason && (
                             <div className="mt-3">

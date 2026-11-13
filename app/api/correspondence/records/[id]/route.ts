@@ -153,8 +153,22 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
         .order("version_no", { ascending: false }),
     ])
 
+    // Approvers are stored by id: look their names up so the stages can say who decided.
+    const approverIds = Array.from(
+      new Set((approvals || []).map((a) => a.approver_id as string | null).filter((id): id is string => Boolean(id)))
+    )
+    const approverNames = new Map<string, string>()
+    if (approverIds.length) {
+      const { data: staff } = await supabase.from("staff_directory").select("id, full_name").in("id", approverIds)
+      for (const person of staff || []) approverNames.set(person.id as string, person.full_name as string)
+    }
+    const approvalsWithNames = (approvals || []).map((a) => ({
+      ...a,
+      approver_name: a.approver_id ? (approverNames.get(a.approver_id as string) ?? null) : null,
+    }))
+
     return NextResponse.json({
-      data: { record, approvals: approvals || [], events: events || [], versions: versions || [] },
+      data: { record, approvals: approvalsWithNames, events: events || [], versions: versions || [] },
     })
   } catch (error) {
     log.error({ err: String(error) }, "Error in GET /api/correspondence/records/[id]:")
