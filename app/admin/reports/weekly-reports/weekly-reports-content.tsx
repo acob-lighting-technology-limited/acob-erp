@@ -314,9 +314,11 @@ export function WeeklyReportsContent({
           const created = formatWATTimeDate(report.created_at)
           const updatedAt = (report as WeeklyReport & { updated_at?: string | null }).updated_at
           const wasEdited = Boolean(updatedAt && new Date(updatedAt).getTime() > new Date(report.created_at).getTime())
+          const submittedLate = Boolean((report as WeeklyReport & { submitted_late?: boolean }).submitted_late)
           return (
             <div className="flex flex-col">
               <span>{created}</span>
+              {submittedLate ? <span className="text-warning text-xs font-medium">Submitted late</span> : null}
               {wasEdited ? <span className="text-muted-foreground text-xs">(edited)</span> : null}
             </div>
           )

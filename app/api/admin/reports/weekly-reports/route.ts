@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await db
     .from("weekly_reports")
     .select(
-      "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, updated_at, profiles(first_name, last_name)"
+      "id, department, week_number, year, work_done, tasks_new_week, challenges, status, submitted_late, user_id, created_at, updated_at, profiles(first_name, last_name)"
     )
     .eq("status", "submitted")
     .eq("week_number", week)

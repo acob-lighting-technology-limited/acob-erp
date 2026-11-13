@@ -300,6 +300,8 @@ export async function PATCH(request: Request) {
       tasks_new_week: tasksNewWeek,
       challenges,
       status,
+      // A missing report filled in after its week locked is marked late. Edits keep the flag as it was.
+      ...(targetExisting?.id ? {} : { submitted_late: !isWeekMutable }),
     }
     log.info({ payload, writeMode: targetExisting?.id ? "update" : "insert" }, "Weekly report write payload prepared")
 
