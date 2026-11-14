@@ -4,6 +4,7 @@ import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-wor
 import { findDepartmentOverlaps } from "@/app/api/hr/leave/requests/_lib/shared"
 import { logger } from "@/lib/logger"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { delegationForDepartment, loadApprovalDelegations } from "@/lib/dept/approval-authority"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { applyDataScopeV2 } from "@/lib/admin/policy-v2"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -166,12 +167,18 @@ export async function GET(request: NextRequest) {
     let typedRequests = fetchedRequests
 
     if (!all) {
+      const grants = await loadApprovalDelegations(dataClient, actorProfileId, "hr.leave")
       typedRequests = typedRequests.filter((row) => {
         const stage = String(row.current_stage_code || row.approval_stage || "").toLowerCase()
         const isRelieverStage = stage === "pending_reliever" || stage === "reliever_pending"
         const matchedByApprover = row.current_approver_user_id === actorProfileId
         const matchedByReliever = row.reliever_id === actorProfileId && isRelieverStage
-        const matched = matchedByApprover || matchedByReliever
+        const delegated =
+          Boolean(row.current_approver_user_id) &&
+          row.user_id !== actorProfileId &&
+          stage === "pending_department_lead" &&
+          delegationForDepartment(grants, row.user?.department)?.onBehalfOf === row.current_approver_user_id
+        const matched = matchedByApprover || matchedByReliever || delegated
         return matched
       })
     }

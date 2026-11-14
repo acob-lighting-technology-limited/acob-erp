@@ -67,7 +67,14 @@ export const RELEASES: Release[] = [
           "HR and IT pages now separate viewing from editing: the lead of the owning department edits, everyone else with the admin role views, and a notice names who can make changes",
           "Settings > Access lists every admin with a View or Edit choice for HR and IT; leads hand work to a delegate, with an end date, from Delegate access on their department page",
           "Mailbox changes now need IT edit access, not just the admin role",
+          "HR admins can manage department leads and delegate department-level decisions for leave, correspondence, attendance appeals, and tasks",
           "IT pages (Onboarding, Mailboxes, Mail, Starlink, Network Activity, Bypass & Override) moved under IT, Payroll, Inventory and Assets under Accounts, and PMS under HR; old links still work",
+        ],
+      },
+      {
+        area: "Employees",
+        items: [
+          "HR can manage birthdays, confirmation dates, employment start dates, and contract categories from dedicated Employees pages",
         ],
       },
       {

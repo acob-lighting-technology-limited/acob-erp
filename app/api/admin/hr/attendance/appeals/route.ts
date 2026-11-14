@@ -5,6 +5,11 @@ import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireApiAdminScope, getScopedDepartments, type AdminScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import {
+  delegationForDepartment,
+  loadApprovalDelegations,
+  type ApprovalDelegation,
+} from "@/lib/dept/approval-authority"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
@@ -217,6 +222,7 @@ export async function GET(request: NextRequest) {
     const departmentLeads = await loadDepartmentLeads(dataClient)
     const admin_hr_lead_name = departmentLeads.adminHrLeadName
     const routing = await loadAppealRoutingContext(dataClient, scope.userId)
+    const departmentDelegations = await loadApprovalDelegations(dataClient, scope.userId, "hr.attendance")
     const now = new Date()
 
     const policy = await loadAttendancePolicy(dataClient)
@@ -255,7 +261,16 @@ export async function GET(request: NextRequest) {
         admin_hr_lead_name,
         overridden_by_name: resolveProfileName(r.overridden_by),
         reviewer_name: r.status === "pending" ? null : resolveProfileName(r.reviewed_by),
-        review_block: r.status === "pending" ? appealReviewBlock(scope, r, department || null, routing) : null,
+        review_block:
+          r.status === "pending"
+            ? appealReviewBlock(
+                scope.delegated ? { ...scope, isDepartmentLead: false } : scope,
+                r,
+                department || null,
+                routing,
+                Boolean(delegationForDepartment(departmentDelegations, department))
+              )
+            : null,
         can_override: r.status === "pending" && overrideBlock(scope, r) === null,
         stuck_reason: r.status === "pending" ? appealStuckReason(r, department || null, routing, now) : null,
         override_block: r.status === "pending" ? overrideBlock(scope, r) : null,
@@ -311,6 +326,7 @@ async function decideAppeal(
     dataClient: SupabaseClient
     supabase: Parameters<typeof writeAuditLog>[0]
     scope: AdminScope
+    onBehalf?: ApprovalDelegation
   },
   appeal: AppealRow,
   action: ReviewAction,
@@ -599,6 +615,7 @@ async function decideAppeal(
         appeal_date: appeal.appeal_date,
         requested_status: appeal.requested_status,
         resolution_note: resolutionNote || null,
+        ...ctx.onBehalf,
         ...(action === "override" ? { overridden_stage: currentStage } : {}),
       },
       context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/appeals" },
@@ -735,6 +752,9 @@ export async function PATCH(request: NextRequest) {
       .returns<Appellant[]>()
     const appellants = new Map((appellantRows ?? []).map((p) => [p.id, p]))
     const routing: AppealRoutingContext = await loadAppealRoutingContext(dataClient, scope.userId)
+    const departmentDelegations =
+      action === "override" ? [] : await loadApprovalDelegations(dataClient, scope.userId, "hr.attendance")
+    const delegatedDecisions = new Map<string, ApprovalDelegation>()
 
     // Check every day before writing any, so a range is decided whole or not at all.
     for (const appeal of appeals) {
@@ -745,16 +765,31 @@ export async function PATCH(request: NextRequest) {
         )
       }
       const appellantDepartment = appellants.get(appeal.user_id)?.department ?? null
+      if (scope.scopeMode === "lead" && !getScopedDepartments(scope)?.includes(appellantDepartment ?? "")) {
+        return NextResponse.json({ error: "Appeal is outside your department scope." }, { status: 403 })
+      }
+      const grant =
+        (appeal.stage || "pending_lead") === "pending_lead"
+          ? delegationForDepartment(departmentDelegations, appellantDepartment)
+          : undefined
+      const reviewer = scope.delegated ? { ...scope, isDepartmentLead: false } : scope
+      const reviewBlock = appealReviewBlock(reviewer, appeal, appellantDepartment, routing)
+      if (grant && reviewBlock && !appealReviewBlock(reviewer, appeal, appellantDepartment, routing, true)) {
+        delegatedDecisions.set(appeal.id, grant)
+      }
       const blocked =
-        action === "override"
-          ? overrideBlock(scope, appeal)
-          : appealReviewBlock(scope, appeal, appellantDepartment, routing)
+        action === "override" ? overrideBlock(scope, appeal) : delegatedDecisions.has(appeal.id) ? null : reviewBlock
       if (blocked) return NextResponse.json({ error: blocked }, { status: 403 })
     }
 
     const decidedByUser = new Map<string, Decided[]>()
     for (const appeal of appeals) {
-      const result = await decideAppeal({ dataClient, supabase, scope }, appeal, action, resolutionNote)
+      const result = await decideAppeal(
+        { dataClient, supabase, scope, onBehalf: delegatedDecisions.get(appeal.id) },
+        appeal,
+        action,
+        resolutionNote
+      )
       if (!result.ok) {
         const done = [...decidedByUser.values()].reduce((sum, list) => sum + list.length, 0)
         return NextResponse.json(

@@ -11,6 +11,7 @@ import {
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { sendCorrespondenceDecisionEmail } from "@/lib/correspondence/mailer"
 import { getRequestScope } from "@/lib/admin/api-scope"
+import { delegationForDepartment, loadApprovalDelegations } from "@/lib/dept/approval-authority"
 import { logger } from "@/lib/logger"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -150,16 +151,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: record, error: recordError } = await supabase
-      .from("correspondence_records")
-      .select("*")
-      .eq("id", params.id)
-      .single()
-
-    if (recordError || !record) {
-      return NextResponse.json({ error: "Record not found" }, { status: 404 })
-    }
-
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const body = await request.json()
     const parsed = CreateCorrespondenceApprovalSchema.safeParse(body)
     if (!parsed.success) {
@@ -167,9 +159,33 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     }
 
     const actingDepartment = parsed.data.acting_department || null
+    const departmentGrant = actingDepartment
+      ? delegationForDepartment(await loadApprovalDelegations(dataClient, user.id, "correspondence"), actingDepartment)
+      : undefined
+    const normalRead = await supabase.from("correspondence_records").select("*").eq("id", params.id).single()
+    const { data: record, error: recordError } =
+      !normalRead.data && departmentGrant
+        ? await dataClient
+            .from("correspondence_records")
+            .select(
+              "id, status, reference_number, originator_id, department_name, assigned_department_name, category, created_at, department_code, letter_type, recipient_code, submitted_at"
+            )
+            .eq("id", params.id)
+            .eq("department_name", departmentGrant.department)
+            .single()
+        : normalRead
+    if (recordError || !record) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+    const currentDepartment = record.department_name || record.assigned_department_name
+    const delegated =
+      actingDepartment &&
+      record.originator_id !== user.id &&
+      normalizeDepartmentName(actingDepartment) === normalizeDepartmentName(currentDepartment || "")
+        ? departmentGrant
+        : undefined
+    if (!normalRead.data && !delegated) return NextResponse.json({ error: "Record not found" }, { status: 404 })
     if (
       actingDepartment &&
-      (!canAccessDepartment(profile, actingDepartment) ||
+      ((!delegated && !canAccessDepartment(profile, actingDepartment)) ||
         ![record.department_name, record.assigned_department_name]
           .filter(Boolean)
           .some(
@@ -182,7 +198,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     const approvalsScope = await getRequestScope()
     const isGlobalAdmin =
       !actingDepartment && approvalsScope?.isAdminLike === true && approvalsScope.scopeMode !== "lead"
-    if (!isGlobalAdmin && !canAccessRecord(profile, user.id, record)) {
+    if (!isGlobalAdmin && !delegated && !canAccessRecord(profile, user.id, record)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -238,7 +254,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     const isExecutiveApprover = isManagingDirector || isExecutiveLead
     const canBypassChain = !actingDepartment && (role === "super_admin" || role === "developer" || role === "admin")
 
-    const { data: existingApprovals, error: approvalError } = await supabase
+    const { data: existingApprovals, error: approvalError } = await (delegated ? dataClient : supabase)
       .from("correspondence_approvals")
       .select("*")
       .eq("correspondence_id", record.id)
@@ -255,7 +271,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       (a) => a.approval_stage === STAGE_EXEC || a.approval_stage === STAGE_EXEC_LEGACY
     )
 
-    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const onBehalf =
+      !isDepartmentLeadForRecord && !isExecutiveApprover && deptApproval?.status !== "approved" ? delegated : undefined
+    const approvalClient = onBehalf ? dataClient : supabase
 
     // ── Super admin / developer bypass ─────────────────────────────────────────
     if (canBypassChain && decision === "approved") {
@@ -383,7 +401,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
     // ── Normal chain flow ───────────────────────────────────────────────────────
 
-    if (decision !== "approved" && !isDepartmentLeadForRecord && !isExecutiveApprover) {
+    if (decision !== "approved" && !isDepartmentLeadForRecord && !isExecutiveApprover && !onBehalf) {
       return NextResponse.json(
         { error: "Only department leads or executive approvers can reject/return correspondence" },
         { status: 403 }
@@ -399,12 +417,12 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
       if (!deptApproved) {
         // Stage 1: dept_review
-        if (!isDepartmentLeadForRecord && !isExecutiveApprover) {
+        if (!isDepartmentLeadForRecord && !isExecutiveApprover && !onBehalf) {
           return NextResponse.json({ error: "Department lead approval is required first" }, { status: 403 })
         }
 
         if (!deptApproval) {
-          const { data: inserted, error: insertError } = await supabase
+          const { data: inserted, error: insertError } = await approvalClient
             .from("correspondence_approvals")
             .insert({
               correspondence_id: record.id,
@@ -423,7 +441,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
         } else {
           if (deptApproval.status !== "pending") return alreadyProcessedResponse()
 
-          const { data: updatedApproval, error: updateError } = await supabase
+          const { data: updatedApproval, error: updateError } = await approvalClient
             .from("correspondence_approvals")
             .update({ approver_id: user.id, status: "approved", comments, decided_at: now })
             .eq("id", deptApproval.id)
@@ -437,7 +455,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
         // Ensure exec_review record exists for next stage
         if (!execApproval) {
-          await supabase.from("correspondence_approvals").insert({
+          await approvalClient.from("correspondence_approvals").insert({
             correspondence_id: record.id,
             approval_stage: STAGE_EXEC,
             status: "pending",
@@ -496,7 +514,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       const stageToUse = activeApproval?.approval_stage || STAGE_DEPT
 
       if (!activeApproval) {
-        const { data: inserted, error: insertError } = await supabase
+        const { data: inserted, error: insertError } = await approvalClient
           .from("correspondence_approvals")
           .insert({
             correspondence_id: record.id,
@@ -515,7 +533,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       } else {
         if (activeApproval.status !== "pending") return alreadyProcessedResponse()
 
-        const { data: updated, error: updateError } = await supabase
+        const { data: updated, error: updateError } = await approvalClient
           .from("correspondence_approvals")
           .update({ approver_id: user.id, status: decision, comments, decided_at: now })
           .eq("id", activeApproval.id)
@@ -558,6 +576,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
         decision,
         approval_stage: targetApproval?.approval_stage,
         comments,
+        ...onBehalf,
       },
     })
 
@@ -569,7 +588,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       route: "/api/correspondence/records/[id]/approvals",
       critical: true,
       oldValues: { status: record.status },
-      newValues: { status: updatedRecord.status, decision },
+      newValues: { status: updatedRecord.status, decision, ...onBehalf },
     })
 
     try {

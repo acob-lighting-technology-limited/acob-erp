@@ -184,7 +184,7 @@ export const QUERY_KEYS = {
   adminRolesSettings: () => ["admin-roles-settings"],
   adminAccessGrants: () => ["admin-access-grants"],
   adminAccessPeople: () => ["admin-access-people"],
-  deptDelegations: (deptId: string) => ["dept-delegations", deptId],
+  deptDelegations: (deptId?: string) => (deptId ? ["dept-delegations", deptId] : ["dept-delegations"]),
   devAreaOwners: () => ["dev-area-owners"],
 
   // Inventory pages
@@ -354,6 +354,7 @@ export const QUERY_KEYS = {
   adminMailboxOptions: (...parts: unknown[]) => ["admin-mailbox-options", ...parts],
   actionTracker: (...parts: unknown[]) => ["action-tracker", ...parts],
   departmentLeads: (...parts: unknown[]) => ["department-leads", ...parts],
+  adminDepartmentDelegations: (...parts: unknown[]) => ["admin-department-delegations", ...parts],
   mailPolicies: (...parts: unknown[]) => ["mail-policies", ...parts],
   controlledDoc: (...parts: unknown[]) => ["controlled-doc", ...parts],
   controlledDocs: (...parts: unknown[]) => ["controlled-docs", ...parts],

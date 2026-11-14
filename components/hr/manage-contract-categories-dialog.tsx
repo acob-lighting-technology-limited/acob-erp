@@ -17,11 +17,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Pencil, Layers } from "lucide-react"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
+import { useCanEdit } from "@/components/admin/edit-access-context"
 
 import { RowsSkeleton } from "@/components/skeletons"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 interface ManageContractCategoriesDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
@@ -35,10 +37,26 @@ interface ContractCategory {
   sort_order: number
 }
 
-export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageContractCategoriesDialogProps) {
+export function ManageContractCategoriesDialog(props: ManageContractCategoriesDialogProps) {
+  return <ContractCategories {...props} />
+}
+
+export function ContractCategoriesPageContent() {
+  const canEdit = useCanEdit("hr.employees")
+  return <ContractCategories isOpen canEdit={canEdit} />
+}
+
+function ContractCategories({
+  isOpen,
+  onOpenChange,
+  canEdit = true,
+}: {
+  isOpen: boolean
+  onOpenChange?: (open: boolean) => void
+  canEdit?: boolean
+}) {
   const queryClient = useQueryClient()
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [supabase] = useState(() => createClient())
 
   // Form states
   const [name, setName] = useState("")
@@ -47,7 +65,12 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
-  const { data: categories = [], isLoading } = useQuery<ContractCategory[]>({
+  const {
+    data: categories = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<ContractCategory[]>({
     queryKey: QUERY_KEYS.contractCategoriesAll(),
     queryFn: async () => {
       const response = await apiFetch("/api/admin/hr/employment-categories?include_inactive=true")
@@ -112,8 +135,8 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
       resetForm()
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesAll() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesKey() })
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred")
     } finally {
       setIsSaving(false)
     }
@@ -139,158 +162,199 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
       toast.success(`Category is now ${!cat.is_active ? "active" : "inactive"}`)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesAll() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contractCategoriesKey() })
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update status")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status")
     }
+  }
+
+  const header = (
+    <DialogHeader className="border-b pb-4">
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+          <Layers className="text-primary h-5 w-5" />
+        </div>
+        <div>
+          <DialogTitle className="text-xl">Manage Contract Categories</DialogTitle>
+          <DialogDescription className="mt-1">
+            Configure sub-categories for contract employees (e.g. SIWES, NYSC) to customize their staff ID series.
+          </DialogDescription>
+        </div>
+      </div>
+    </DialogHeader>
+  )
+
+  const content = (
+    <div className="grid gap-6 py-4 md:grid-cols-5">
+      {/* Left panel: Form */}
+      {canEdit && (
+        <form onSubmit={handleSave} className="space-y-4 md:col-span-2 md:border-r md:pr-6">
+          <h4 className="text-sm font-semibold">{editingId ? "Edit Category" : "Add New Category"}</h4>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat_name">Category Name</Label>
+            <Input
+              id="cat_name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. SIWES IT Student"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat_code">Prefix Code</Label>
+            <Input
+              id="cat_code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g. SIWES"
+              maxLength={10}
+              required
+              disabled={!!editingId}
+            />
+            <p className="text-muted-foreground text-xs">Must be letters/numbers (unique prefix code).</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat_sort">Sort Order</Label>
+            <Input
+              id="cat_sort"
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
+              required
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="cat_active"
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              className="border-primary h-4 w-4 rounded-sm"
+            />
+            <Label htmlFor="cat_active" className="cursor-pointer">
+              Is Active
+            </Label>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button type="submit" className="flex-1" loading={isSaving}>
+              {editingId ? "Update" : "Create"}
+            </Button>
+            {editingId && (
+              <Button type="button" variant="outline" onClick={resetForm}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
+      )}
+
+      {/* Right panel: Table list */}
+      <div className={canEdit ? "space-y-2 md:col-span-3" : "space-y-2 md:col-span-5"}>
+        <h4 className="text-sm font-semibold">Existing Categories</h4>
+        <div className="max-h-[320px] overflow-y-auto rounded-md border">
+          <Table>
+            <TableHeader className="bg-muted/50 sticky top-0">
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Sort</TableHead>
+                <TableHead>Status</TableHead>
+                {canEdit && <TableHead className="text-right">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={canEdit ? 5 : 4} className="py-4">
+                    <RowsSkeleton rows={3} />
+                  </TableCell>
+                </TableRow>
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={canEdit ? 5 : 4} className="py-6 text-center">
+                    <p className="text-sm">Could not load categories.</p>
+                    <Button variant="link" onClick={() => void refetch()}>
+                      Retry
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ) : categories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={canEdit ? 5 : 4} className="text-muted-foreground py-8 text-center">
+                    No categories found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                categories.map((cat) => (
+                  <TableRow key={cat.id}>
+                    <TableCell className="font-mono text-xs font-bold">{cat.code}</TableCell>
+                    <TableCell className="max-w-[120px] truncate text-xs" title={cat.name}>
+                      {cat.name}
+                    </TableCell>
+                    <TableCell className="text-xs">{cat.sort_order}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={cat.is_active ? "default" : "secondary"}
+                        className={canEdit ? "cursor-pointer select-none" : undefined}
+                        onClick={canEdit ? () => handleToggleActive(cat) : undefined}
+                      >
+                        {cat.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell className="text-right">
+                        <Button
+                          aria-label="Edit"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleEditInit(cat)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (!onOpenChange) {
+    const active = categories.filter((category) => category.is_active).length
+    return (
+      <div className="space-y-4">
+        {!isLoading && !isError && (
+          <StatGrid>
+            <StatCard title="Categories" value={categories.length} icon={Layers} />
+            <StatCard
+              title="Active"
+              value={active}
+              iconColor="text-success"
+              iconBgColor="bg-success/10"
+              icon={Layers}
+            />
+            <StatCard title="Inactive" value={categories.length - active} icon={Layers} />
+          </StatGrid>
+        )}
+        <div className="bg-card rounded-lg border px-4 sm:px-6">{content}</div>
+      </div>
+    )
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader className="border-b pb-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
-              <Layers className="text-primary h-5 w-5" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl">Manage Contract Categories</DialogTitle>
-              <DialogDescription className="mt-1">
-                Configure sub-categories for contract employees (e.g. SIWES, NYSC) to customize their staff ID series.
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="grid gap-6 py-4 md:grid-cols-5">
-          {/* Left panel: Form */}
-          <form onSubmit={handleSave} className="space-y-4 border-r pr-6 md:col-span-2">
-            <h4 className="text-sm font-semibold">{editingId ? "Edit Category" : "Add New Category"}</h4>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="cat_name">Category Name</Label>
-              <Input
-                id="cat_name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. SIWES IT Student"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="cat_code">Prefix Code</Label>
-              <Input
-                id="cat_code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. SIWES"
-                maxLength={10}
-                required
-                disabled={!!editingId}
-              />
-              <p className="text-muted-foreground text-xs">Must be letters/numbers (unique prefix code).</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="cat_sort">Sort Order</Label>
-              <Input
-                id="cat_sort"
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
-                required
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="cat_active"
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="border-primary h-4 w-4 rounded-sm"
-              />
-              <Label htmlFor="cat_active" className="cursor-pointer">
-                Is Active
-              </Label>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" className="flex-1" loading={isSaving}>
-                {editingId ? "Update" : "Create"}
-              </Button>
-              {editingId && (
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </form>
-
-          {/* Right panel: Table list */}
-          <div className="space-y-2 md:col-span-3">
-            <h4 className="text-sm font-semibold">Existing Categories</h4>
-            <div className="max-h-[320px] overflow-y-auto rounded-md border">
-              <Table>
-                <TableHeader className="bg-muted/50 sticky top-0">
-                  <TableRow>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Sort</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-4">
-                        <RowsSkeleton rows={3} />
-                      </TableCell>
-                    </TableRow>
-                  ) : categories.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
-                        No categories found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    categories.map((cat) => (
-                      <TableRow key={cat.id}>
-                        <TableCell className="font-mono text-xs font-bold">{cat.code}</TableCell>
-                        <TableCell className="max-w-[120px] truncate text-xs" title={cat.name}>
-                          {cat.name}
-                        </TableCell>
-                        <TableCell className="text-xs">{cat.sort_order}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={cat.is_active ? "default" : "secondary"}
-                            className="cursor-pointer select-none"
-                            onClick={() => handleToggleActive(cat)}
-                          >
-                            {cat.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            aria-label="Edit"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handleEditInit(cat)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-
+        {header}
+        {content}
         <DialogFooter className="border-t pt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close

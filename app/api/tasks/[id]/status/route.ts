@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { delegationForDepartment, loadApprovalDelegations } from "@/lib/dept/approval-authority"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { checkRequestSize } from "@/lib/api/request-size"
@@ -103,10 +105,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       )
     }
 
-    const { data: task, error: taskError } = await supabase
-      .from("tasks")
-      .select(
-        `
+    const delegationDb = getServiceRoleClientOrFallback(supabase)
+    const reviewGrantCandidates =
+      ["completed", "failed"].includes(parsed.data.status) && !parsed.data.due_date
+        ? await loadApprovalDelegations(delegationDb, user.id, "tasks")
+        : []
+    const taskFields = `
         id,
         title,
         status,
@@ -126,10 +130,21 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         source_type,
         project_id
       `
-      )
-      .eq("id", params.id)
-      .single<TaskRecord>()
+    const normalRead = await supabase.from("tasks").select(taskFields).eq("id", params.id).single<TaskRecord>()
+    const { data: task, error: taskError } =
+      !normalRead.data && reviewGrantCandidates.length
+        ? await delegationDb
+            .from("tasks")
+            .select(taskFields)
+            .eq("id", params.id)
+            .in(
+              "department",
+              reviewGrantCandidates.map((grant) => grant.department)
+            )
+            .single<TaskRecord>()
+        : normalRead
 
+    const taskGrant = delegationForDepartment(reviewGrantCandidates, task?.department)
     if (taskError || !task) {
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
@@ -148,6 +163,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const taskScope = await getRequestScope()
     const isAdmin = isAdminProfile(taskScope)
     const isLead = isLeadForTaskDepartment(profile ?? null, task.department)
+    const delegated =
+      !isAdmin &&
+      !isLead &&
+      !task.project_id &&
+      task.status === "submitted_for_review" &&
+      task.assigned_to !== user.id &&
+      !assignments?.length &&
+      !parsed.data.due_date &&
+      ["completed", "failed"].includes(parsed.data.status)
+        ? taskGrant
+        : undefined
     const isLeadOrAdmin = isAdmin || isLead
 
     // A project task is rated by the manager of the project it belongs to; a
@@ -164,7 +190,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const isProjectManager = Boolean(projectManagerId) && projectManagerId === user.id
 
     // Who may approve, rate, fail or reassign this task.
-    const canReview = isLeadOrAdmin || isProjectManager
+    const canReview = isLeadOrAdmin || isProjectManager || Boolean(delegated)
     const isAssignee = task.assigned_to === user.id || Boolean(assignments && assignments.length > 0)
     const isAssigner = task.assigned_by === user.id
     // A regular employee cannot rate their own work, but department leads and
@@ -319,10 +345,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updatePayload.reviewed_at = now
     }
 
-    const { data: updatedTask, error: updateError } = await supabase
+    const { data: updatedTask, error: updateError } = await (
+      delegated ? getServiceRoleClientOrFallback(supabase) : supabase
+    )
       .from("tasks")
       .update(updatePayload)
       .eq("id", task.id)
+      .eq("status", oldStatus)
       .select("*")
       .single()
 
@@ -504,7 +533,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         entityType: "task",
         entityId: task.id,
         oldValues: { status: oldStatus },
-        newValues: { status: nextStatus, ...updatePayload },
+        newValues: { status: nextStatus, ...updatePayload, ...delegated },
         context: { actorId: user.id, source: "api", route: "/api/tasks/[id]/status" },
       },
       { failOpen: true }
