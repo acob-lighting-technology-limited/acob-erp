@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { SidebarSubmenuToggle } from "@/components/admin/sidebar-submenu-toggle"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
@@ -150,7 +151,17 @@ const adminNavigation: NavItem[] = [
     href: "/admin/hr",
     icon: Users,
     children: [
-      { name: "Employees", href: "/admin/hr/employees" },
+      {
+        name: "Employees",
+        href: "/admin/hr/employees",
+        children: [
+          { name: "Birthday", href: "/admin/hr/employees/birthday" },
+          { name: "Confirmation", href: "/admin/hr/employees/confirmation" },
+          { name: "Employment", href: "/admin/hr/employees/employment" },
+          { name: "Categories", href: "/admin/hr/employees/categories" },
+          { name: "Leads & Delegates", href: "/admin/hr/employees/leads-and-delegates" },
+        ],
+      },
       { name: "Departments", href: "/admin/hr/departments" },
       { name: "Job Descriptions", href: "/admin/hr/job-descriptions" },
       { name: "Attendance", href: "/admin/hr/attendance" },
@@ -504,6 +515,9 @@ export function AdminSidebar({
 
   const canAccessRoute = (href: string) => {
     if (!profile?.role || !accessContext) return false
+    if (href === "/admin/hr/employees/leads-and-delegates" && accessContext.actingContext !== "global_admin") {
+      return false
+    }
     // Legacy role arrays are no longer authoritative under RBAC V2.
     // Use centralized policy evaluation so department leads with base role "employee"
     // still see allowed admin routes.
@@ -748,18 +762,11 @@ export function AdminSidebar({
                                     {child.name}
                                   </Link>
                                 )}
-                                <button
-                                  onClick={() => toggleSubSection(child.href)}
-                                  className="flex items-center px-1.5 py-1.5"
-                                  aria-label={isSubOpen ? "Collapse" : "Expand"}
-                                >
-                                  <ChevronRight
-                                    className={cn(
-                                      "h-3 w-3 shrink-0 transition-transform duration-200",
-                                      isSubOpen && "rotate-90"
-                                    )}
-                                  />
-                                </button>
+                                <SidebarSubmenuToggle
+                                  name={child.name}
+                                  open={isSubOpen}
+                                  onToggle={() => toggleSubSection(child.href)}
+                                />
                               </div>
                             ) : (
                               <Link

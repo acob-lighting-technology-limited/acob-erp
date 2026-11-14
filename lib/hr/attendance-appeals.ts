@@ -639,7 +639,8 @@ export function appealReviewBlock(
   reviewer: AppealReviewer,
   appeal: ReviewableAppeal,
   appellantDepartment: string | null,
-  routing: AppealRoutingContext = EMPTY_APPEAL_ROUTING
+  routing: AppealRoutingContext = EMPTY_APPEAL_ROUTING,
+  delegatedLead = false
 ): string | null {
   if (appeal.created_by === reviewer.userId && appeal.initiated_by_role !== "employee") {
     return "You made this change, so someone else must confirm it."
@@ -647,7 +648,7 @@ export function appealReviewBlock(
 
   const stage = appeal.stage || "pending_lead"
   if (stage === "pending_lead") {
-    return leadsDepartment(reviewer, appellantDepartment)
+    return (delegatedLead && appeal.user_id !== reviewer.userId) || leadsDepartment(reviewer, appellantDepartment)
       ? null
       : `Only the Department Lead for ${appellantDepartment || "this department"} can confirm this.`
   }

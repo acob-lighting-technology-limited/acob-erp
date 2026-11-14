@@ -14,6 +14,7 @@ import {
 } from "@/lib/hr/leave-workflow"
 import { LEAVE_REVIEWS_PATH } from "@/lib/hr/leave-links"
 import { getRouteStageByOrder, stageCodeForRole } from "@/lib/hr/leave-routing"
+import { delegationForDepartment, loadApprovalDelegations } from "@/lib/dept/approval-authority"
 import { MD_PENDING_STAGE } from "@/lib/hr/leave-attendance-filter"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -223,7 +224,23 @@ export async function PATCH(request: NextRequest) {
       return apiError("LEAVE_APPROVER_NOT_CONFIGURED:current_stage", ApiErrorCode.INVALID_STATE, 400)
     }
 
-    if (expectedApproverId !== actorProfileId) {
+    const delegated =
+      expectedApproverId !== actorProfileId &&
+      typedLeaveRequest.user_id !== actorProfileId &&
+      stageCode === stageCodeForRole("department_lead")
+        ? delegationForDepartment(
+            await loadApprovalDelegations(supabaseAdmin, actorProfileId, "hr.leave"),
+            (
+              await supabaseAdmin
+                .from("profiles")
+                .select("department")
+                .eq("id", typedLeaveRequest.user_id)
+                .maybeSingle()
+            ).data?.department
+          )
+        : undefined
+    const onBehalf = delegated?.onBehalfOf === expectedApproverId ? delegated : undefined
+    if (expectedApproverId !== actorProfileId && !onBehalf) {
       return apiError("LEAVE_STAGE_NOT_ASSIGNED_TO_ACTOR", ApiErrorCode.FORBIDDEN, 403)
     }
 
@@ -332,6 +349,9 @@ export async function PATCH(request: NextRequest) {
           entityType: "leave_request",
           entityId: leave_request_id,
           newValues: { status: "rejected", stage: stageCode, reason: comments },
+          metadata: onBehalf
+            ? { department_lead_id: onBehalf.onBehalfOf, delegation_id: onBehalf.delegationId }
+            : undefined,
           context: { actorId: actorProfileId, source: "api", route: "/api/hr/leave/approve" },
         },
         { failOpen: true }
@@ -455,6 +475,9 @@ export async function PATCH(request: NextRequest) {
           entityType: "leave_request",
           entityId: leave_request_id,
           newValues: { status: "approved", final: true, stage: stageCode },
+          metadata: onBehalf
+            ? { department_lead_id: onBehalf.onBehalfOf, delegation_id: onBehalf.delegationId }
+            : undefined,
           context: { actorId: actorProfileId, source: "api", route: "/api/hr/leave/approve" },
         },
         { failOpen: true }
@@ -556,6 +579,9 @@ export async function PATCH(request: NextRequest) {
         entityType: "leave_request",
         entityId: leave_request_id,
         newValues: { stage: stageCode, next_stage: nextStage?.stage_code },
+        metadata: onBehalf
+          ? { department_lead_id: onBehalf.onBehalfOf, delegation_id: onBehalf.delegationId }
+          : undefined,
         context: { actorId: actorProfileId, source: "api", route: "/api/hr/leave/approve" },
       },
       { failOpen: true }
