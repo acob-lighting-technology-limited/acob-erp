@@ -72,7 +72,7 @@ export function bankSheetXml(
       return `<row r="${n}">${[
         textCell(`A${n}`, 2, r.reference),
         textCell(`B${n}`, 2, r.name),
-        numberCell(`C${n}`, 3, r.amount),
+        textCell(`C${n}`, 2, r.amount.toFixed(2)),
         textCell(`D${n}`, 2, bankDate(r.dueDate)),
         textCell(`E${n}`, 2, r.beneficiaryCode),
         textCell(`F${n}`, 2, r.accountNumber),

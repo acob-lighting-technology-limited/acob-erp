@@ -128,6 +128,7 @@ export const RELEASES: Release[] = [
         area: "Requisitions & Signing",
         items: [
           "Requisition amounts are larger and easier to read in the list",
+          "Payment Requests, Petty Cash vouchers and Payment Schedules use ACOB-prefixed references, and bank spreadsheets export amounts as text with two decimal places",
           "Beneficiary account name, account number, bank and amount can each be copied with one click",
           "Large Payment Requests and Petty Cash vouchers can include up to 100 beneficiaries, with the full list supplied in a bank-layout spreadsheet",
           "Former Diamond Bank accounts can be entered under Access Bank, and valid accounts are confirmed by the bank rather than rejected only by a local check-digit test",

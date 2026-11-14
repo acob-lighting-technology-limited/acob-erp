@@ -7,7 +7,7 @@ import { BANK_FILE_HEADERS } from "../bank-file"
 
 const items = [
   {
-    transaction_ref: "PR/HR/26/003/1",
+    transaction_ref: "ACOB/PR/HR/26/003/1",
     account_name: "Adukwu Lawrence & Sons",
     amount: 108800,
     beneficiary_code: "ACOB-V-0001",
@@ -24,9 +24,9 @@ describe("bank workbook", () => {
     const rows = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets["BANK UPLOAD SCHEDULE"], { header: 1, raw: true })
     assert.equal(rows.length, 2)
     assert.equal(rows[0][0], BANK_FILE_HEADERS[0])
-    assert.equal(rows[1][0], "PR/HR/26/003/1")
+    assert.equal(rows[1][0], "ACOB/PR/HR/26/003/1")
     assert.equal(rows[1][1], "ADUKWU LAWRENCE & SONS")
-    assert.equal(rows[1][2], 108800)
+    assert.equal(rows[1][2], "108800.00")
     assert.equal(rows[1][3], "10/11/2026")
     assert.equal(rows[1][5], "0021191633") // leading zero kept
     assert.equal(rows[1][6], 44)
